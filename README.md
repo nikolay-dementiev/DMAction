@@ -59,7 +59,7 @@ To integrate DMAction into your Xcode project using Swift Package Manager, add i
 
 ```Swift
 dependencies: [
-    .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "1.0.0")
+    .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "v1.0.1")
 ]
 ```
 ## Usage
