@@ -1,5 +1,4 @@
-![DMAction: Elegant managing actions with retry/fallback](https://github.com/nikolay-dementiev/DMAction/raw/main/Resources/DMAction-SDK-logo.png)
-
+<img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/DMAction-SDK-logo.png" alt="DMAction-SDK-logo" style="max-height: 150px;">
 [![Swift](https://img.shields.io/badge/Swift-5*-orange?style=flat-square)](https://img.shields.io/badge/Swift-5*-blue?style=flat-square)
 [![Swift-tools-version](https://img.shields.io/badge/Swift--tools-6.0-darkorange?style=flat-square)](https://img.shields.io/badge/Swift--tools-6.0-darkorange?style=flat-square)
 
