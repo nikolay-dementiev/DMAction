@@ -15,6 +15,8 @@ public extension DMActionResultValueProtocol {
 }
 
 public extension Result where Success: Copyable, Failure == Error {
+    ///Get rid from wrapper
+    ///return original result value that was passed via ActionType' completion closure
     func unwrapValue() -> DMAction.ResultType {
         self.map(unwrapNestedResult)
     }
