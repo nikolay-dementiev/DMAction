@@ -1,0 +1,15 @@
+{
+  "originHash" : "edf5bde55168a6cdd613d364c32609a667fa27860fe829fdcf6c6b197fcc8e5c",
+  "pins" : [
+    {
+      "identity" : "swiftlintplugin",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/GayleDunham/SwiftLintPlugin.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "0bb7767a7c64701b62cb6fcb4d846bd01869662b"
+      }
+    }
+  ],
+  "version" : 3
+}
