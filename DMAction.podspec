@@ -12,9 +12,9 @@ Pod::Spec.new do |s|
     can be encapsulated within a DMActionWithFallback object.
                        DESC
 
-  s.homepage         = 'https://github.com/nikolay-dementiev/DMErrorHandling'
+  s.homepage         = 'https://github.com/nikolay-dementiev/DMAction'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
-  s.author           = { 'Nikolay Dementiev' => 'nikolas.dementiev@gmail.com' }
+  s.author           = { 'Mykola Dementiev' => 'nikolas.dementiev@gmail.com' }
   s.ios.deployment_target = "17.0"
   s.watchos.deployment_target = "7.0"
   
@@ -23,6 +23,7 @@ Pod::Spec.new do |s|
   s.exclude_files = 'Examples/**'
   s.weak_framework = "XCTest"
   s.requires_arc = true
+  s.frameworks = 'Foundation'
   
   s.cocoapods_version = '>= 1.4.0'
   if s.respond_to?(:swift_versions) then
