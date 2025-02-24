@@ -1,0 +1,49 @@
+@startuml
+
+' Define Protocols
+interface DMAction {
+    + currentAttempt: UInt
+    + id: UUID
+    + action: ActionType
+    + simpleAction: () -> Void
+}
+
+interface DMActionResultValueProtocol <<Copyable>> {
+    + attemptCount: UInt?
+}
+
+' Define Structs
+class DMActionResultValue {
+    + attemptCount: UInt?
+    + value: Copyable
+}
+
+class PlaceholderCopyable <<Copyable>> {}
+
+class DMActionWithFallback {
+    + currentAttempt: UInt
+    + id: UUID
+    + action: ActionType
+}
+
+class DMButtonAction {
+    + currentAttempt: UInt
+    + id: UUID
+    + action: ActionType
+}
+
+' Relationships
+DMActionResultValue ..|> DMActionResultValueProtocol : implements
+DMActionWithFallback ..|> DMAction : implements
+DMButtonAction ..|> DMAction : implements
+DMActionResultValue --> Copyable : wraps
+DMButtonAction --> PlaceholderCopyable : uses
+
+' Extensions
+note right of DMAction
+    + fallbackTo(...)
+    + retry(...)
+    + callAsFunction(...)
+end note
+
+@enduml

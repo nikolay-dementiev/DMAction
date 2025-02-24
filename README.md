@@ -8,6 +8,17 @@
 [![CocoaPods Compatible](https://img.shields.io/cocoapods/v/DMAction.svg?style=flat-square)](https://img.shields.io/cocoapods/v/DMAction.svg)
 [![Swift Package Manager](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)
 
+- [DMAction Swift SDK](#dm-action-swift-sdk)
+  - [Features](#features)
+  - [UML Schema](#uml-schema)
+  - [Installation](#installation)
+    - [CocoaPods](#cocoaPods-installation)
+    - [Swift Package Manager](#swift-package-manager-installation)
+  - [Usage](#usage)
+    - [Basic](#basic-usage)
+    - [Full usage example](#full-usage-example)
+  - [License](#license)
+
 # DMAction Swift SDK
 
 DMAction is a Swift SDK that provides a framework for defining and handling actions with retry and fallback mechanisms. It offers a flexible way to manage asynchronous actions and handle errors gracefully.
@@ -18,6 +29,12 @@ DMAction is a Swift SDK that provides a framework for defining and handling acti
 - Handle asynchronous actions with completion handlers
 - Protocol-based design for easy integration
 - Simple and intuitive API
+
+## UML Schema
+
+<p align="center">
+  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Uml-schema.svg?raw=true" alt="Uml-schema" height="400">
+</p>
 
 ## Installation
 
@@ -46,7 +63,21 @@ dependencies: [
 ```
 ## Usage
 
-### Full flow structure
+### DMAction 101 (of course simple action closure works as expected). 
+###   But the main power was explained in the section below [`A More Advanced Example`](#a-more-advanced-example):
+
+```Swift
+let buttonAction = DMButtonAction {
+    print("Button action performed")
+}
+
+buttonAction { _ in
+    ...
+}
+```
+
+### A More Advanced Example
+
 - An example with two different actions (primaryButtonAction and fallbackButtonAction) combined 
 into a single execution chain using `.retry(1)`:
     - `1` represents the maximum number of retry attempts for `primaryButtonAction`. It will be executed until either it succeeds or the retry limit is reached.
@@ -71,9 +102,9 @@ let actionWithFallback = primaryButtonAction
     
 actionWithFallback { output in
     // `unwrapValue()`: get rid of the wrapper - return the original result value that was passed via DMButtonAction' completion closure
-    result = output.unwrapValue()
+    print("the result value: \(output.unwrapValue())")
     // `attemptCount`: contains UInt number of action's attemps
-    attemptExecuted = output.attemptCount
+    print("attemptCount: \(output.attemptCount)")
 }
 
 if case .success(let copyable) = result {

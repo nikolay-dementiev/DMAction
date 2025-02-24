@@ -1,0 +1,44 @@
++-----------------------------+
+|        <<Protocol>>         |
+|        DMAction             |
++-----------------------------+
+| + currentAttempt: UInt      |
+| + id: UUID                  |
+| + action: ActionType        |
+| + simpleAction: () -> Void  |
++-----------------------------+
+| + fallbackTo(...)           |
+| + retry(...)                |
+| + callAsFunction(...)       |
++-----------------------------+
+          ^         ^
+          |         |
++-----------------+  +-----------------------------+
+| DMActionWith...|  |        DMButtonAction        |
++-----------------+  +-----------------------------+
+| + currentAttempt|  | + currentAttempt: UInt      |
+| + id: UUID      |  | + id: UUID                  |
+| + action: Act...|  | + action: ActionType        |
++-----------------+  +-----------------------------+
+                           |
+                           v
+                 +-----------------------+
+                 |    PlaceholderCopyable|
+                 +-----------------------+
+                 | <<conforms>> Copyable |
+                 +-----------------------+
+
++-----------------------------+
+| <<Protocol>>                |
+| DMActionResultValueProtocol  |
++-----------------------------+
+| + attemptCount: UInt?       |
++-----------------------------+
+          ^
+          |
++-----------------------------+
+|    DMActionResultValue      |
++-----------------------------+
+| + attemptCount: UInt?       |
+| + value: Copyable           |
++-----------------------------+
