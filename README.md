@@ -1,3 +1,12 @@
+![DMAction: Elegant managing actions with retry/fallback](https://raw.githubusercontent.com/nikolay-dementiev/DMAction/master/Resources/DMAction-SDK-logo.png)
+
+[![Swift](https://img.shields.io/badge/Swift-5*-orange?style=flat-square)](https://img.shields.io/badge/Swift-5*-blue?style=flat-square)
+[![Swift-tools-version](https://img.shields.io/badge/Swift--tools-6.0-darkorange?style=flat-square)](https://img.shields.io/badge/Swift--tools-6.0-darkorange?style=flat-square)
+
+[![Platforms](https://img.shields.io/badge/Platforms-iOS-yellowgreen?style=flat-square)](https://img.shields.io/badge/Platforms-iOS-yellowgreen?style=flat-square)
+[![CocoaPods Compatible](https://img.shields.io/cocoapods/v/DMAction.svg?style=flat-square)](https://img.shields.io/cocoapods/v/DMAction.svg)
+[![Swift Package Manager](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)
+
 # DMAction Swift SDK
 
 DMAction is a Swift SDK that provides a framework for defining and handling actions with retry and fallback mechanisms. It offers a flexible way to manage asynchronous actions and handle errors gracefully.
@@ -36,15 +45,11 @@ dependencies: [
 ```
 ## Usage
 
-### 
-/*
-An example with two different actions (primaryButtonAction and fallbackButtonAction) combined 
-into a single execution chain using .retry(1):
-    - `1` represents the maximum number of retry attempts for primaryButtonAction. It will be executed 
-        until either it succeeds or the retry limit is reached.
-    - If primaryButtonAction fails after the maximum attempts, fallbackButtonAction is triggered 
-        via fallbackTo(...).
-*/
+### Full flow structure
+- An example with two different actions (primaryButtonAction and fallbackButtonAction) combined 
+into a single execution chain using `.retry(1)`:
+    - `1` represents the maximum number of retry attempts for `primaryButtonAction`. It will be executed until either it succeeds or the retry limit is reached.
+    - If `primaryButtonAction` fails after the maximum attempts,`fallbackButtonAction` will be triggered via `fallbackTo(...)`.
 ```Swift
 
 
