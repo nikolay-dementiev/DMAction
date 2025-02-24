@@ -7,6 +7,7 @@
 [![Platforms](https://img.shields.io/badge/Platforms-iOS-yellowgreen?style=flat-square)](https://img.shields.io/badge/Platforms-iOS-yellowgreen?style=flat-square)
 [![CocoaPods Compatible](https://img.shields.io/cocoapods/v/DMAction.svg?style=flat-square)](https://img.shields.io/cocoapods/v/DMAction.svg)
 [![Swift Package Manager](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)
+![Unit Tests coverage](https://img.shields.io/badge/Test_Coverage-99.4%25-darkgreen?style=flat-square)
 
 - [DMAction Swift SDK](#dm-action-swift-sdk)
   - [Features](#features)
@@ -33,7 +34,7 @@ DMAction is a Swift SDK that provides a framework for defining and handling acti
 ## UML Schema
 
 <p align="center">
-  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Uml-schema.svg?raw=true" alt="Uml-schema" height="400">
+  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Uml-schema.svg?raw=true" alt="Uml-schema" height="300">
 </p>
 
 ## Installation
@@ -107,7 +108,7 @@ actionWithFallback { output in
     print("attemptCount: \(output.attemptCount)")
 }
 
-if case .success(let copyable) = result {
+if case .success(let copyableValue) = result {
     ...
 } else {
     ...
