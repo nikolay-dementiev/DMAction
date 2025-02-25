@@ -17,6 +17,8 @@
     - [Swift Package Manager](#swift-package-manager-installation)
   - [Usage](#usage)
     - [Basic](#basic-usage)
+    - [Using within UIKit](#using-within-ui_kit)
+    - [Using within SWiftUI](#using-within-swift_ui)
     - [Full usage example](#full-usage-example)
   - [License](#license)
 
@@ -64,8 +66,8 @@ dependencies: [
 ```
 ## Usage
 
-### DMAction 101 (of course simple action closure works as expected). 
-###   But the main power was explained in the section below [`A More Advanced Example`](#a-more-advanced-example):
+### Basic (of course simple action closure works as expected). 
+####   But the main power was explained in the section below [`A More Advanced Example`](#a-more-advanced-example):
 
 ```Swift
 let buttonAction = DMButtonAction {
@@ -76,6 +78,82 @@ buttonAction { _ in
     ...
 }
 ```
+
+### Using within UIKit
+```Swift
+
+let buttonTest = UIButton(type: .system)
+
+// If the result is completely uninteresting (muted)
+buttonTest.addTarget(self,// `self` here is some UIKit object where the action's function exists
+                     action: #selector(buttonTestActionWithMutedResult),
+                     for: .touchUpInside)
+// OR:
+                     
+// if you need to process the result
+buttonTest.addTarget(self,// `self` here is some UIKit object where the action's function exists
+                     action: #selector(buttonTestActionWithHandledResult),
+                     for: .touchUpInside)
+                     
+@objc
+func buttonTestActionWithMutedResult() {
+    let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
+    let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
+    
+    primaryButtonAction
+        .retry(2)
+        .fallbackTo(fallbackButtonAction)
+        .simpleAction()
+}
+
+@objc
+func buttonTestActionWithHandledResult() {
+    let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
+    let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
+    
+    primaryButtonAction
+        .retry(2)
+        .fallbackTo(fallbackButtonAction)() { result in
+            // do something with result
+        }
+}
+```
+
+### Using within SWiftUI
+```Swift
+...
+var body: some View {
+    // If the result is completely uninteresting (muted)
+    Button("Test button with muted result", action: buttonTestActionWithMutedResult)
+    // if you need to process the result
+    Button("Test button with handled result", action: buttonTestActionWithHandledResult)
+}
+...
+
+@objc
+func buttonTestActionWithMutedResult() {
+    let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
+    let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
+    
+    primaryButtonAction
+        .retry(2)
+        .fallbackTo(fallbackButtonAction)
+        .simpleAction()
+}
+
+@objc
+func buttonTestActionWithHandledResult() {
+    let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
+    let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
+    
+    primaryButtonAction
+        .retry(2)
+        .fallbackTo(fallbackButtonAction)() { result in
+            // do something with result
+        }
+}
+```
+
 
 ### A More Advanced Example
 
@@ -101,14 +179,18 @@ let actionWithFallback = primaryButtonAction
     .retry(1) //The number of retry action before fallback
     .fallbackTo(fallbackButtonAction)
     
-actionWithFallback { output in
-    // `unwrapValue()`: get rid of the wrapper - return the original result value that was passed via DMButtonAction' completion closure
-    print("the result value: \(output.unwrapValue())")
+var resultOfAction: DMAction.ResultType?
+actionWithFallback { result in
+    // `unwrapValue()`: get rid of the wrapper - return the original result value that 
+    // was passed via DMButtonAction' completion closure
+    print("the result value: \(result.unwrapValue())")
     // `attemptCount`: contains UInt number of action's attemps
-    print("attemptCount: \(output.attemptCount)")
+    print("attemptCount: \(result.attemptCount)")
+    
+    resultOfAction = result
 }
 
-if case .success(let copyableValue) = result {
+if case .success(let copyableValue) = resultOfAction {
     ...
 } else {
     ...
