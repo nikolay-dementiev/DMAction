@@ -213,7 +213,6 @@ if case .success(let copyableValue) = resultOfAction {
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.
 
----
 
-##Additional Resources
-- [Articles](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources#Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature)
+## Additional Resources
+- [Articles](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md)
