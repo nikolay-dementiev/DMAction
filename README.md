@@ -34,9 +34,22 @@ DMAction is a Swift SDK that provides a framework for defining and handling acti
 - Simple and intuitive API
 
 ## UML Schema
+### Protocol Overview
 
 <p align="center">
   <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Uml-schema.svg?raw=true" alt="Uml-schema" height="300">
+</p>
+
+### Retry Mechanism
+
+<p align="center">
+  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Retry-Mechanism.svg?raw=true" alt="Uml-schema" height="300">
+</p>
+
+### Fallback Behavior
+
+<p align="center">
+  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Fallback-Behavior.svg?raw=true" alt="Uml-schema" height="300">
 </p>
 
 ## Installation
@@ -199,3 +212,8 @@ if case .success(let copyableValue) = resultOfAction {
 
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+##Additional Resources
+- [Articles](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources#Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature)
