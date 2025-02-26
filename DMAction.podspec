@@ -18,7 +18,7 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = "17.0"
   s.watchos.deployment_target = "7.0"
   
-  s.source           = { :git => 'https://github.com/nikolay-dementiev/DMAction.git', :tag => "v#{s.version}" }
+  s.source           = { :git => 'https://github.com/nikolay-dementiev/DMAction.git', :tag => s.version.to_s }
   s.source_files = 'Sources/**/*.{swift,h,m,c}'
   s.exclude_files = 'Examples/**'
   s.weak_framework = "XCTest"
