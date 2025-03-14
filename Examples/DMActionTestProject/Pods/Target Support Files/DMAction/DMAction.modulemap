@@ -1,0 +1,6 @@
+framework module DMAction {
+  umbrella header "DMAction-umbrella.h"
+
+  export *
+  module * { export * }
+}

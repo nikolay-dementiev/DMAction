@@ -1,0 +1,16 @@
+PODS:
+  - DMAction (1.0.4)
+
+DEPENDENCIES:
+  - DMAction (from `../../`)
+
+EXTERNAL SOURCES:
+  DMAction:
+    :path: "../../"
+
+SPEC CHECKSUMS:
+  DMAction: d0d482fca64619a0868f2390d832027647fd475d
+
+PODFILE CHECKSUM: 7b6dc1d851493da85fa6af41af8fb57249e90db8
+
+COCOAPODS: 1.16.2
