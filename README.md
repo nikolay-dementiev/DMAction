@@ -130,6 +130,23 @@ func buttonTestActionWithHandledResult() {
             // do something with result
         }
 }
+
+func makeActionWithFailureResult(completion: @escaping (DMButtonAction.ResultType) -> Void) {
+    
+    // ... do something
+    
+    completion(.failure(NSError(domain: "TestDomain",
+                                code: 404,
+                                userInfo: nil)))
+}
+
+func makeActionWithSuccessResult(completion: @escaping (DMButtonAction.ResultType) -> Void) {
+    
+    // ... do something
+    
+    let yourResultVaue: Copyable = "\(#function) succeded!"
+    completion(.success(yourResultVaue))
+}
 ```
 
 ### Using within SWiftUI
@@ -143,7 +160,6 @@ var body: some View {
 }
 ...
 
-@objc
 func buttonTestActionWithMutedResult() {
     let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
     let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
@@ -154,7 +170,6 @@ func buttonTestActionWithMutedResult() {
         .simpleAction()
 }
 
-@objc
 func buttonTestActionWithHandledResult() {
     let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
     let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
@@ -164,6 +179,23 @@ func buttonTestActionWithHandledResult() {
         .fallbackTo(fallbackButtonAction)() { result in
             // do something with result
         }
+}
+
+func makeActionWithFailureResult(completion: @escaping (DMButtonAction.ResultType) -> Void) {
+    
+    // ... do something
+    
+    completion(.failure(NSError(domain: "TestDomain",
+                                code: 404,
+                                userInfo: nil)))
+}
+
+func makeActionWithSuccessResult(completion: @escaping (DMButtonAction.ResultType) -> Void) {
+    
+    // ... do something
+    
+    let yourResultVaue: Copyable = "\(#function) succeded!"
+    completion(.success(yourResultVaue))
 }
 ```
 

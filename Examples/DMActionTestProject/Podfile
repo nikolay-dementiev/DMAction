@@ -1,0 +1,28 @@
+platform :ios, '17.0'
+
+helper_file = File.expand_path('podInstall_helper.rb', __dir__)
+if File.exist?(helper_file)
+  require_relative 'podInstall_helper'
+else
+  puts "Error: Helper file 'podInstall_helper.rb' not found!"
+  exit 1
+end
+
+# Print the DEPENDENCY_MANAGER being used
+current_dependency_manager = dependency_manager
+puts "#{LOG_INFO}: >>> Using #{DEPENDENCY_MANAGER_KEY}: `#{current_dependency_manager}` <<<"
+
+# Run cleanup before installing pods
+clean_xcode_project(PROJECT_NAME)
+
+# Main target configuration
+target PROJECT_NAME do
+  # Conditionally include the DMErrorHandling pod
+  if is_pod_configuration(current_dependency_manager)
+    use_frameworks!
+    pod 'DMAction', path: '../../'
+  end
+end
+
+# Save the dependency manager to a file (optional, if you want to persist it)
+save_dependency_manager(current_dependency_manager)
