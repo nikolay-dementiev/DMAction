@@ -33,7 +33,7 @@ public extension Result where Success: Copyable, Failure == Error {
     }
     
     /// The attempt count of the result.
-    internal var attemptCount: UInt? {
+    var attemptCount: UInt? {
         (try? self.get() as? DMActionResultValue)?.attemptCount
     }
     

@@ -1,7 +1,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'DMAction'
-  s.version          = '1.0.3'
+  s.version          = '1.0.4'
   s.summary          = 'Action with fallback possibility'
   s.description      = <<-DESC
     This package allows executing any action block with a retry mechanism (up to N attempts)
