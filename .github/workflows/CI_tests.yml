@@ -21,7 +21,8 @@ jobs:
             echo "swift_installed=true" >> $GITHUB_ENV
           else
             echo "swift_installed=false" >> $GITHUB_ENV
-          
+          fi
+
       - name: Install Swift Toolchain
         if: env.swift_installed == 'false'
         run: |
