@@ -1,6 +1,3 @@
-# This workflow will build a Swift project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-swift
-
 name: CI_tests
 
 on:
@@ -11,11 +8,10 @@ on:
 
 jobs:
   build:
-
     runs-on: macos-latest
 
     steps:
-     # Step 1: Install the correct Swift toolchain
+      # Step 1: Install the correct Swift toolchain
     - name: Install Swift Toolchain
       run: |
         # Download and install the latest Swift toolchain
@@ -33,10 +29,10 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    # Step 4: Build the project
+    # Step 4: Build the project with additional logging
     - name: Build
       run: swift build -v
 
-    # Step 5: Test the project
+    # Step 5: Test the project with additional logging
     - name: Run tests
-      run: swift test -v
+      run: swift test -v --enable-test-discovery
