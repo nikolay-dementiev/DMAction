@@ -15,8 +15,28 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v4
+     # Step 1: Install the correct Swift toolchain
+    - name: Install Swift Toolchain
+      run: |
+        # Download and install the latest Swift toolchain
+        curl -O https://download.swift.org/swift-6.0-release/xcode/swift-6.0-RELEASE/swift-6.0-RELEASE-osx.pkg
+        sudo installer -pkg swift-6.0-RELEASE-osx.pkg -target /
+
+        # Add Swift to PATH
+        echo "/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin" >> $GITHUB_PATH
+
+    # Step 2: Verify the Swift tools version
+    - name: Check Swift Tools Version
+      run: swift --version
+
+    # Step 3: Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Step 4: Build the project
     - name: Build
       run: swift build -v
+
+    # Step 5: Test the project
     - name: Run tests
       run: swift test -v
