@@ -37,4 +37,5 @@ jobs:
           echo 'plugin: [name: "SwiftLintBuildTool", package: "swiftlintplugin"]' >> .swiftlint.yml
 
       - name: Build and Run tests for iOS
-        run: xcodebuild clean build test -scheme DMAction -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5'
+        run: |
+          xcodebuild clean build test -scheme DMAction -sdk iphonesimulator -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5'
