@@ -8,6 +8,7 @@
 [![CocoaPods Compatible](https://img.shields.io/cocoapods/v/DMAction.svg?style=flat-square)](https://img.shields.io/cocoapods/v/DMAction.svg)
 [![Swift Package Manager](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)
 ![Unit Tests coverage](https://img.shields.io/badge/Test_Coverage-99.4%25-darkgreen?style=flat-square)
+[![CI_tests](https://github.com/nikolay-dementiev/DMAction/actions/workflows/CI_tests.yml/badge.svg)](https://github.com/nikolay-dementiev/DMAction/actions/workflows/CI_tests.yml)
 
 - [DMAction Swift SDK](#dm-action-swift-sdk)
   - [Features](#features)

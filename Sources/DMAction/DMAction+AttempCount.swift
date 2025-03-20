@@ -42,14 +42,7 @@ public extension Result where Success: Copyable, Failure == Error {
     /// - Parameter value: The value to unwrap.
     /// - Returns: The original result value without any wrapper.
     private func unwrapNestedResult(_ value: Copyable) -> Copyable {
-        var unwrappedValue: Copyable = value
-        
-        // Recursively unwrap nested DMActionResultValue
-        while let nestedValue = (unwrappedValue as? DMActionResultValue)?.value {
-            unwrappedValue = nestedValue
-        }
-        
-        return unwrappedValue
+        DMActionHelper.unwrapNestedResult(value)
     }
 }
 
@@ -87,6 +80,12 @@ internal extension DMAction {
     /// let value: Copyable = // Your Copyable instance
     /// let unwrappedValue = type(of: value).unwrapNestedResult(value)
     /// ```
+    static func unwrapNestedResult(_ value: Copyable) -> Copyable {
+        DMActionHelper.unwrapNestedResult(value)
+    }
+}
+
+private struct DMActionHelper {
     static func unwrapNestedResult(_ value: Copyable) -> Copyable {
         var unwrappedValue: Copyable = value
         

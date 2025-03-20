@@ -2,6 +2,9 @@
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
+import Foundation
+
+let isCI = ProcessInfo.processInfo.environment["CI_ENV"] == "true"
 
 let package = Package(
     name: "DMAction",
@@ -21,12 +24,13 @@ let package = Package(
         .target(
             name: "DMAction",
             path: "Sources",
-            plugins: [ .plugin(name: "SwiftLintBuildTool", package: "SwiftLintPlugin") ]),
+            plugins: isCI ? [] : [.plugin(name: "SwiftLintBuildTool", package: "SwiftLintPlugin")]
+        ),
         .testTarget(
             name: "DMActionTests",
             dependencies: ["DMAction"],
             path: "Tests",
-            plugins: [ .plugin(name: "SwiftLintBuildTool", package: "SwiftLintPlugin") ]
+            plugins: isCI ? [] : [.plugin(name: "SwiftLintBuildTool", package: "SwiftLintPlugin")]
         ),
     ]
 )
