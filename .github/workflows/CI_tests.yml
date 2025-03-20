@@ -11,28 +11,20 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # Step 1: Install the correct Swift toolchain
-    - name: Install Swift Toolchain
-      run: |
-        # Download and install the latest Swift toolchain
-        curl -O https://download.swift.org/swift-6.0-release/xcode/swift-6.0-RELEASE/swift-6.0-RELEASE-osx.pkg
-        sudo installer -pkg swift-6.0-RELEASE-osx.pkg -target /
+      - name: Install Swift Toolchain
+        run: |
+          curl -O https://download.swift.org/swift-6.0-release/xcode/swift-6.0-RELEASE/swift-6.0-RELEASE-osx.pkg
+          sudo installer -pkg swift-6.0-RELEASE-osx.pkg -target /
+          echo "/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin" >> $GITHUB_PATH
 
-        # Add Swift to PATH
-        echo "/Library/Developer/Toolchains/swift-latest.xctoolchain/usr/bin" >> $GITHUB_PATH
+      - name: Check Swift Tools Version
+        run: swift --version
 
-    # Step 2: Verify the Swift tools version
-    - name: Check Swift Tools Version
-      run: swift --version
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    # Step 3: Checkout the repository
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Build
+        run: swift build -v -Xswiftc -enable-assertions -Xswiftc -debug-info-level=2
 
-    # Step 4: Build the project with additional logging
-    - name: Build
-      run: swift build -v
-
-    # Step 5: Test the project with additional logging
-    - name: Run tests
-      run: swift test -v --enable-test-discovery
+      - name: Run tests
+        run: swift test -v --enable-test-discovery
