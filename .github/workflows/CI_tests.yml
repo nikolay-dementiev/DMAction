@@ -11,8 +11,8 @@ jobs:
     runs-on: macos-latest
 
     steps:
-       - name: Set CI Environment Variable
-      run: echo "CI_ENV=true" >> $GITHUB_ENV
+      - name: Set CI Environment Variable
+        run: echo "CI_ENV=true" >> $GITHUB_ENV
 
       - name: Install Swift Toolchain
         run: |
@@ -28,15 +28,9 @@ jobs:
 
       - name: Select Xcode
         run: sudo xcode-select -switch /Applications/Xcode_16.2.app
-         
+
       - name: Xcode version
         run: /usr/bin/xcodebuild -version
-
-      # - name: Install SwiftLint
-      #   run: brew install swiftlint
-      # - name: Enable SwiftLintBuildTool plugin
-      #   run: |
-      #     echo 'plugin: [name: "SwiftLintBuildTool", package: "swiftlintplugin"]' >> .swiftlint.yml
 
       - name: Build and Run tests for iOS
         run: |
