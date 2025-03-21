@@ -1,0 +1,26 @@
+{
+  "configurations" : [
+    {
+      "id" : "B23F8D88-187E-46F9-81BC-E2DC4FA9079F",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "testExecutionOrdering" : "random",
+    "threadSanitizerEnabled" : true
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "DMActionTests",
+        "name" : "DMActionTests"
+      }
+    }
+  ],
+  "version" : 1
+}
