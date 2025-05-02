@@ -246,6 +246,8 @@ if case .success(let copyableValue) = resultOfAction {
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction?ref=badge_large)
+
 
 ## Additional Resources
 - [Articles](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md)
