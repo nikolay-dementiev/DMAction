@@ -19,7 +19,7 @@
   - [Usage](#usage)
     - [Basic](#basic-usage)
     - [Using within UIKit](#using-within-ui_kit)
-    - [Using within SWiftUI](#using-within-swift_ui)
+    - [Using within SwiftUI](#using-within-swift_ui)
     - [Full usage example](#full-usage-example)
   - [License](#license)
 
@@ -150,7 +150,7 @@ func makeActionWithSuccessResult(completion: @escaping (DMButtonAction.ResultTyp
 }
 ```
 
-### Using within SWiftUI
+### Using within SwiftUI
 ```Swift
 ...
 var body: some View {
