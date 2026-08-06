@@ -1,56 +1,58 @@
+# DMAction
+
 <p align="center">
-  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/DMAction-SDK-logo.png?raw=true" alt="DMAction-SDK-logo" height="200">
+  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/DMAction-SDK-logo.png?raw=true" alt="DMAction SDK logo" height="200">
 </p>
 
-[![Swift](https://img.shields.io/badge/Swift-5\*-orange?style=flat-square)](https://img.shields.io/badge/Swift-5\*-blue?style=flat-square) [![Swift-tools-version](https://img.shields.io/badge/Swift--tools-6.0-darkorange?style=flat-square)](https://img.shields.io/badge/Swift--tools-6.0-darkorange?style=flat-square)
+[![Swift](https://img.shields.io/badge/Swift-5%2B-orange?style=flat-square)](https://swift.org) [![Swift tools version](https://img.shields.io/badge/Swift_tools-6.0-darkorange?style=flat-square)](https://swift.org/package-manager/)
 
-[![Platforms](https://img.shields.io/badge/Platforms-iOS-yellowgreen?style=flat-square)](https://img.shields.io/badge/Platforms-iOS-yellowgreen?style=flat-square)
-[![CocoaPods Compatible](https://img.shields.io/cocoapods/v/DMAction.svg?style=flat-square)](https://img.shields.io/cocoapods/v/DMAction.svg)
-[![Swift Package Manager](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)
-![Unit Tests coverage](https://img.shields.io/badge/Test_Coverage-99.4%25-darkgreen?style=flat-square)
-[![CI_tests](https://github.com/nikolay-dementiev/DMAction/actions/workflows/CI_tests.yml/badge.svg)](https://github.com/nikolay-dementiev/DMAction/actions/workflows/CI_tests.yml)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_7%2B-yellowgreen?style=flat-square)](#installation)
+[![CocoaPods Compatible](https://img.shields.io/cocoapods/v/DMAction.svg?style=flat-square)](https://cocoapods.org/pods/DMAction)
+[![Swift Package Manager](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)](#swift-package-manager)
+[![CI](https://github.com/nikolay-dementiev/DMAction/actions/workflows/CI_tests.yml/badge.svg)](https://github.com/nikolay-dementiev/DMAction/actions/workflows/CI_tests.yml)
 
-- [DMAction Swift SDK](#dm-action-swift-sdk)
-  - [Features](#features)
-  - [UML Schema](#uml-schema)
-  - [Installation](#installation)
-    - [CocoaPods](#cocoaPods-installation)
-    - [Swift Package Manager](#swift-package-manager-installation)
-  - [Usage](#usage)
-    - [Basic](#basic-usage)
-    - [Using within UIKit](#using-within-ui_kit)
-    - [Using within SwiftUI](#using-within-swift_ui)
-    - [Full usage example](#full-usage-example)
-  - [License](#license)
+- [Overview](#overview)
+- [Features](#features)
+- [UML diagrams](#uml-diagrams)
+- [Installation](#installation)
+  - [CocoaPods](#cocoapods)
+  - [Swift Package Manager](#swift-package-manager)
+- [Usage](#usage)
+  - [Basic usage](#basic-usage)
+  - [Using with UIKit](#using-with-uikit)
+  - [Using with SwiftUI](#using-with-swiftui)
+  - [Retry and fallback example](#retry-and-fallback-example)
+- [License](#license)
+- [Additional resources](#additional-resources)
 
-# DMAction Swift SDK
+## Overview
 
-DMAction is a Swift SDK that provides a framework for defining and handling actions with retry and fallback mechanisms. It offers a flexible way to manage asynchronous actions and handle errors gracefully.
+DMAction is a Swift library for composing completion-based actions with retry and fallback behavior. It centralizes execution and result handling behind a protocol-oriented API shared by UIKit and SwiftUI clients.
 
 ## Features
 
-- Define actions with retry and fallback mechanisms
-- Handle asynchronous actions with completion handlers
-- Protocol-based design for easy integration
-- Simple and intuitive API
+- Compose actions with configurable retry and fallback behavior
+- Receive asynchronous results through completion handlers
+- Ignore results through `simpleAction` or handle them through `Result`
+- Use the same small API from UIKit and SwiftUI
 
-## UML Schema
-### Protocol Overview
+## UML diagrams
+### Protocol overview
 
 <p align="center">
-  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Uml-schema.svg?raw=true" alt="Uml-schema" height="300">
+  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Uml-schema.svg?raw=true" alt="DMAction protocol overview diagram" height="300">
 </p>
 
-### Retry Mechanism
+### Retry mechanism
 
 <p align="center">
-  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Retry-Mechanism.svg?raw=true" alt="Uml-schema" height="300">
+  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Retry-Mechanism.svg?raw=true" alt="DMAction retry mechanism diagram" height="300">
 </p>
 
-### Fallback Behavior
+### Fallback behavior
 
 <p align="center">
-  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Fallback-Behavior.svg?raw=true" alt="Uml-schema" height="300">
+  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Fallback-Behavior.svg?raw=true" alt="DMAction fallback behavior diagram" height="300">
 </p>
 
 ## Installation
@@ -71,183 +73,197 @@ pod install
 
 ### Swift Package Manager
 
-To integrate DMAction into your Xcode project using Swift Package Manager, add it to the dependencies array in your Package.swift file:
+To add `DMAction` through Swift Package Manager, include it in the `dependencies` array of your `Package.swift` file:
 
-```Swift
+```swift
 dependencies: [
-    .package(url: "https://github.com/nikolay-dementiev/DMAction.git", branch: "main")
+    .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "1.0.5")
 ]
 ```
+
 ## Usage
 
-### Basic (of course simple action closure works as expected). 
-####   But the main power was explained in the section below [`A More Advanced Example`](#a-more-advanced-example):
+### Basic usage
 
-```Swift
+For retry and fallback composition, see the [retry and fallback example](#retry-and-fallback-example).
+
+```swift
+import DMAction
+
 let buttonAction = DMButtonAction {
     print("Button action performed")
 }
 
-buttonAction { _ in
-    ...
-}
+buttonAction.simpleAction()
 ```
 
-### Using within UIKit
-```Swift
+### Using with UIKit
 
-let buttonTest = UIButton(type: .system)
+```swift
+import Foundation
+import UIKit
+import DMAction
 
-// If the result is completely uninteresting (muted)
-buttonTest.addTarget(self,// `self` here is some UIKit object where the action's function exists
-                     action: #selector(buttonTestActionWithMutedResult),
-                     for: .touchUpInside)
-// OR:
-                     
-// if you need to process the result
-buttonTest.addTarget(self,// `self` here is some UIKit object where the action's function exists
-                     action: #selector(buttonTestActionWithHandledResult),
-                     for: .touchUpInside)
-                     
-@objc
-func buttonTestActionWithMutedResult() {
-    let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
-    let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
-    
-    primaryButtonAction
-        .retry(2)
-        .fallbackTo(fallbackButtonAction)
-        .simpleAction()
-}
+final class ActionViewController: UIViewController {
+    override func loadView() {
+        let ignoreResultButton = UIButton(type: .system)
+        ignoreResultButton.setTitle("Run and ignore result", for: .normal)
+        ignoreResultButton.addTarget(
+            self,
+            action: #selector(performIgnoringResult),
+            for: .touchUpInside
+        )
 
-@objc
-func buttonTestActionWithHandledResult() {
-    let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
-    let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
-    
-    primaryButtonAction
-        .retry(2)
-        .fallbackTo(fallbackButtonAction)() { result in
-            // do something with result
+        let handleResultButton = UIButton(type: .system)
+        handleResultButton.setTitle("Run and handle result", for: .normal)
+        handleResultButton.addTarget(
+            self,
+            action: #selector(performHandlingResult),
+            for: .touchUpInside
+        )
+
+        let stackView = UIStackView(arrangedSubviews: [
+            ignoreResultButton,
+            handleResultButton
+        ])
+        stackView.axis = .vertical
+        stackView.spacing = 12
+        view = stackView
+    }
+
+    @objc
+    private func performIgnoringResult() {
+        makeAction().simpleAction()
+    }
+
+    @objc
+    private func performHandlingResult() {
+        let action = makeAction()
+        action { result in
+            // Handle the result.
         }
-}
+    }
 
-func makeActionWithFailureResult(completion: @escaping (DMButtonAction.ResultType) -> Void) {
-    
-    // ... do something
-    
-    completion(.failure(NSError(domain: "TestDomain",
-                                code: 404,
-                                userInfo: nil)))
-}
+    private func makeAction() -> DMActionWithFallback {
+        let primaryAction = DMButtonAction(makeActionWithFailureResult)
+        let fallbackAction = DMButtonAction(makeActionWithSuccessResult)
 
-func makeActionWithSuccessResult(completion: @escaping (DMButtonAction.ResultType) -> Void) {
-    
-    // ... do something
-    
-    let yourResultVaue: Copyable = "\(#function) succeded!"
-    completion(.success(yourResultVaue))
+        return primaryAction
+            .retry(2)
+            .fallbackTo(fallbackAction)
+    }
+
+    private func makeActionWithFailureResult(
+        completion: @escaping (DMAction.ResultType) -> Void
+    ) {
+        completion(.failure(NSError(
+            domain: "TestDomain",
+            code: 404,
+            userInfo: nil
+        )))
+    }
+
+    private func makeActionWithSuccessResult(
+        completion: @escaping (DMAction.ResultType) -> Void
+    ) {
+        let resultValue: Copyable = "\(#function) succeeded!"
+        completion(.success(resultValue))
+    }
 }
 ```
 
-### Using within SwiftUI
-```Swift
-...
-var body: some View {
-    // If the result is completely uninteresting (muted)
-    Button("Test button with muted result", action: buttonTestActionWithMutedResult)
-    // if you need to process the result
-    Button("Test button with handled result", action: buttonTestActionWithHandledResult)
-}
-...
+### Using with SwiftUI
 
-func buttonTestActionWithMutedResult() {
-    let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
-    let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
-    
-    primaryButtonAction
-        .retry(2)
-        .fallbackTo(fallbackButtonAction)
-        .simpleAction()
-}
+```swift
+import Foundation
+import SwiftUI
+import DMAction
 
-func buttonTestActionWithHandledResult() {
-    let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
-    let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
-    
-    primaryButtonAction
-        .retry(2)
-        .fallbackTo(fallbackButtonAction)() { result in
-            // do something with result
+struct ActionButtonsView: View {
+    var body: some View {
+        VStack {
+            Button("Run and ignore result", action: performIgnoringResult)
+            Button("Run and handle result", action: performHandlingResult)
         }
-}
+    }
 
-func makeActionWithFailureResult(completion: @escaping (DMButtonAction.ResultType) -> Void) {
-    
-    // ... do something
-    
-    completion(.failure(NSError(domain: "TestDomain",
-                                code: 404,
-                                userInfo: nil)))
-}
+    private func performIgnoringResult() {
+        makeAction().simpleAction()
+    }
 
-func makeActionWithSuccessResult(completion: @escaping (DMButtonAction.ResultType) -> Void) {
-    
-    // ... do something
-    
-    let yourResultVaue: Copyable = "\(#function) succeded!"
-    completion(.success(yourResultVaue))
+    private func performHandlingResult() {
+        let action = makeAction()
+        action { result in
+            // Handle the result.
+        }
+    }
+
+    private func makeAction() -> DMActionWithFallback {
+        let primaryAction = DMButtonAction(makeActionWithFailureResult)
+        let fallbackAction = DMButtonAction(makeActionWithSuccessResult)
+
+        return primaryAction
+            .retry(2)
+            .fallbackTo(fallbackAction)
+    }
+
+    private func makeActionWithFailureResult(
+        completion: @escaping (DMAction.ResultType) -> Void
+    ) {
+        completion(.failure(NSError(
+            domain: "TestDomain",
+            code: 404,
+            userInfo: nil
+        )))
+    }
+
+    private func makeActionWithSuccessResult(
+        completion: @escaping (DMAction.ResultType) -> Void
+    ) {
+        let resultValue: Copyable = "\(#function) succeeded!"
+        completion(.success(resultValue))
+    }
 }
 ```
 
 
-### A More Advanced Example
+### Retry and fallback example
 
-- An example with two different actions (primaryButtonAction and fallbackButtonAction) combined 
-into a single execution chain using `.retry(1)`:
-    - `1` represents the maximum number of retry attempts for `primaryButtonAction`. It will be executed until either it succeeds or the retry limit is reached.
-    - If `primaryButtonAction` fails after the maximum attempts,`fallbackButtonAction` will be triggered via `fallbackTo(...)`.
-```Swift
+This example allows one retry after the primary action's initial attempt. If both attempts fail, DMAction invokes the fallback action.
 
+```swift
+import Foundation
+import DMAction
 
-// Primary action
 let primaryButtonAction = DMButtonAction { completion in
     completion(.failure(NSError(domain: "TestError", code: 1, userInfo: nil)))
 }
 
-// Fallback action
 let fallbackButtonAction = DMButtonAction { completion in
-    completion(.success(MockCopyable(value: "Fallback Success")))
+    completion(.success("Fallback succeeded"))
 }
 
-// Create execution chain
 let actionWithFallback = primaryButtonAction
-    .retry(1) //The number of retry action before fallback
+    .retry(1)
     .fallbackTo(fallbackButtonAction)
-    
-var resultOfAction: DMAction.ResultType?
-actionWithFallback { result in
-    // `unwrapValue()`: get rid of the wrapper - return the original result value that 
-    // was passed via DMButtonAction' completion closure
-    print("the result value: \(result.unwrapValue())")
-    // `attemptCount`: contains UInt number of action's attemps
-    print("attemptCount: \(result.attemptCount)")
-    
-    resultOfAction = result
-}
 
-if case .success(let copyableValue) = resultOfAction {
-    ...
-} else {
-    ...
+actionWithFallback { result in
+    let unwrappedResult = result.unwrapValue()
+    print("Attempt count: \(result.attemptCount ?? 0)")
+
+    switch unwrappedResult {
+    case .success(let value):
+        print("Result value: \(value)")
+    case .failure(let error):
+        print("Action failed: \(error)")
+    }
 }
 ```
 
 ## License
-This project is licensed under the MIT License - see the LICENSE file for details.
 
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction?ref=badge_large)
+DMAction is available under the MIT License. See [LICENSE](LICENSE) for details.
 
+## Additional resources
 
-## Additional Resources
-- [Articles](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md)
+- [The Challenges of Retry Logic and Fallback Mechanisms in App Development](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md)
