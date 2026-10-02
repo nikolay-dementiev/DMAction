@@ -45,6 +45,9 @@ for index, line in enumerate(lines, start=1):
     if block is None:
         if line.strip() == "```swift":
             block, start = [], index + 1
+        elif re.match(r"^\s*(```|~~~)", line) and "swift" in line.lower():
+            # A fence that GitHub may still render as Swift, but that this check would skip.
+            sys.exit(f"README.md:{index}: write a Swift block's fence as ```swift, so that it is compiled")
     elif line.strip() == "```":
         number += 1
         text = "\n".join(block) + "\n"
@@ -124,26 +127,46 @@ write_manifest() { # <folder> <platform line> <target kind> <product line> <name
 
 report() { # <log> <what>
     echo "check-readme-snippets: $2 do not build:" >&2
-    grep -E "error:" "$1" | sort -u | sed "s|$WORK/||; s/^/  /" | head -20 >&2
+    local errors
+    errors="$(grep -E "error:" "$1" | sort -u | head -20 || true)"
+    if [ -n "$errors" ]; then
+        printf '%s\n' "$errors" | sed 's/^/  /' >&2
+    else
+        tail -15 "$1" | sed 's/^/  /' >&2
+    fi
     echo "  Snippet numbers map to README lines in ${WORK#"$ROOT"/}/lines.txt" >&2
 }
 
-check_warnings() { # <log> <sources folder>
+# The compiler may print a path other than this script's, a resolved symbolic link for one,
+# so a warning is found by the generated name of its block, not by the path of the checkout.
+check_warnings() { # <log>
     local warnings
-    warnings="$(grep -E "^$2/[^:]+:[0-9]+:[0-9]+: warning:" "$1" | sort -u || true)"
+    warnings="$(grep -E "/Sources/Snippet[0-9]+/[^:]+:[0-9]+:[0-9]+: warning:" "$1" | sort -u || true)"
     if [ -n "$warnings" ]; then
         echo "check-readme-snippets: a block has a warning:" >&2
-        local prefix="$WORK/"
-        printf '%s\n' "${warnings//$prefix/}" | sed 's/^/  /' >&2
+        printf '%s\n' "$warnings" | sed 's/^/  /' >&2
         echo "  Snippet numbers map to README lines in ${WORK#"$ROOT"/}/lines.txt" >&2
         FAILED=1
     fi
 }
 
+# No warning means something only if the log shows the block compiled in this run.
+check_compiled() { # <log> <pattern with NAME> <names...>
+    local log="$1" pattern="$2" name
+    shift 2
+    for name in "$@"; do
+        if ! grep -qE "${pattern//NAME/$name}" "$log"; then
+            echo "check-readme-snippets: $name, $(grep "^$name " "$WORK/lines.txt" | cut -d ' ' -f 2), was not compiled in this run" >&2
+            FAILED=1
+        fi
+    done
+}
+
 if [ "${#TOOLS[@]}" -gt 0 ]; then
     write_manifest "$WORK/tools" ".macOS(.v14)" executableTarget "" "${TOOLS[@]}"
     if swift build --package-path "$WORK/tools" --scratch-path "$TOOLS_BUILD" > "$WORK/tools.log" 2>&1; then
-        check_warnings "$WORK/tools.log" "$WORK/tools/Sources"
+        check_compiled "$WORK/tools.log" "Compiling NAME main\.swift" "${TOOLS[@]}"
+        check_warnings "$WORK/tools.log"
     else
         report "$WORK/tools.log" "the blocks for a command-line tool"
         FAILED=1
@@ -157,7 +180,8 @@ if [ "${#IOS[@]}" -gt 0 ]; then
             -scheme ReadmeSnippets \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$IOS_DERIVED_DATA") > "$WORK/ios.log" 2>&1; then
-        check_warnings "$WORK/ios.log" "$WORK/ios/Sources"
+        check_compiled "$WORK/ios.log" "^SwiftCompile .*/Sources/NAME/NAME\.swift" "${IOS[@]}"
+        check_warnings "$WORK/ios.log"
     else
         report "$WORK/ios.log" "the blocks for iOS"
         FAILED=1
