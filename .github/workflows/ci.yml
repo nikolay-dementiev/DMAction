@@ -98,6 +98,7 @@ jobs:
         with:
           name: xcresult-${{ matrix.runner }}
           path: ${{ runner.temp }}/DMAction.xcresult
+          retention-days: 7
 
   example:
     name: example (${{ matrix.name }})
@@ -162,6 +163,17 @@ jobs:
       # the sources of the example.
       - name: Fail on a warning in the example
         run: |
+          # No warning means something only if the log shows every source of the example compiled.
+          missing=""
+          while IFS= read -r source; do
+            if ! grep -qE "^SwiftCompile .*/$source( |$)" "$RUNNER_TEMP/example.log"; then
+              missing="$missing $source"
+            fi
+          done < <(git ls-files 'Examples/DMActionExample/*.swift')
+          if [ -n "$missing" ]; then
+            echo "The build log does not show these compiled:$missing"
+            exit 1
+          fi
           warnings="$(grep -E "/Examples/[^:]*:[0-9]+:[0-9]+: warning:" "$RUNNER_TEMP/example.log" | sort -u || true)"
           if [ -n "$warnings" ]; then
             echo "$warnings"
@@ -176,6 +188,7 @@ jobs:
         with:
           name: example-xcresult-${{ matrix.runner }}
           path: ${{ runner.temp }}/example.xcresult
+          retention-days: 7
 
   docs:
     runs-on: macos-26
