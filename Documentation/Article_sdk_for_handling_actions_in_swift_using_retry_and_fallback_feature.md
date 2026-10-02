@@ -78,13 +78,13 @@ This SDK is built on a protocol-oriented architecture, making it flexible and ea
 ###The structure of the DMAction protocol and its related components:
 
 ###The structure of the DMAction protocol and its related components:
-![](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Uml-schema.svg?raw=true)
+![](Uml-schema.svg)
 
 ###How the retry mechanism works:
-![](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Retry-Mechanism.svg?raw=true)
+![](Retry-Mechanism.svg)
 
 ###How fallback actions work:
-![](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Fallback-Behavior.svg?raw=true)
+![](Fallback-Behavior.svg)
 
 ---
 

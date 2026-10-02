@@ -1,7 +1,7 @@
 # DMAction
 
 <p align="center">
-  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/DMAction-SDK-logo.png?raw=true" alt="DMAction SDK logo" height="200">
+  <img src="Documentation/DMAction-SDK-logo.png" alt="DMAction SDK logo" height="200">
 </p>
 
 [![Swift](https://img.shields.io/badge/Swift-5%2B-orange?style=flat-square)](https://swift.org) [![Swift tools version](https://img.shields.io/badge/Swift_tools-6.0-darkorange?style=flat-square)](https://swift.org/package-manager/)
@@ -40,19 +40,19 @@ DMAction is a Swift library for composing completion-based actions with retry an
 ### Protocol overview
 
 <p align="center">
-  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Uml-schema.svg?raw=true" alt="DMAction protocol overview diagram" height="300">
+  <img src="Documentation/Uml-schema.svg" alt="DMAction protocol overview diagram" height="300">
 </p>
 
 ### Retry mechanism
 
 <p align="center">
-  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Retry-Mechanism.svg?raw=true" alt="DMAction retry mechanism diagram" height="300">
+  <img src="Documentation/Retry-Mechanism.svg" alt="DMAction retry mechanism diagram" height="300">
 </p>
 
 ### Fallback behavior
 
 <p align="center">
-  <img src="https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Fallback-Behavior.svg?raw=true" alt="DMAction fallback behavior diagram" height="300">
+  <img src="Documentation/Fallback-Behavior.svg" alt="DMAction fallback behavior diagram" height="300">
 </p>
 
 ## Installation
@@ -266,4 +266,4 @@ DMAction is available under the MIT License. See [LICENSE](LICENSE) for details.
 
 ## Additional resources
 
-- [The Challenges of Retry Logic and Fallback Mechanisms in App Development](https://github.com/nikolay-dementiev/DMAction/blob/main/Resources/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md)
+- [The Challenges of Retry Logic and Fallback Mechanisms in App Development](Documentation/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md)
