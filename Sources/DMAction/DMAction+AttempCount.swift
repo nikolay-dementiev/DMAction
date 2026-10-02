@@ -83,6 +83,12 @@ internal extension DMAction {
     static func unwrapNestedResult(_ value: Copyable) -> Copyable {
         DMActionHelper.unwrapNestedResult(value)
     }
+
+    /// The attempt after `attempt`. It stays at `UInt.max` instead of trapping: an action
+    /// that starts counting from a large value must not stop its host.
+    static func attempt(after attempt: UInt) -> UInt {
+        attempt == .max ? .max : attempt + 1
+    }
 }
 
 private struct DMActionHelper {

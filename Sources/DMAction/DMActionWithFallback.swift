@@ -35,7 +35,7 @@ public struct DMActionWithFallback: DMAction {
                                                                 attempt: result.attemptCount ?? currentAttempt)
                     completion(finalResult)
                 case .failure:
-                    let fallbackActionWithIncrement = DMButtonAction(currentAttempt: currentAttempt + 1,
+                    let fallbackActionWithIncrement = DMButtonAction(currentAttempt: Self.attempt(after: currentAttempt),
                                                                      action: fallbackAction)
                     fallbackActionWithIncrement.action(completion)
                 }

@@ -60,7 +60,7 @@ public extension DMAction {
     /// }
     /// ```
     func fallbackTo(_ fallback: DMAction) -> DMActionWithFallback {
-        DMActionWithFallback(currentAttempt: self.currentAttempt + 1, self.action, fallback.action)
+        DMActionWithFallback(currentAttempt: Self.attempt(after: currentAttempt), self.action, fallback.action)
     }
     
     /// Returns a new action that retries this action the specified number of times.
