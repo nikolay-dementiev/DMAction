@@ -101,7 +101,7 @@ final class ActionRun {
         }
         attempt.cursor = nil
         // A label a producer put on its success is replaced: the run counts its own attempts.
-        let labelled = DMButtonAction.mapResultWithAttempt(result, attempt: base.saturatingAdd(cursor.failed))
+        let labelled = DMActionResultValue.labelling(result, attempt: base.saturatingAdd(cursor.failed))
         // A completion on the thread that is still inside the producer call is kept for that
         // thread, which goes on when the call returns. A completion on any other thread goes
         // on at once: the producer may be waiting, inside its call, for an effect of this very

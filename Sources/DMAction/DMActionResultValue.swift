@@ -29,6 +29,23 @@ public struct DMActionResultValue: DMActionResultValueProtocol {
     }
 }
 
+extension DMActionResultValue {
+    /// The value inside any number of wrappers.
+    static func payload(of value: any Copyable) -> any Copyable {
+        var payload = value
+        while let wrapper = payload as? DMActionResultValue {
+            payload = wrapper.value
+        }
+        return payload
+    }
+
+    /// The success of `result` with its payload in one wrapper that carries `attempt`. A failure
+    /// stays as it is.
+    static func labelling(_ result: DMButtonAction.ResultType, attempt: UInt) -> DMButtonAction.ResultType {
+        result.map { DMActionResultValue(value: payload(of: $0), attemptCount: attempt) }
+    }
+}
+
 /// A struct representing a placeholder value that conforms to `Copyable`.
 public struct PlaceholderCopyable: Copyable {
     /// Initializes a new instance of `PlaceholderCopyable`.
