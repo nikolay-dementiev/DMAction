@@ -6,3 +6,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # A release of an action is proposed a week after it appears, not on the day it does.
+    cooldown:
+      default-days: 7
