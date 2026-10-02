@@ -130,8 +130,9 @@ have been delivered, labelled 3.
 
 A run delivers a `DMAction.ResultType`, a `Result<any Copyable, any Error>`. A success comes
 wrapped in a `DMActionResultValue`: `unwrapValue()` gives the payload a producer delivered, and
-`attemptCount` gives the label. A failure is the error of the last attempt, the same instance,
-without a label.
+`attemptCount` gives the label. Read the label on the result as it was delivered: the result of
+`unwrapValue()` has none. A failure is the error of the last attempt, the same instance, without a
+label.
 
 | Action | Success at | Label |
 |---|---|---|
@@ -188,8 +189,11 @@ final class QuoteViewController: UIViewController {
             completion(.success("Kept from the last visit"))
         }
         fresh.retry(2).fallbackTo(cached).action { [weak self] result in
-            if case .success(let quote) = result.unwrapValue() {
+            switch result.unwrapValue() {
+            case .success(let quote):
                 self?.label.text = "\(quote)"
+            case .failure(let error):
+                self?.label.text = error.localizedDescription
             }
         }
     }
@@ -216,8 +220,11 @@ final class QuoteModel {
             completion(.success("Kept from the last visit"))
         }
         fresh.retry(2).fallbackTo(cached).action { [weak self] result in
-            if case .success(let quote) = result.unwrapValue() {
+            switch result.unwrapValue() {
+            case .success(let quote):
                 self?.text = "\(quote)"
+            case .failure(let error):
+                self?.text = error.localizedDescription
             }
         }
     }
