@@ -48,29 +48,42 @@ final class ContractCharacterizationTests: XCTestCase {
     // MARK: - Threads
 
     func test_action_completedOnAnotherThread_deliversOnThatThread() {
-        let delivered = expectation(description: "the consumer completion ran")
-        var deliveryThread: Thread?
-        var value: String?
+        // Written under a lock: a broken run could deliver from two threads.
+        struct Record {
+            var producerCalls = 0
+            var deliveryThread: Thread?
+            var results: [DMButtonAction.ResultType] = []
+        }
+        let record = Locked(Record())
+        let completers = DispatchGroup()
         var caller: BackgroundCaller?
         let action = DMButtonAction { completion in
+            record.withLock { $0.producerCalls += 1 }
+            completers.enter()
             let background = BackgroundCaller {
                 completion(.success("background"))
+                completers.leave()
             }
             caller = background
             background.start()
         }
 
         action.action { result in
-            deliveryThread = Thread.current
-            value = ConsumerSpy.text(of: result)
-            delivered.fulfill()
+            record.withLock {
+                $0.deliveryThread = Thread.current
+                $0.results.append(result)
+            }
         }
-        wait(for: [delivered], timeout: 5)
+        let completersReturned = completers.wait(timeout: .now() + 5)
 
-        XCTAssertNotNil(deliveryThread, "the consumer completion ran")
-        XCTAssertTrue(deliveryThread === caller?.thread, "delivered on the thread the producer completed on")
-        XCTAssertFalse(deliveryThread === Thread.current, "which is not the thread that started the run")
-        XCTAssertEqual(value, "background", "the payload the producer delivered")
+        let final = record.withLock { $0 }
+        XCTAssertEqual(completersReturned, .success, "the completing thread returned from the completion")
+        XCTAssertEqual(final.producerCalls, 1, "the producer ran once")
+        XCTAssertEqual(final.results.count, 1, "one delivery")
+        XCTAssertTrue(final.deliveryThread === caller?.thread, "delivered on the thread the producer completed on")
+        XCTAssertFalse(final.deliveryThread === Thread.current, "which is not the thread that started the run")
+        XCTAssertEqual(final.results.first.flatMap(ConsumerSpy.text(of:)), "background", "the payload the producer delivered")
+        XCTAssertEqual(final.results.first?.attemptCount, 0, "the label of a first-try success")
     }
 
     // MARK: - Missing, duplicate and cancelled completions
