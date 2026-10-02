@@ -20,6 +20,8 @@
 #    used to delete the Xcode DerivedData folder of the whole machine on every install.
 #    This is a text search: it catches that spelling again, it does not prove that a
 #    script has no side effect.
+# 5. The podspec describes the same product as the manifest: the same platforms, the
+#    language mode the package is built in, and no link against a test framework.
 
 set -euo pipefail
 
@@ -120,6 +122,46 @@ if [ -n "$DELETES" ]; then
     FAILED=1
 else
     echo "check-manifest: no recursive delete in the example's tooling."
+fi
+
+# 5. The podspec. `pod ipc spec` prints it as JSON.
+if ! command -v pod > /dev/null; then
+    echo "check-manifest: CocoaPods is not installed; the podspec was not checked."
+elif ! pod ipc spec "$ROOT/$MODULE.podspec" > "$WORK/podspec.json" 2> "$WORK/podspec.log"; then
+    echo "check-manifest: the podspec cannot be read. See ${WORK#"$ROOT"/}/podspec.log" >&2
+    FAILED=1
+elif ! python3 - "$WORK/podspec.json" "$WORK/manifest.json" <<'PY'
+import json
+import sys
+
+spec = json.load(open(sys.argv[1]))
+manifest = json.load(open(sys.argv[2]))
+problems = []
+
+def listed(value):
+    return [value] if isinstance(value, str) else list(value or [])
+
+for key in ("frameworks", "weak_frameworks"):
+    if "XCTest" in listed(spec.get(key)):
+        problems.append(f"the podspec links XCTest ({key}) into a production pod")
+modes = listed(spec.get("swift_versions"))
+unknown = [mode for mode in modes if mode not in ("5.0", "6.0")]
+if unknown:
+    problems.append(f"swift_versions lists {unknown}: only language modes that exist belong there")
+if "6.0" not in modes:
+    problems.append("swift_versions does not list 6.0, the language mode the package is built in")
+package_platforms = {p["platformName"]: p["version"] for p in manifest.get("platforms", [])}
+pod_platforms = {name: version for name, version in (spec.get("platforms") or {}).items()}
+if package_platforms != pod_platforms:
+    problems.append(f"platforms differ: Package.swift {package_platforms}, podspec {pod_platforms}")
+for problem in problems:
+    print(f"check-manifest: {problem}", file=sys.stderr)
+sys.exit(1 if problems else 0)
+PY
+then
+    FAILED=1
+else
+    echo "check-manifest: the podspec matches the manifest and links no test framework."
 fi
 
 exit "$FAILED"
