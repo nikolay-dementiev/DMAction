@@ -167,13 +167,17 @@ jobs:
               exit 1
             fi
           done
-      # A bundle whose tests were all skipped passes too: the counts come from the result bundle.
+      # A bundle whose tests were skipped, or that lost tests, passes too. So every test method of
+      # the example's test files must be in the result bundle, run and passed.
       - name: Check the test counts
         run: |
+          EXPECTED="$(git grep -hcE '^[[:space:]]*func test[[:alnum:]_]*\(\)' -- 'Examples/DMActionExample/*Tests/*.swift' \
+            | awk '{ total += $1 } END { print total + 0 }')"
           xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/example.xcresult" > "$RUNNER_TEMP/summary.json"
-          if ! jq -e '.totalTestCount > 0 and .passedTests == .totalTestCount and .failedTests == 0 and .skippedTests == 0' \
+          if ! jq -e --argjson expected "$EXPECTED" \
+              '$expected > 0 and .totalTestCount == $expected and .passedTests == $expected and .failedTests == 0 and .skippedTests == 0' \
               "$RUNNER_TEMP/summary.json" > /dev/null; then
-            echo "The example's tests did not all run and pass:"
+            echo "Expected $EXPECTED tests of the example to run and pass:"
             jq '{totalTestCount, passedTests, failedTests, skippedTests}' "$RUNNER_TEMP/summary.json"
             exit 1
           fi
