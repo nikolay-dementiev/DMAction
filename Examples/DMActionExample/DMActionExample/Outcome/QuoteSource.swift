@@ -2,6 +2,9 @@ import DMAction
 import Foundation
 
 /// Where the example's quotes come from.
+///
+/// Call the completions on the main actor. A composed action goes on with its run on the thread
+/// of a completion, and the view model that runs it keeps its state on the main actor.
 @MainActor
 package protocol QuoteSource {
     /// Fetches a quote. `failing` makes this one call fail, so that the example can show a retry
