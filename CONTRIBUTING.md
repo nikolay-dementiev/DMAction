@@ -33,6 +33,7 @@ Every check is a script in `Scripts/`, and CI runs the same command you run loca
 | `Scripts/check-api.sh` | the public interface against `Fixtures/API/public-interface.txt`. A deliberate change of the public API runs it with `--update` and commits the new baseline in the same commit |
 | `Scripts/check-manifest.sh` | the manifest, installation by version, the consumer fixture, the podspec and the uses across isolation domains that the compiler must keep rejecting |
 | `Scripts/coverage-gate.sh <result bundle>` | the line coverage of the library |
+| `Scripts/check-readme-snippets.sh` | every Swift block of `README.md`, each compiled on its own against the checkout: a manifest, a block for iOS, or a command-line tool for the Mac. A warning fails it too |
 
 ## The example app
 

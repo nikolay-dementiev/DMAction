@@ -189,6 +189,18 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             OTHER_DOCC_FLAGS="--warnings-as-errors"
 
+  readme:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Compile the Swift blocks of the README
+        run: Scripts/check-readme-snippets.sh
+
   floor:
     # The oldest toolchain the manifest promises: swift-tools-version 6.0 is Xcode 16.0 to 16.2.
     runs-on: macos-15
