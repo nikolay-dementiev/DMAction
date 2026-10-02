@@ -158,6 +158,15 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIMULATOR" \
             -resultBundlePath "$RUNNER_TEMP/example.xcresult" \
             2>&1 | tee "$RUNNER_TEMP/example.log"
+      # A scheme that lost a test bundle would still build and pass.
+      - name: Check that both test bundles ran
+        run: |
+          for bundle in DMActionExampleTests DMActionExampleUITests; do
+            if ! grep -q "Test Suite '$bundle.xctest' passed" "$RUNNER_TEMP/example.log"; then
+              echo "The test bundle $bundle did not run."
+              exit 1
+            fi
+          done
       # Xcode compiles the package with its warnings suppressed, so warnings as errors cannot
       # cover the whole build. The library's own warnings fail the test job; this step covers
       # the sources of the example.
