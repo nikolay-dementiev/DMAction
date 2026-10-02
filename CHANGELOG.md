@@ -68,14 +68,27 @@ replaced by the run's count everywhere. Up to 1.0.5 it was kept in three places:
 build the chain with `fallbackTo` for an exact count.
 
 **Order of a synchronous producer.** When a producer calls its completion on the thread that called
-it, before it returns, the completion call now returns at once, the rest of the producer runs, and the next attempt and the
-consumer follow after the producer has returned. Up to 1.0.5 the next attempt and the consumer ran
-inside the completion call. A producer that blocks after its completion call until the consumer has
-run now waits forever.
+it, before it returns, the completion call now returns at once, the rest of the producer runs, and
+the next attempt and the consumer follow after the producer has returned. Up to 1.0.5 the next
+attempt and the consumer ran inside the completion call. A producer that blocks after its
+completion call until the consumer has run now waits forever. For `a.fallbackTo(b)`, where `a`
+fails and `b` succeeds, each on the calling thread before it returns:
+
+| Version | Order of events |
+|---|---|
+| 1.0.5 | `a` is called, `b` is called, the consumer runs, `b` returns, `a` returns |
+| 1.1.0 | `a` is called, `a` returns, `b` is called, `b` returns, the consumer runs |
 
 **At most once.** The first completion of an attempt moves the run on. Any later one is ignored and
-written to the unified log at fault level. The consumer is called at most once per run. A producer
-that never completes still stalls its run.
+written to the unified log at fault level, one line for each. The consumer is called at most once
+per run. A producer that never completes still stalls its run.
+
+| A producer calls its completion twice | 1.0.5 | 1.1.0 |
+|---|---|---|
+| `a` succeeds twice | the consumer runs twice | the consumer runs once, with the first success |
+| `a` fails twice, in `a.fallbackTo(b)` | `b` runs twice, and so does the consumer | `b` runs once, and so does the consumer |
+| `a` fails, then succeeds, in `a.fallbackTo(b)` | the consumer gets the result of `b`, then the success of `a` | the consumer gets the result of `b` |
+| `a` succeeds, then fails, in `a.fallbackTo(b)` | the consumer gets the success of `a`, then `b` runs and the consumer gets its result | the consumer gets the success of `a` |
 
 **Threads.** Unchanged: a run continues on the thread that completes an attempt, and a completion
 from another thread is not made to wait for the producer's call to return.
