@@ -35,9 +35,9 @@ final class ContractCharacterizationTests: XCTestCase {
         var values: [String] = []
 
         action.action { first in
-            values.append(Self.text(of: first))
+            values.append(ConsumerSpy.text(of: first) ?? "no text")
             action.action { second in
-                values.append(Self.text(of: second))
+                values.append(ConsumerSpy.text(of: second) ?? "no text")
             }
         }
 
@@ -49,38 +49,48 @@ final class ContractCharacterizationTests: XCTestCase {
 
     func test_action_completedOnAnotherThread_deliversOnThatThread() {
         let delivered = expectation(description: "the consumer completion ran")
-        var deliveredOnMainThread: Bool?
+        var deliveryThread: Thread?
         var value: String?
+        var caller: BackgroundCaller?
         let action = DMButtonAction { completion in
-            BackgroundCaller {
+            let background = BackgroundCaller {
                 completion(.success("background"))
             }
-            .start()
+            caller = background
+            background.start()
         }
 
         action.action { result in
-            deliveredOnMainThread = Thread.isMainThread
-            value = Self.text(of: result)
+            deliveryThread = Thread.current
+            value = ConsumerSpy.text(of: result)
             delivered.fulfill()
         }
         wait(for: [delivered], timeout: 5)
 
-        XCTAssertEqual(deliveredOnMainThread, false, "the library does not move the delivery to another thread")
+        XCTAssertNotNil(deliveryThread, "the consumer completion ran")
+        XCTAssertTrue(deliveryThread === caller?.thread, "delivered on the thread the producer completed on")
+        XCTAssertFalse(deliveryThread === Thread.current, "which is not the thread that started the run")
         XCTAssertEqual(value, "background", "the payload the producer delivered")
     }
 
     // MARK: - Missing, duplicate and cancelled completions
 
-    func test_producer_thatNeverCompletes_suspendsTheRunUntilCompletedByHand() throws {
+    func test_producer_thatHoldsItsCompletions_suspendsTheRunUntilEachIsCompletedByHand() throws {
         let (producer, consumer) = makeSUT(script: [.hold])
 
         producer.action.retry(1).action(consumer.receive)
+        let callsWhileHeld = producer.callCount
         let deliveriesWhileHeld = consumer.count
-        let held = try XCTUnwrap(producer.heldCompletions.first, "the producer kept its completion")
-        held(.success("late"))
+        let firstAttempt = try XCTUnwrap(producer.heldCompletions.first, "the producer kept its completion")
+        firstAttempt(.failure(MarkedError()))
+        let callsAfterLateFailure = producer.callCount
+        let secondAttempt = try XCTUnwrap(producer.heldCompletions.last, "the retry's completion is held too")
+        secondAttempt(.success("late"))
 
+        XCTAssertEqual(callsWhileHeld, 1, "nothing retries while the completion is held")
         XCTAssertEqual(deliveriesWhileHeld, 0, "nothing is delivered while the completion is held")
-        XCTAssertEqual(producer.callCount, 1, "no timeout starts a retry")
+        XCTAssertEqual(callsAfterLateFailure, 2, "a late failure starts the retry")
+        XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastValue, "late", "the run continues from the late completion")
     }
 
@@ -134,12 +144,5 @@ final class ContractCharacterizationTests: XCTestCase {
 
     private func makeSUT(script: [ProducerSpy.Outcome]) -> (producer: ProducerSpy, consumer: ConsumerSpy) {
         (ProducerSpy(script: script), ConsumerSpy())
-    }
-
-    private static func text(of result: DMButtonAction.ResultType) -> String {
-        guard case .success(let value) = result.unwrapValue(), let text = value as? String else {
-            return "<no text>"
-        }
-        return text
     }
 }
