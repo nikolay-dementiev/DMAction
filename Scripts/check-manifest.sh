@@ -42,11 +42,22 @@ cd "$ROOT"
 PROBE=""
 DERIVED=""
 REJECTED_BUILD=""
+# A compiler job of a failed build can still write its index for a moment after the build
+# has returned, so a removal is tried three times. A folder that stays is reported; it does
+# not change the result of the checks.
 # shellcheck disable=SC2329  # invoked by the trap below
 cleanup() {
-    if [ -n "$PROBE" ]; then rm -rf "$PROBE"; fi
-    if [ -n "$DERIVED" ]; then rm -rf "$DERIVED"; fi
-    if [ -n "$REJECTED_BUILD" ]; then rm -rf "$REJECTED_BUILD"; fi
+    local folder
+    for folder in "$PROBE" "$DERIVED" "$REJECTED_BUILD"; do
+        [ -n "$folder" ] || continue
+        for _ in 1 2 3; do
+            rm -rf "$folder" 2> /dev/null && break
+            sleep 1
+        done
+        if [ -e "$folder" ]; then
+            echo "check-manifest: could not remove ${folder#"$ROOT"/}. It is build output: delete it by hand." >&2
+        fi
+    done
 }
 trap cleanup EXIT
 
