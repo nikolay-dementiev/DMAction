@@ -36,7 +36,7 @@ final class StackSafeExecutionTests: XCTestCase {
         XCTAssertTrue(spies.allSatisfy { $0.callCount == 1 }, "every producer runs once")
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastValue, "last", "the last producer delivers")
-        XCTAssertEqual(consumer.lastLabel, UInt(Self.depth) + 1, "the legacy label of a left-nested chain")
+        XCTAssertEqual(consumer.lastLabel, UInt(Self.depth), "ten thousand failed attempts before the last")
     }
 
     func test_fallbackTo_chainedTenThousandDeepToTheRightOnASmallStack_runsEveryProducerOnce() {
@@ -53,7 +53,7 @@ final class StackSafeExecutionTests: XCTestCase {
         XCTAssertTrue(spies.allSatisfy { $0.callCount == 1 }, "every producer runs once")
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastValue, "last", "the last producer delivers")
-        XCTAssertEqual(consumer.lastLabel, 2, "the legacy label of a right-nested chain")
+        XCTAssertEqual(consumer.lastLabel, UInt(Self.depth), "ten thousand failed attempts before the last")
     }
 
     /// `retry` applied to a composite, again and again, nests one plan per call. Running such

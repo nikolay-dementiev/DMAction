@@ -66,7 +66,7 @@ final class AttemptOverflowTests: XCTestCase {
         let composed = receiver.fallbackTo(last.action)
         composed.action(sut.consumer.receive)
 
-        XCTAssertEqual(composed.currentAttempt, .max, "the composed attempt stops at the maximum")
+        XCTAssertEqual(composed.currentAttempt, .max, "the receiver's attempt")
         XCTAssertEqual(last.callCount, 1, "the added fallback runs once")
         XCTAssertEqual(sut.consumer.count, 1, "one delivery")
         XCTAssertEqual(sut.consumer.lastValue, "last", "the added fallback's payload")
@@ -81,7 +81,7 @@ final class AttemptOverflowTests: XCTestCase {
         let composed = receiver.fallbackTo(last.action)
         composed.action(sut.consumer.receive)
 
-        XCTAssertEqual(composed.currentAttempt, .max, "one below the maximum, plus one")
+        XCTAssertEqual(composed.currentAttempt, .max - 1, "the receiver's attempt")
         XCTAssertEqual([sut.primary, sut.fallback, last].map(\.callCount), [1, 1, 1], "each action runs once")
         XCTAssertEqual(sut.consumer.count, 1, "one delivery")
         XCTAssertEqual(sut.consumer.lastLabel, .max, "the last fallback stops at the maximum")

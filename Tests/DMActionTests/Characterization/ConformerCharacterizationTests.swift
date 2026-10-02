@@ -59,30 +59,36 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertEqual(fallbackRun.lastValue, "fallback", "the fallback's payload")
     }
 
-    func test_publicInit_whenAProducerSuppliesALabel_keepsThePrimarysAndOverwritesTheFallbacks() {
+    func test_publicInit_whenAProducerSuppliesALabel_overwritesItInBothPositions() {
         let primaryRun = ConsumerSpy()
         let fallbackRun = ConsumerSpy()
 
         DMActionWithFallback(currentAttempt: 5, succeedWithOwnLabel, succeedAsFallback).action(primaryRun.receive)
         DMActionWithFallback(currentAttempt: 5, fail, succeedWithOwnLabel).action(fallbackRun.receive)
 
-        XCTAssertEqual(primaryRun.lastLabel, 9, "a label on a primary success is kept")
+        XCTAssertEqual(primaryRun.lastLabel, 5, "a label the primary supplied is overwritten with the given attempt")
         XCTAssertEqual(fallbackRun.lastLabel, 6, "a label on a fallback success is overwritten")
         XCTAssertEqual(fallbackRun.lastValue, "labelled", "the payload is unwrapped from the supplied wrapper")
     }
 
-    func test_publicInit_withComposedActions_keepsThePrimarysLabelAndStampsTheFallback() {
+    /// A composed action handed to the initializer as a closure is one attempt of the outer run:
+    /// the failures inside it are not counted. The same chain built with `fallbackTo` is counted.
+    func test_publicInit_withAComposedActionAsAClosure_countsItAsOneAttempt() {
         let primaryRun = ConsumerSpy()
         let fallbackRun = ConsumerSpy()
+        let chainRun = ConsumerSpy()
         let fallback = ProducerSpy(script: [.success("fallback")]).action
 
         let recovering = ProducerSpy.succeeding(onCall: 2, with: "primary").action.retry(1)
         DMActionWithFallback(currentAttempt: 0, recovering.action, fallback.action).action(primaryRun.receive)
         let failing = ProducerSpy.alwaysFailing().action.retry(1)
         DMActionWithFallback(currentAttempt: 0, failing.action, fallback.action).action(fallbackRun.receive)
+        let recoveringInAChain = ProducerSpy.succeeding(onCall: 2, with: "primary").action.retry(1)
+        recoveringInAChain.fallbackTo(fallback).action(chainRun.receive)
 
-        XCTAssertEqual(primaryRun.lastLabel, 2, "the label of the composed primary's second call")
-        XCTAssertEqual(fallbackRun.lastLabel, 1, "the fallback takes the given attempt plus one")
+        XCTAssertEqual(primaryRun.lastLabel, 0, "the retry inside the closure is not counted")
+        XCTAssertEqual(fallbackRun.lastLabel, 1, "the failed closure counts as one attempt")
+        XCTAssertEqual(chainRun.lastLabel, 1, "built with fallbackTo, the failed first call is counted")
     }
 
     func test_publicInit_whenUsedAsAReceiver_keepsItsLabelsAndLabelsTheAddedFallbackAfterThem() {
@@ -100,7 +106,7 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertEqual(afterBoth.lastLabel, 7, "the added fallback takes the one after that")
     }
 
-    func test_publicInit_whenUsedAsAFallback_labelsBothOfItsSuccessesTwo() {
+    func test_publicInit_whenUsedAsAFallback_labelsItsSuccessesByTheFailuresBeforeThem() {
         let primaryRun = ConsumerSpy()
         let fallbackRun = ConsumerSpy()
         let failing = DMButtonAction(fail)
@@ -108,8 +114,8 @@ final class ConformerCharacterizationTests: XCTestCase {
         failing.fallbackTo(DMActionWithFallback(currentAttempt: 5, succeed, succeedAsFallback)).action(primaryRun.receive)
         failing.fallbackTo(DMActionWithFallback(currentAttempt: 5, fail, succeedAsFallback)).action(fallbackRun.receive)
 
-        XCTAssertEqual(primaryRun.lastLabel, 2, "the given attempt is overwritten")
-        XCTAssertEqual(fallbackRun.lastLabel, 2, "and so is the one after it")
+        XCTAssertEqual(primaryRun.lastLabel, 1, "the given attempt is not used: one failure before it")
+        XCTAssertEqual(fallbackRun.lastLabel, 2, "two failures before its fallback")
     }
 
     // MARK: - Custom conformers: when their properties are read
@@ -151,12 +157,12 @@ final class ConformerCharacterizationTests: XCTestCase {
 
     // MARK: - Custom conformers: what they deliver
 
-    func test_fallbackTo_onCustomConformer_labelsAFirstTrySuccessOne() {
+    func test_fallbackTo_onCustomConformer_labelsAFirstTrySuccessZero() {
         let consumer = ConsumerSpy()
 
         makeSUT().fallbackTo(DMButtonAction(succeedAsFallback)).action(consumer.receive)
 
-        XCTAssertEqual(consumer.lastLabel, 1)
+        XCTAssertEqual(consumer.lastLabel, 0)
     }
 
     func test_callSyntax_onCustomConformer_wrapsTheResultWithItsAttempt() {
@@ -170,7 +176,7 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertEqual(consumer.lastValue, "primary", "and keeps the payload")
     }
 
-    func test_customConformer_whenItsProducerSuppliesALabel_keepsItThroughCallSyntaxAndComposition() {
+    func test_customConformer_whenItsProducerSuppliesALabel_overwritesItThroughCallSyntaxAndComposition() {
         let called = ConsumerSpy()
         let composed = ConsumerSpy()
         let receiver = makeSUT(succeedWithOwnLabel)
@@ -178,8 +184,8 @@ final class ConformerCharacterizationTests: XCTestCase {
         receiver(completion: called.receive)
         receiver.fallbackTo(DMButtonAction(succeedAsFallback)).action(composed.receive)
 
-        XCTAssertEqual(called.lastLabel, 9, "through call syntax")
-        XCTAssertEqual(composed.lastLabel, 9, "through a fallback composition")
+        XCTAssertEqual(called.lastLabel, 0, "through call syntax: the conformer's attempt")
+        XCTAssertEqual(composed.lastLabel, 0, "through a fallback composition: no failure before it")
     }
 
     func test_simpleAction_whenAConformerSuppliesItsOwn_runsThatOne() {

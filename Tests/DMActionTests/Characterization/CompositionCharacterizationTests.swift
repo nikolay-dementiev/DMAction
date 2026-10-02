@@ -1,9 +1,9 @@
 import DMAction
 import XCTest
 
-/// Pins what composition does today: how often each producer runs, what the consumer
-/// receives and which attempt label a success carries. The labels are irregular. They are
-/// the released behaviour, so they are pinned as they are.
+/// Pins what composition does: how often each producer runs, what the consumer receives and
+/// which attempt label a success carries: the number of attempts that failed before it in the
+/// same run, added to the attempt of the action that was run.
 final class CompositionCharacterizationTests: XCTestCase {
     private struct LabelRow {
         /// The call of the primary that succeeds. `nil`: it never succeeds.
@@ -61,7 +61,7 @@ final class CompositionCharacterizationTests: XCTestCase {
         XCTAssertNil(consumer.lastLabel, "a failure carries no label")
     }
 
-    func test_retry_whenLaterAttemptSucceeds_stopsAndReportsLegacyLabel() {
+    func test_retry_whenLaterAttemptSucceeds_stopsAndLabelsTheFailuresBeforeIt() {
         for successOnCall in 2...4 {
             let producer = ProducerSpy.succeeding(onCall: successOnCall)
             let consumer = ConsumerSpy()
@@ -70,7 +70,7 @@ final class CompositionCharacterizationTests: XCTestCase {
 
             XCTAssertEqual(producer.callCount, successOnCall, "stops at the success on call \(successOnCall)")
             XCTAssertEqual(consumer.count, 1, "one delivery, success on call \(successOnCall)")
-            XCTAssertEqual(consumer.lastLabel, UInt(successOnCall), "legacy label of call \(successOnCall)")
+            XCTAssertEqual(consumer.lastLabel, UInt(successOnCall - 1), "the failed attempts before call \(successOnCall)")
             XCTAssertEqual(consumer.lastValue, "value", "the payload of call \(successOnCall)")
         }
     }
@@ -121,7 +121,7 @@ final class CompositionCharacterizationTests: XCTestCase {
         XCTAssertEqual(consumer.lastLabel, 0, "a first-try success keeps label 0")
     }
 
-    func test_fallbackTo_whenPrimaryFails_invokesFallbackOnceWithLabelTwo() {
+    func test_fallbackTo_whenPrimaryFails_invokesFallbackOnceWithLabelOne() {
         let primary = ProducerSpy.alwaysFailing()
         let fallback = ProducerSpy(script: [.success("fallback")])
         let consumer = ConsumerSpy()
@@ -132,7 +132,7 @@ final class CompositionCharacterizationTests: XCTestCase {
         XCTAssertEqual(fallback.callCount, 1, "the fallback runs once")
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastValue, "fallback", "the fallback's payload")
-        XCTAssertEqual(consumer.lastLabel, 2, "legacy label of a fallback success")
+        XCTAssertEqual(consumer.lastLabel, 1, "one failed attempt before the fallback")
     }
 
     func test_fallbackTo_whenBothFail_deliversTheFallbackError() {
@@ -150,13 +150,13 @@ final class CompositionCharacterizationTests: XCTestCase {
 
     // MARK: - Chains
 
-    func test_fallbackTo_afterThreeRetries_reportsLegacyLabelForEachSuccessPosition() {
+    func test_fallbackTo_afterThreeRetries_labelsEachSuccessByTheFailuresBeforeIt() {
         let rows = [
             LabelRow(successOnCall: 1, label: 0, value: "primary"),
-            LabelRow(successOnCall: 2, label: 2, value: "primary"),
-            LabelRow(successOnCall: 3, label: 3, value: "primary"),
-            LabelRow(successOnCall: 4, label: 4, value: "primary"),
-            LabelRow(successOnCall: nil, label: 5, value: "fallback")
+            LabelRow(successOnCall: 2, label: 1, value: "primary"),
+            LabelRow(successOnCall: 3, label: 2, value: "primary"),
+            LabelRow(successOnCall: 4, label: 3, value: "primary"),
+            LabelRow(successOnCall: nil, label: 4, value: "fallback")
         ]
         for row in rows {
             let primary = ProducerSpy.succeeding(onCall: row.successOnCall, with: "primary")
@@ -172,7 +172,7 @@ final class CompositionCharacterizationTests: XCTestCase {
         }
     }
 
-    func test_fallbackTo_whenTheFallbackIsRetried_labelsEachOfItsSuccessesTwo() {
+    func test_fallbackTo_whenTheFallbackIsRetried_countsTheFailuresOfBoth() {
         for successOnCall in 1...3 {
             let primary = ProducerSpy.alwaysFailing()
             let fallback = ProducerSpy.succeeding(onCall: successOnCall, with: "fallback")
@@ -182,15 +182,19 @@ final class CompositionCharacterizationTests: XCTestCase {
 
             XCTAssertEqual(fallback.callCount, successOnCall, "calls of the retried fallback")
             XCTAssertEqual(consumer.count, 1, "one delivery, fallback succeeds on call \(successOnCall)")
-            XCTAssertEqual(consumer.lastLabel, 2, "label when the fallback succeeds on call \(successOnCall)")
+            XCTAssertEqual(
+                consumer.lastLabel,
+                UInt(successOnCall),
+                "the primary's failure and the fallback's failures before its call \(successOnCall)"
+            )
         }
     }
 
     func test_retry_onARetriedAction_repeatsTheInnerRetryAsAUnit() {
         let rows = [
             LabelRow(successOnCall: 1, label: 0, value: "value"),
-            LabelRow(successOnCall: 2, label: 2, value: "value"),
-            LabelRow(successOnCall: 3, label: 3, value: "value"),
+            LabelRow(successOnCall: 2, label: 1, value: "value"),
+            LabelRow(successOnCall: 3, label: 2, value: "value"),
             LabelRow(successOnCall: 4, label: 3, value: "value"),
             LabelRow(successOnCall: nil, label: nil, value: nil)
         ]
@@ -217,10 +221,10 @@ final class CompositionCharacterizationTests: XCTestCase {
         XCTAssertEqual(primary.callCount, 2, "the primary runs again with the pair")
         XCTAssertEqual(fallback.callCount, 2, "the fallback runs again with the pair")
         XCTAssertEqual(consumer.count, 1, "one delivery")
-        XCTAssertEqual(consumer.lastLabel, 3, "legacy label of the fourth call")
+        XCTAssertEqual(consumer.lastLabel, 3, "three failed attempts before the fourth call")
     }
 
-    func test_fallbackTo_whenNestedRightOrLeft_labelsTheLastActionByShape() {
+    func test_fallbackTo_whenNestedRightOrLeft_labelsTheLastActionTheSameEitherWay() {
         let rightNested = ConsumerSpy()
         let leftNested = ConsumerSpy()
         func failing() -> DMButtonAction { ProducerSpy.alwaysFailing().action }
@@ -231,7 +235,7 @@ final class CompositionCharacterizationTests: XCTestCase {
 
         XCTAssertEqual(rightNested.count + leftNested.count, 2, "one delivery per run")
         XCTAssertEqual(rightNested.lastLabel, 2, "A.fallbackTo(B.fallbackTo(C))")
-        XCTAssertEqual(leftNested.lastLabel, 3, "A.fallbackTo(B).fallbackTo(C)")
+        XCTAssertEqual(leftNested.lastLabel, 2, "A.fallbackTo(B).fallbackTo(C)")
     }
 
     func test_fallbackTo_whenChainedAHundredDeep_runsEveryProducerOnceInOrder() {
@@ -255,7 +259,16 @@ final class CompositionCharacterizationTests: XCTestCase {
         XCTAssertEqual(calls, (0...depth).map { "\($0) call 1" }, "in composition order")
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastValue, "last", "the last fallback delivers")
-        XCTAssertEqual(consumer.lastLabel, UInt(depth) + 1, "legacy label of a left-nested chain")
+        XCTAssertEqual(consumer.lastLabel, UInt(depth), "a hundred failed attempts before the last")
+    }
+
+    func test_currentAttempt_ofACompositionOrARetry_isTheReceiversAttempt() {
+        let receiver = DMActionWithFallback(currentAttempt: 5, { $0(.success("primary")) }, { $0(.success("fallback")) })
+        let other = DMButtonAction { $0(.success("other")) }
+
+        XCTAssertEqual(receiver.fallbackTo(other).currentAttempt, 5, "fallbackTo keeps the receiver's attempt")
+        XCTAssertEqual(receiver.retry(3).currentAttempt, 5, "retry keeps the receiver's attempt")
+        XCTAssertEqual(other.fallbackTo(receiver).currentAttempt, 0, "the attempt of a fallback is not used")
     }
 
     // MARK: - Running
@@ -283,7 +296,7 @@ final class CompositionCharacterizationTests: XCTestCase {
         XCTAssertEqual(consumer.count, 2, "one delivery per run")
     }
 
-    func test_fallbackTo_afterOneRetry_labelsTheFallbackThree() {
+    func test_fallbackTo_afterOneRetry_labelsTheFallbackTwo() {
         let primary = ProducerSpy.alwaysFailing()
         let fallback = ProducerSpy(script: [.success("fallback")])
         let consumer = ConsumerSpy()
@@ -292,7 +305,7 @@ final class CompositionCharacterizationTests: XCTestCase {
 
         XCTAssertEqual(primary.callCount, 2, "the first attempt and one retry")
         XCTAssertEqual(consumer.count, 1, "one delivery")
-        XCTAssertEqual(consumer.lastLabel, 3, "legacy label of the fallback after two attempts")
+        XCTAssertEqual(consumer.lastLabel, 2, "two failed attempts before the fallback")
     }
 
     // MARK: - Entry points
@@ -310,7 +323,7 @@ final class CompositionCharacterizationTests: XCTestCase {
 
         XCTAssertEqual(succeeded.count + failed.count, 2, "one delivery per call")
         XCTAssertEqual(succeeded.lastValue, "value", "the payload")
-        XCTAssertEqual(succeeded.lastLabel, 2, "the same legacy label as through action")
+        XCTAssertEqual(succeeded.lastLabel, 1, "the same label as through action")
         XCTAssertTrue(failed.lastError as? MarkedError === error, "a failure keeps its error instance")
     }
 

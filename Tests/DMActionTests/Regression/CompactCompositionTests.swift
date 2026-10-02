@@ -10,7 +10,7 @@ final class CompactCompositionTests: XCTestCase {
         let retried = producer.action.retry(.max)
         retried.action(consumer.receive)
 
-        XCTAssertEqual(retried.currentAttempt, .max, "the attempt of the composition stops at the maximum")
+        XCTAssertEqual(retried.currentAttempt, 0, "retry keeps the receiver's attempt")
         XCTAssertEqual(producer.callCount, 1, "one call")
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastLabel, 0, "the label of a first-try success")
@@ -33,7 +33,7 @@ final class CompactCompositionTests: XCTestCase {
         XCTAssertEqual(deliveriesAfterFiveFailures, 0, "nothing is delivered while attempts remain")
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastValue, "sixth", "the payload of the sixth call")
-        XCTAssertEqual(consumer.lastLabel, 6, "the legacy label of the sixth call")
+        XCTAssertEqual(consumer.lastLabel, 5, "five failed attempts before the sixth call")
     }
 
     // MARK: - Helpers
