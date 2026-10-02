@@ -61,20 +61,23 @@ for path in open(files, encoding="utf-8").read().split("\n"):
             if match is None:
                 if block is not None:
                     sys.exit(f"check-snippets: {path}:{start - 1}: the Swift block of this doc comment is not closed")
+                if re.search(r"(```|~~~)\s*swift", line, re.IGNORECASE):
+                    sys.exit(f"check-snippets: {path}:{index}: a Swift block outside a /// comment is not compiled")
                 continue
             line = match.group(1)
         if block is None:
             if line.strip() == "```swift":
                 block, start = [], index + 1
-            elif re.match(r"^\s*(```|~~~)", line) and "swift" in line.lower():
-                # A fence that may still be shown as Swift, but that this check would skip.
-                sys.exit(f"check-snippets: {path}:{index}: write a Swift block's fence as ```swift, so that it is compiled")
+            elif re.search(r"(```|~~~)\s*swift", line, re.IGNORECASE):
+                # A fence that may still be shown as Swift, in a quote or a list for one, but
+                # that this check would skip.
+                sys.exit(f"check-snippets: {path}:{index}: write a Swift block's fence as ```swift on a line of its own")
         elif line.strip() == "```":
             number += 1
             text = "\n".join(block) + "\n"
             if "Package(" in text:
                 kind = "manifest"
-            elif re.search(r"^import (UIKit|SwiftUI)$", text, re.MULTILINE):
+            elif re.search(r"^\s*(@\w+\s+)*import\s+(UIKit|SwiftUI)\b", text, re.MULTILINE):
                 kind = "ios"
             else:
                 kind = "tool"
@@ -95,12 +98,14 @@ if [ ! -s "$WORK/blocks.txt" ]; then
 fi
 
 FAILED=0
+MANIFESTS=0
 TOOLS=()
 IOS=()
 while read -r KIND NAME WHERE; do
     echo "$NAME $WHERE" >> "$WORK/lines.txt"
     case "$KIND" in
         manifest)
+            MANIFESTS=$((MANIFESTS + 1))
             mkdir -p "$WORK/$NAME"
             cp "$WORK/blocks/$NAME.swift" "$WORK/$NAME/Package.swift"
             if ! swift package dump-package --package-path "$WORK/$NAME" > "$WORK/$NAME.log" 2>&1; then
@@ -119,8 +124,31 @@ while read -r KIND NAME WHERE; do
             cp "$WORK/blocks/$NAME.swift" "$WORK/ios/Sources/$NAME/$NAME.swift"
             IOS+=("$NAME")
             ;;
+        *)
+            echo "check-snippets: $NAME at $WHERE has the unknown kind '$KIND'" >&2
+            FAILED=1
+            ;;
     esac
 done < "$WORK/blocks.txt"
+BLOCKS="$(wc -l < "$WORK/blocks.txt" | tr -d ' ')"
+if [ "$((MANIFESTS + ${#TOOLS[@]} + ${#IOS[@]}))" -ne "$BLOCKS" ]; then
+    echo "check-snippets: $BLOCKS blocks were found, but $((MANIFESTS + ${#TOOLS[@]} + ${#IOS[@]})) were set up to build" >&2
+    FAILED=1
+fi
+
+# Each build also compiles a canary that must warn. If its warning is not found in the log,
+# the search for warnings is broken and would pass a block that warns.
+CANARY="SnippetCanary"
+echo "$CANARY the-canary-of-the-warning-search" >> "$WORK/lines.txt"
+write_canary() { # <file>
+    mkdir -p "$(dirname "$1")"
+    {
+        echo "func canary() {"
+        echo "    var neverChanged = 1"
+        echo "    print(neverChanged)"
+        echo "}"
+    } > "$1"
+}
 
 # The manifest of a generated package: one target per block, each depending on DMAction.
 write_manifest() { # <folder> <platform line> <target kind> <product line> <names...>
@@ -161,6 +189,10 @@ report() { # <log> <what>
 # so a warning is found by the generated name of its block, not by the path of the checkout.
 check_warnings() { # <log>
     local warnings
+    if ! grep -qE "/Sources/$CANARY/[^:]+:[0-9]+:[0-9]+: warning:" "$1"; then
+        echo "check-snippets: the canary's warning is not in ${1#"$ROOT"/}: the search for warnings is broken" >&2
+        FAILED=1
+    fi
     warnings="$(grep -E "/Sources/Snippet[0-9]+/[^:]+:[0-9]+:[0-9]+: warning:" "$1" | sort -u || true)"
     if [ -n "$warnings" ]; then
         echo "check-snippets: a block has a warning:" >&2
@@ -183,9 +215,11 @@ check_compiled() { # <log> <pattern with NAME> <names...>
 }
 
 if [ "${#TOOLS[@]}" -gt 0 ]; then
-    write_manifest "$WORK/tools" ".macOS(.v14)" executableTarget "" "${TOOLS[@]}"
+    write_canary "$WORK/tools/Sources/$CANARY/main.swift"
+    echo "canary()" >> "$WORK/tools/Sources/$CANARY/main.swift"
+    write_manifest "$WORK/tools" ".macOS(.v14)" executableTarget "" "${TOOLS[@]}" "$CANARY"
     if swift build --package-path "$WORK/tools" --scratch-path "$TOOLS_BUILD" > "$WORK/tools.log" 2>&1; then
-        check_compiled "$WORK/tools.log" "Compiling NAME main\.swift" "${TOOLS[@]}"
+        check_compiled "$WORK/tools.log" "Compiling NAME main\.swift" "${TOOLS[@]}" "$CANARY"
         check_warnings "$WORK/tools.log"
     else
         report "$WORK/tools.log" "the blocks for a command-line tool"
@@ -194,13 +228,14 @@ if [ "${#TOOLS[@]}" -gt 0 ]; then
 fi
 
 if [ "${#IOS[@]}" -gt 0 ]; then
-    TARGET_LIST="$(printf '"%s", ' "${IOS[@]}")"
-    write_manifest "$WORK/ios" ".iOS(.v17)" target ".library(name: \"Snippets\", targets: [${TARGET_LIST%, }])" "${IOS[@]}"
+    write_canary "$WORK/ios/Sources/$CANARY/$CANARY.swift"
+    TARGET_LIST="$(printf '"%s", ' "${IOS[@]}" "$CANARY")"
+    write_manifest "$WORK/ios" ".iOS(.v17)" target ".library(name: \"Snippets\", targets: [${TARGET_LIST%, }])" "${IOS[@]}" "$CANARY"
     if (cd "$WORK/ios" && xcodebuild build \
             -scheme Snippets \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$IOS_DERIVED_DATA") > "$WORK/ios.log" 2>&1; then
-        check_compiled "$WORK/ios.log" "^SwiftCompile .*/Sources/NAME/NAME\.swift" "${IOS[@]}"
+        check_compiled "$WORK/ios.log" "^SwiftCompile .*/Sources/NAME/NAME\.swift" "${IOS[@]}" "$CANARY"
         check_warnings "$WORK/ios.log"
     else
         report "$WORK/ios.log" "the blocks for iOS"
@@ -212,6 +247,5 @@ if [ "$FAILED" -ne 0 ]; then
     exit 1
 fi
 FILES="$(cut -d ' ' -f 3 "$WORK/blocks.txt" | cut -d : -f 1 | sort -u | tr '\n' ' ')"
-echo "check-snippets: $(wc -l < "$WORK/blocks.txt" | tr -d ' ') Swift blocks build," \
-    "$(grep -c '^manifest' "$WORK/blocks.txt" || true) manifest, ${#TOOLS[@]} for a command-line tool, ${#IOS[@]} for iOS," \
-    "from ${FILES% }."
+echo "check-snippets: $BLOCKS Swift blocks build without a warning, $MANIFESTS manifest," \
+    "${#TOOLS[@]} for a command-line tool, ${#IOS[@]} for iOS, from ${FILES% }."
