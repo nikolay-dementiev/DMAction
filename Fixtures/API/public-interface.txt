@@ -1,0 +1,51 @@
+public protocol DMActionResultValueProtocol {
+  var attemptCount: Swift.UInt? { get }
+}
+extension DMAction.DMActionResultValueProtocol {
+  public var attemptCount: Swift.UInt? {
+    get
+  }
+}
+extension Swift.Result where Failure == any Swift.Error {
+  public func unwrapValue() -> Swift.Result<any Swift.Copyable, any Swift.Error>
+  public var attemptCount: Swift.UInt? {
+    get
+  }
+}
+public protocol DMAction {
+  typealias ResultType = Swift.Result<any Swift.Copyable, any Swift.Error>
+  typealias ActionType = (@escaping (Self.ResultType) -> Swift.Void) -> Swift.Void
+  var currentAttempt: Swift.UInt { get }
+  var id: Foundation.UUID { get }
+  var action: Self.ActionType { get }
+  var simpleAction: () -> Swift.Void { get }
+}
+extension DMAction.DMAction {
+  public var simpleAction: () -> Swift.Void {
+    get
+  }
+  public func fallbackTo(_ fallback: any DMAction.DMAction) -> DMAction.DMActionWithFallback
+  public func retry(_ retryCount: Swift.UInt) -> any DMAction.DMAction
+  public func callAsFunction(completion: @escaping (Self.ResultType) -> Swift.Void)
+}
+public struct DMActionResultValue : DMAction.DMActionResultValueProtocol {
+  public let attemptCount: Swift.UInt?
+  public let value: any Swift.Copyable
+  public init(value: any Swift.Copyable, attemptCount: Swift.UInt? = nil)
+}
+public struct PlaceholderCopyable : Swift.Copyable {
+  public init()
+}
+public struct DMActionWithFallback : DMAction.DMAction {
+  public let currentAttempt: Swift.UInt
+  public let id: Foundation.UUID
+  public let action: DMAction.DMActionWithFallback.ActionType
+  public init(currentAttempt: Swift.UInt, _ primaryAction: @escaping DMAction.DMActionWithFallback.ActionType, _ fallbackAction: @escaping DMAction.DMActionWithFallback.ActionType)
+}
+public struct DMButtonAction : DMAction.DMAction {
+  public let currentAttempt: Swift.UInt
+  public let id: Foundation.UUID
+  public let action: DMAction.DMButtonAction.ActionType
+  public init(_ action: @escaping DMAction.DMButtonAction.ActionType)
+  public init(_ simpleAction: @escaping () -> Swift.Void)
+}
