@@ -257,12 +257,43 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         if aliveWhileOutstanding {
             pending.work?()
         }
+        let releasedAfterTheDelivery = weakReceiver == nil
         pending.work = nil
 
         XCTAssertTrue(aliveWhileOutstanding, "the receiver lives while its call is outstanding")
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastValue, "deferred", "the receiver's payload")
-        XCTAssertNil(weakReceiver, "the receiver is released after the delivery")
+        XCTAssertTrue(releasedAfterTheDelivery, "the receiver is released after the delivery, though the producer keeps its work")
+    }
+
+    /// A class conformer that keeps its own run's completion, and with it the run.
+    private final class CompletionKeepingConformer: DMAction {
+        let currentAttempt: UInt = 0
+        let id = UUID()
+        var kept: ((ResultType) -> Void)?
+
+        var action: ActionType {
+            { [unowned self] completion in
+                kept = completion
+            }
+        }
+    }
+
+    /// The run keeps the receiver until it delivers, and the receiver keeps the run through the
+    /// completion it stores. The delivery breaks that cycle, though the completion stays stored.
+    func test_callSyntax_onAConformerThatKeepsItsOwnCompletion_releasesItAfterTheDelivery() {
+        let consumer = ConsumerSpy()
+        weak var weakReceiver: CompletionKeepingConformer?
+        do {
+            let receiver = CompletionKeepingConformer()
+            weakReceiver = receiver
+            receiver(completion: consumer.receive)
+            receiver.kept?(.success("kept"))
+        }
+
+        XCTAssertEqual(consumer.count, 1, "one delivery")
+        XCTAssertEqual(consumer.lastValue, "kept", "the receiver's payload")
+        XCTAssertNil(weakReceiver, "the delivery broke the cycle through the stored completion")
     }
 
     func test_run_afterDelivery_releasesTheConsumerWhileAProducerKeepsItsCompletion() {
