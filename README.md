@@ -9,7 +9,7 @@
 [![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_7%2B-yellowgreen?style=flat-square)](#installation)
 [![CocoaPods Compatible](https://img.shields.io/cocoapods/v/DMAction.svg?style=flat-square)](https://cocoapods.org/pods/DMAction)
 [![Swift Package Manager](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)](#swift-package-manager)
-[![CI](https://github.com/nikolay-dementiev/DMAction/actions/workflows/CI_tests.yml/badge.svg)](https://github.com/nikolay-dementiev/DMAction/actions/workflows/CI_tests.yml)
+[![CI](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml/badge.svg)](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml)
 
 - [Overview](#overview)
 - [Features](#features)

@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Mondays. A new runner image or OS that breaks the package shows up within a week.
+    - cron: "23 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Lint
+        run: Scripts/lint.sh
+
+  test:
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The newest hosted image, Xcode and iOS runtime.
+          - name: iOS 26.5
+            runner: macos-26
+            xcode: "26.6"
+            destination: platform=iOS Simulator,name=iPhone 17,OS=26.5
+          # The oldest hosted image and the oldest iOS runtime it offers.
+          - name: iOS 18.5
+            runner: macos-15
+            xcode: "16.4"
+            destination: platform=iOS Simulator,name=iPhone 16,OS=18.5
+    env:
+      XCODE: ${{ matrix.xcode }}
+      DESTINATION: ${{ matrix.destination }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme DMAction \
+            -sdk iphonesimulator \
+            -destination "$DESTINATION" \
+            -enableCodeCoverage YES \
+            -resultBundlePath "$RUNNER_TEMP/DMAction.xcresult" \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+      - name: Coverage
+        run: Scripts/coverage-gate.sh "$RUNNER_TEMP/DMAction.xcresult"
+      - name: Upload the result bundle
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xcresult-${{ matrix.runner }}
+          path: ${{ runner.temp }}/DMAction.xcresult
+
+  floor:
+    # The oldest toolchain the manifest promises: swift-tools-version 6.0 is Xcode 16.0 to 16.2.
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+      - name: Build with Swift 6.0
+        run: |
+          swift --version
+          swift build
+
+  consumer:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Manifest, installation by version, consumer fixture, podspec
+        run: Scripts/check-manifest.sh
+
+  api:
+    # The interface text depends on the compiler: this job and the baseline use Xcode 26.6.
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Public interface against the baseline
+        run: Scripts/check-api.sh
+
+  podspec:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Lint the podspec
+        run: pod lib lint DMAction.podspec
