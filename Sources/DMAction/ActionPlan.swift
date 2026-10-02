@@ -89,62 +89,9 @@ extension ActionPlan {
     typealias Completion = (DMButtonAction.ResultType) -> Void
 
     /// Runs the steps in order and calls `completion` with the first success, labelled, or
-    /// with the failure of the last step. A step starts inside the completion call of the
-    /// step before it, as it did when a composition was a chain of nested closures.
+    /// with the failure of the last step. Each run is an `ActionRun` of its own.
     func run(_ completion: @escaping Completion) {
-        run(from: 0, relabel: .keep, completion: completion)
-    }
-
-    private func run(from index: Int, relabel outer: Relabel, completion: @escaping Completion) {
-        let next: Completion = { result in
-            if case .failure = result, index + 1 < steps.count {
-                run(from: index + 1, relabel: outer, completion: completion)
-            } else {
-                completion(result)
-            }
-        }
-        switch steps[index] {
-        case let .produce(produce, relabel):
-            let label = outer.applied(over: relabel)
-            produce { result in
-                next(label.label(result))
-            }
-        case let .repeating(unit, retries, base, relabel):
-            unit.repeatedly(
-                from: 1,
-                remaining: retries,
-                base: base,
-                relabel: outer.applied(over: relabel),
-                completion: next
-            )
-        }
-    }
-
-    /// Run `number` of a repeated unit, then the runs after it while they fail. The runs that
-    /// remain are counted down, so nothing is ever computed past `retries`.
-    private func repeatedly(
-        from number: UInt,
-        remaining: UInt,
-        base: UInt,
-        relabel: Relabel,
-        completion: @escaping Completion
-    ) {
-        let runLabel: Relabel = number == 1
-            ? .keepOrDefault(base.saturatingAdd(1))
-            : .override(base.saturatingAdd(number))
-        run(from: 0, relabel: relabel.applied(over: runLabel)) { result in
-            if case .failure = result, remaining > 0 {
-                repeatedly(
-                    from: number.saturatingAdd(1),
-                    remaining: remaining - 1,
-                    base: base,
-                    relabel: relabel,
-                    completion: completion
-                )
-            } else {
-                completion(result)
-            }
-        }
+        ActionRun(completion: completion).start(self)
     }
 }
 
