@@ -5,9 +5,14 @@
 //
 
 import Foundation
+#if canImport(os)
+import os
+#endif
 
 /// One run of a plan. Its attempts run in a loop on the thread that continues the run, so
-/// the stack does not grow with the number of attempts or the length of a chain.
+/// the stack does not grow with the number of attempts or the length of a chain. The first
+/// completion of an attempt moves the run on and any later one is ignored, so the consumer is
+/// called at most once.
 final class ActionRun {
     /// What the loop does next: start an attempt, or act on the result of one.
     private enum Work {
@@ -15,13 +20,15 @@ final class ActionRun {
         case finish(Cursor, DMButtonAction.ResultType)
     }
 
-    /// One call of a producer, and what its completion brought while the call was running.
+    /// One call of a producer.
     private final class Attempt {
-        let cursor: Cursor
+        /// Where the attempt is in the plan. Its first completion takes it: a completion that
+        /// finds it gone is a second one.
+        var cursor: Cursor?
         /// The thread inside the producer call, until the call returns.
         var callingThread: Thread?
-        /// The results that arrived on the calling thread before the call returned, in order.
-        var deposits: [DMButtonAction.ResultType] = []
+        /// The first result, when it arrived on the calling thread before the call returned.
+        var deposit: DMButtonAction.ResultType?
 
         init(cursor: Cursor, callingThread: Thread) {
             self.cursor = cursor
@@ -29,9 +36,11 @@ final class ActionRun {
         }
     }
 
-    private let completion: ActionPlan.Completion
-    /// Guards the `callingThread` and `deposits` of every attempt of this run. No producer
-    /// and no completion is ever called while it is held.
+    /// The consumer's completion, until the run delivers to it. After that, a producer that
+    /// keeps its own completion keeps nothing of the consumer alive.
+    private var completion: ActionPlan.Completion?
+    /// Guards `completion` and the state of every attempt of this run. No producer and no
+    /// completion is ever called while it is held.
     private let lock = NSLock()
 
     init(completion: @escaping ActionPlan.Completion) {
@@ -39,57 +48,83 @@ final class ActionRun {
     }
 
     func start(_ plan: ActionPlan) {
-        drive([.start(Cursor(first: plan))])
+        drive(.start(Cursor(first: plan)))
     }
 
-    /// Runs work on this thread until none is left: until the run delivers, or until an
-    /// attempt waits for a completion that has not arrived yet.
-    private func drive(_ initial: [Work]) {
-        var work = initial
-        while let item = work.popLast() {
-            switch item {
+    /// Runs the attempts on this thread, one after another, until the run delivers or until
+    /// an attempt waits for a completion that has not arrived yet.
+    private func drive(_ first: Work) {
+        var next: Work? = first
+        while let work = next {
+            next = nil
+            switch work {
             case let .start(cursor):
-                // A producer that completed more than once continues the run once per result,
-                // the first result first.
-                work.append(contentsOf: call(cursor).reversed().map { .finish(cursor, $0) })
+                next = call(cursor).map { .finish(cursor, $0) }
             case let .finish(cursor, result):
-                if case .failure = result, let next = cursor.next() {
-                    work.append(.start(next))
+                if case .failure = result, let following = cursor.next() {
+                    next = .start(following)
                 } else {
-                    completion(result)
+                    deliver(result)
                 }
             }
         }
     }
 
-    /// Calls the producer at `cursor` and returns what it delivered on this thread before the
-    /// call returned.
-    private func call(_ cursor: Cursor) -> [DMButtonAction.ResultType] {
+    /// Calls the producer at `cursor` and returns its first result when that arrived on this
+    /// thread before the call returned.
+    private func call(_ cursor: Cursor) -> DMButtonAction.ResultType? {
         let attempt = Attempt(cursor: cursor, callingThread: Thread.current)
         cursor.produce { result in
-            self.complete(attempt, with: cursor.relabel.label(result))
+            self.complete(attempt, with: result)
         }
         lock.lock()
         attempt.callingThread = nil
-        let deposits = attempt.deposits
-        attempt.deposits = []
+        let deposit = attempt.deposit
+        attempt.deposit = nil
         lock.unlock()
-        return deposits
+        return deposit
     }
 
     private func complete(_ attempt: Attempt, with result: DMButtonAction.ResultType) {
         lock.lock()
+        guard let cursor = attempt.cursor else {
+            lock.unlock()
+            Self.reportIgnoredCompletion()
+            return
+        }
+        attempt.cursor = nil
+        let labelled = cursor.relabel.label(result)
         // A completion on the thread that is still inside the producer call is kept for that
         // thread, which goes on when the call returns. A completion on any other thread goes
         // on at once: the producer may be waiting, inside its call, for an effect of this very
         // completion, and making the completion wait for the call would deadlock both.
         if attempt.callingThread === Thread.current {
-            attempt.deposits.append(result)
+            attempt.deposit = labelled
             lock.unlock()
             return
         }
         lock.unlock()
-        drive([.finish(attempt.cursor, result)])
+        drive(.finish(cursor, labelled))
+    }
+
+    private func deliver(_ result: DMButtonAction.ResultType) {
+        lock.lock()
+        let completion = self.completion
+        self.completion = nil
+        lock.unlock()
+        completion?(result)
+    }
+
+    /// There is no failure to hand to anyone: the extra completion has nowhere to go. One line
+    /// in the unified log, at fault level, is the whole diagnostic.
+    private static func reportIgnoredCompletion() {
+        #if canImport(os)
+        os_log(
+            "A producer completed more than once. DMAction ignored the extra completion.",
+            log: OSLog(subsystem: "DMAction", category: "ActionRun"),
+            type: .fault
+        )
+        #endif
     }
 }
 

@@ -108,7 +108,7 @@ public extension DMAction {
     /// }
     /// ```
     func callAsFunction(completion: @escaping (ResultType) -> Void) {
-        self.action { result in
+        ActionPlan(of: self).run { result in
             let finalResult = Self.mapResultWithAttempt(result, attempt: result.attemptCount ?? currentAttempt)
             completion(finalResult)
         }
