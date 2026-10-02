@@ -11,7 +11,9 @@
 set -euo pipefail
 
 BUNDLE="${1:?give the path of an .xcresult bundle recorded with code coverage}"
-FLOOR="${2:-90}"
+# Measured for 1.1.0: 99.61 % (253 of 254 lines; the closing brace of Cursor.descend, after its
+# endless loop, is never reached), rounded down to a whole percent.
+FLOOR="${2:-99}"
 TARGET="DMAction"
 REPORT="$(mktemp -t coverage-gate)"
 trap 'rm -f "$REPORT"' EXIT
