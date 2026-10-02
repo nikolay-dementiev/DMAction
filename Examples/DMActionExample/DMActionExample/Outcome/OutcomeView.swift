@@ -1,12 +1,23 @@
 import SwiftUI
 
-/// How many fetches fail, a button that loads, and what came back.
+/// What came back, how many fetches fail, and a button that loads.
+///
+/// The outcome comes first, so that it stays in view at the largest text sizes.
+/// The header and the footer use the primary color: their default gray reaches only about 3.3:1
+/// on the grouped background, under the 4.5:1 that text needs. It is the color `Color.primary`,
+/// because the hierarchical `.primary` resolves to that gray inside a header or a footer.
 struct OutcomeView<ViewModel: OutcomeViewModel>: View {
     @Bindable var viewModel: ViewModel
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    outcome
+                } header: {
+                    Text("Outcome")
+                        .foregroundStyle(Color.primary)
+                }
                 Section {
                     Stepper(value: $viewModel.failuresBeforeSuccess, in: 0...4) {
                         Text("Failures before success: \(viewModel.failuresBeforeSuccess)")
@@ -19,9 +30,7 @@ struct OutcomeView<ViewModel: OutcomeViewModel>: View {
                     .accessibilityIdentifier("load-button")
                 } footer: {
                     Text("The fetch is retried twice. When all three attempts fail, the cached quote is shown.")
-                }
-                Section("Outcome") {
-                    outcome
+                        .foregroundStyle(Color.primary)
                 }
             }
             .navigationTitle("DMAction")

@@ -30,7 +30,32 @@ package final class DefaultOutcomeViewModel: OutcomeViewModel {
         self.source = source
     }
 
+    /// Fetches a quote, retries a failed fetch twice, and shows the cached quote when all three
+    /// attempts have failed.
     package func load() {
         state = .loading
+        let failures = failuresBeforeSuccess
+        var fetches = 0
+        let fetch = DMButtonAction { [source] completion in
+            fetches += 1
+            source.fetchQuote(failing: fetches <= failures, completion: completion)
+        }
+        let cached = DMButtonAction { [source] completion in
+            source.cachedQuote(completion: completion)
+        }
+        let fetchOrCached = fetch.retry(2).fallbackTo(cached)
+        fetchOrCached { [weak self] result in
+            self?.show(result)
+        }
+    }
+
+    private func show(_ result: DMButtonAction.ResultType) {
+        switch result.unwrapValue() {
+        case let .success(quote):
+            // A run labels every success it delivers, so the count is always there.
+            state = .loaded(text: String(describing: quote), failedAttempts: result.attemptCount ?? 0)
+        case let .failure(error):
+            state = .failed(message: error.localizedDescription)
+        }
     }
 }
