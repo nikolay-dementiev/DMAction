@@ -1,0 +1,43 @@
+name: Bug report
+description: Something in DMAction does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Thank you for the report. A security problem does not belong here: report it privately,
+        as SECURITY.md describes.
+  - type: input
+    id: version
+    attributes:
+      label: DMAction version
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Xcode, Swift and the OS it runs on
+      placeholder: "Xcode 26.6, Swift 6.3, iOS 26.5 simulator"
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: The smallest code that shows the problem
+      render: swift
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The result, its attempt label, the order of the calls, or the error message.
+    validations:
+      required: true

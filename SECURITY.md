@@ -1,10 +1,19 @@
-# Security Policy
+# Security policy
 
-## Supported Versions
+## Supported versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+Security fixes are made for the latest release.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+| Version | Supported |
+|---|---|
+| 1.1.x | yes |
+| earlier | no |
+
+## Reporting a vulnerability
+
+Report a vulnerability privately, through GitHub's private vulnerability reporting: on the
+repository page, open the Security tab and choose "Report a vulnerability". Do not open a public
+issue for it.
+
+Describe what is affected, how to reproduce it, and the versions you tried. The report stays
+between you and the maintainer until a fix is published.
