@@ -138,10 +138,18 @@ final class StackSafeExecutionTests: XCTestCase {
     /// 1 800 levels passed and 2 000 failed in a debug build, 2 000 passed and 4 000 failed in a
     /// release build. CI also runs this test with Swift 6.0 and 6.1.
     func test_retry_appliedAThousandTimesToACompositeOnASmallStack_runsAndIsDestroyed() {
+        final class Probe {}
         let (producer, consumer) = makeSUT(script: [.success("value")])
+        weak var weakProbe: Probe?
 
         runOnASmallStack {
-            var action: any DMAction = producer.action.fallbackTo(DMButtonAction { $0(.success("fallback")) })
+            // Only the innermost plan holds the probe, so it goes when the whole nest is destroyed.
+            let probe = Probe()
+            weakProbe = probe
+            var action: any DMAction = producer.action.fallbackTo(DMButtonAction { completion in
+                _ = probe
+                completion(.success("fallback"))
+            })
             for _ in 0..<1_000 {
                 action = action.retry(1)
             }
@@ -152,6 +160,7 @@ final class StackSafeExecutionTests: XCTestCase {
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastValue, "value", "the producer's payload")
         XCTAssertEqual(consumer.lastLabel, 0, "the label of a first-try success")
+        XCTAssertNil(weakProbe, "the nested action was destroyed")
     }
 
     // MARK: - Helpers
