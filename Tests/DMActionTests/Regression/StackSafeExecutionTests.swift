@@ -68,7 +68,7 @@ final class StackSafeExecutionTests: XCTestCase {
         drainAndStop(first, second)
 
         XCTAssertEqual(calls.withLock { $0 }, Self.depth + 1, "the first attempt and ten thousand retries")
-        XCTAssertEqual(completedDuringACall.count, 0, "no completion arrived while a producer call was running")
+        XCTAssertEqual(completedDuringACall.count, 0, "the premise: every completion came after its call had returned")
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertTrue(consumer.lastError as? MarkedError === errors.last, "the error of the last attempt")
     }

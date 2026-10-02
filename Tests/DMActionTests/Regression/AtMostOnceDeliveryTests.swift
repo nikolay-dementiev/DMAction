@@ -392,6 +392,10 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         let right = SerialThread(stackSize: 512 * 1024)
         _ = left.start()
         _ = right.start()
+        defer {
+            left.stop()
+            right.stop()
+        }
         var wrong: [Int] = []
         for iteration in 0..<3_000 {
             let fallbackCalls = LockedCounter()
@@ -413,20 +417,22 @@ final class AtMostOnceDeliveryTests: XCTestCase {
                 done.enter()
                 thread.enqueue {
                     arrived.withLock { $0 += 1 }
-                    while arrived.withLock({ $0 }) < 2 {}
+                    // A thread whose partner never arrives gives up after a second.
+                    let deadline = DispatchTime.now() + 1
+                    while arrived.withLock({ $0 }) < 2, DispatchTime.now() < deadline {}
                     held(.failure(MarkedError()))
                     done.leave()
                 }
             }
-            done.wait()
+            guard done.wait(timeout: .now() + 10) == .success else {
+                return XCTFail("iteration \(iteration): a completion call did not return")
+            }
             let delivered = deliveries.withLock { $0 }
             if producer.callCount != 1 || fallbackCalls.count != 1 || delivered.count != 1
                 || delivered.first.flatMap(ConsumerSpy.text(of:)) != "fallback" || delivered.first?.attemptCount != 1 {
                 wrong.append(iteration)
             }
         }
-        left.stop()
-        right.stop()
 
         XCTAssertEqual(
             wrong, [],

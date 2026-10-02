@@ -32,6 +32,7 @@ final class ThreadCharacterizationTests: XCTestCase {
         let (threads, fallback) = makeSUT()
         let primary = ProducerSpy(script: [.hold])
         let delivered = expectation(description: "the consumer completion ran")
+        delivered.assertForOverFulfill = false
         primary.action.fallbackTo(fallback).action { result in
             threads.delivery = Thread.current
             threads.results.append(result)
@@ -56,6 +57,7 @@ final class ThreadCharacterizationTests: XCTestCase {
         let fallbackStarted = DispatchSemaphore(value: 0)
         let (threads, fallback) = makeSUT(whenTheFallbackRuns: { fallbackStarted.signal() })
         let delivered = expectation(description: "the consumer completion ran")
+        delivered.assertForOverFulfill = false
         var caller: BackgroundCaller?
         var waitForTheFallback: DispatchTimeoutResult?
         let primary = DMButtonAction { completion in
@@ -88,6 +90,7 @@ final class ThreadCharacterizationTests: XCTestCase {
         let fallbackStarted = DispatchSemaphore(value: 0)
         let (threads, fallback) = makeSUT(whenTheFallbackRuns: { fallbackStarted.signal() })
         let delivered = expectation(description: "the consumer completion ran")
+        delivered.assertForOverFulfill = false
         let callReturned = expectation(description: "the call that started the run returned")
         var completer: BackgroundCaller?
         var waitForTheFallback: DispatchTimeoutResult?
