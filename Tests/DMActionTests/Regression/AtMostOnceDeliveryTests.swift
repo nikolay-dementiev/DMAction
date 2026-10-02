@@ -174,6 +174,8 @@ final class AtMostOnceDeliveryTests: XCTestCase {
 
         XCTAssertEqual(lateCompletion, .success, "the run holds no lock while the consumer runs")
         XCTAssertEqual(sut.consumer.count, 1, "one delivery")
+        XCTAssertEqual(sut.consumer.lastValue, "first", "the first completion's payload")
+        XCTAssertEqual(sut.consumer.lastLabel, 0, "the label of a first-try success")
     }
 
     func test_run_whenTwoCompletionsAreIgnored_writesOneFaultToTheUnifiedLogForEach() throws {

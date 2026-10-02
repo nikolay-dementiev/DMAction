@@ -126,6 +126,8 @@ final class StackSafeExecutionTests: XCTestCase {
         }
 
         XCTAssertEqual(producer.callCount, 1, "one call")
+        XCTAssertEqual(consumer.count, 1, "one delivery")
+        XCTAssertEqual(consumer.lastValue, "value", "the producer's payload")
         XCTAssertEqual(consumer.lastLabel, 0, "the label of a first-try success")
     }
 
@@ -148,6 +150,7 @@ final class StackSafeExecutionTests: XCTestCase {
 
         XCTAssertEqual(producer.callCount, 1, "one call")
         XCTAssertEqual(consumer.count, 1, "one delivery")
+        XCTAssertEqual(consumer.lastValue, "value", "the producer's payload")
         XCTAssertEqual(consumer.lastLabel, 0, "the label of a first-try success")
     }
 
