@@ -1,0 +1,8 @@
+# The actions of the workflows are pinned to commits. Dependabot proposes the newer ones.
+# The package itself has no dependency to watch.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
