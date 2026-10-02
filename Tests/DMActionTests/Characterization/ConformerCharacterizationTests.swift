@@ -271,6 +271,39 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertEqual(consumer.lastValue, "labelled", "and keeps the payload")
     }
 
+    func test_run_whenAProducerDeliversNestedWrappers_deliversOneWrapperAroundTheInnermostValue() {
+        let consumer = ConsumerSpy()
+        let nested = DMActionResultValue(value: DMActionResultValue(value: "deep", attemptCount: 1), attemptCount: 2)
+
+        DMButtonAction(fail).fallbackTo(DMButtonAction { $0(.success(nested)) }).action(consumer.receive)
+
+        let delivered = consumer.lastDelivered as? DMActionResultValue
+        XCTAssertEqual(delivered?.value as? String, "deep", "one wrapper, around the innermost value")
+        XCTAssertEqual(delivered?.attemptCount, 1, "the run's label: one failed attempt before it")
+    }
+
+    func test_run_whenNestedWrappersArriveFromAnotherThread_deliversOneWrapperAroundTheInnermostValue() {
+        let consumer = ConsumerSpy()
+        let finished = expectation(description: "the run delivered")
+        let nested = DMActionResultValue(value: DMActionResultValue(value: "deep", attemptCount: 1), attemptCount: 2)
+        let fromAnotherThread = DMButtonAction { completion in
+            BackgroundCaller {
+                completion(.success(nested))
+            }
+            .start()
+        }
+
+        DMButtonAction(fail).fallbackTo(fromAnotherThread).action { result in
+            consumer.receive(result)
+            finished.fulfill()
+        }
+        wait(for: [finished], timeout: 5)
+
+        let delivered = consumer.lastDelivered as? DMActionResultValue
+        XCTAssertEqual(delivered?.value as? String, "deep", "one wrapper, around the innermost value")
+        XCTAssertEqual(delivered?.attemptCount, 1, "the run's label: one failed attempt before it")
+    }
+
     func test_attemptCount_onAnotherConformerOfTheValueProtocol_isNil() {
         let result: DMButtonAction.ResultType = .success(LabelledValue())
 
