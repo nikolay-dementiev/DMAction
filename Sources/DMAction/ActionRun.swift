@@ -69,7 +69,9 @@ final class ActionRun {
                 if case .failure = result, let following = cursor.next() {
                     next = .start(following)
                 } else {
-                    deliver(result)
+                    // A label a producer put on its success is replaced: the run counts its own
+                    // attempts. `base` and `cursor` never change, so no lock is needed here.
+                    deliver(DMActionResultValue.labelling(result, attempt: base.saturatingAdd(cursor.failed)))
                 }
             }
         }
@@ -100,19 +102,17 @@ final class ActionRun {
             return
         }
         attempt.cursor = nil
-        // A label a producer put on its success is replaced: the run counts its own attempts.
-        let labelled = DMActionResultValue.labelling(result, attempt: base.saturatingAdd(cursor.failed))
         // A completion on the thread that is still inside the producer call is kept for that
         // thread, which goes on when the call returns. A completion on any other thread goes
         // on at once: the producer may be waiting, inside its call, for an effect of this very
         // completion, and making the completion wait for the call would deadlock both.
         if attempt.callingThread === Thread.current {
-            attempt.deposit = labelled
+            attempt.deposit = result
             lock.unlock()
             return
         }
         lock.unlock()
-        drive(.finish(cursor, labelled))
+        drive(.finish(cursor, result))
     }
 
     private func deliver(_ result: DMButtonAction.ResultType) {
