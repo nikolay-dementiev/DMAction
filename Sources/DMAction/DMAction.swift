@@ -105,7 +105,9 @@ public extension DMAction {
     /// }
     /// ```
     func callAsFunction(completion: @escaping (ResultType) -> Void) {
-        let attempt = currentAttempt
-        ActionPlan(of: self).run(base: attempt, completion)
+        // The order is part of the contract, for a conformer whose getters have effects:
+        // `action`, then `currentAttempt`, both at the call.
+        let plan = ActionPlan(of: self)
+        plan.run(base: currentAttempt, completion)
     }
 }
