@@ -11,19 +11,19 @@ import Foundation
 public protocol DMAction {
     /// Type representing the result of the action, which can either be a `Copyable` or an `Error`.
     typealias ResultType = Result<Copyable, Error>
-    
+
     /// Type representing the action, which is a closure that takes a completion handler.
     typealias ActionType = (@escaping (ResultType) -> Void) -> Void
-    
+
     /// The current attempt number of the action.
     var currentAttempt: UInt { get }
-    
+
     /// The unique identifier of the action.
     var id: UUID { get }
-    
+
     /// The action to be performed.
     var action: ActionType { get }
-    
+
     /// A simplified version of the action.
     var simpleAction: () -> Void { get }
 }
@@ -42,7 +42,7 @@ public extension DMAction {
             self.action { _ in }
         }
     }
-    
+
     /// Returns a new action that falls back to the given action if this action fails.
     ///
     /// - Parameter fallback: The action to fall back to.
@@ -63,7 +63,7 @@ public extension DMAction {
         let plan = ActionPlan(of: self).followed(by: ActionPlan(of: fallback))
         return DMActionWithFallback(currentAttempt: attempt, plan: plan)
     }
-    
+
     /// Returns a new action that retries this action the specified number of times.
     ///
     /// - Parameter retryCount: The number of times to retry the action.
@@ -86,7 +86,7 @@ public extension DMAction {
         let plan = ActionPlan(.repeating(ActionPlan(of: self), retries: retryCount))
         return DMActionWithFallback(currentAttempt: attempt, plan: plan)
     }
-    
+
     /// Performs the action and calls the completion handler with the result.
     ///
     /// - Parameter completion: The completion handler to call with the result.

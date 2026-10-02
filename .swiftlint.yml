@@ -9,9 +9,6 @@ included:
 excluded:
   - Examples/DMActionTestProject/Pods
 
-disabled_rules:
-  - trailing_whitespace
-
 opt_in_rules:
   - force_unwrapping
   - implicitly_unwrapped_optional

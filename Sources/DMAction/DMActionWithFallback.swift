@@ -10,10 +10,10 @@ import Foundation
 public struct DMActionWithFallback: DMAction {
     /// The current attempt number of the action.
     public let currentAttempt: UInt
-    
+
     /// The unique identifier of the action.
     public let id: UUID = UUID()
-    
+
     /// The action to be performed.
     public let action: ActionType
 

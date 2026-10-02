@@ -11,10 +11,10 @@
 public struct DMActionResultValue: DMActionResultValueProtocol {
     /// The attempt count of the action result.
     public let attemptCount: UInt?
-    
+
     /// The value of the action result.
     public let value: Copyable
-    
+
     /// Initializes a new instance of `DMActionResultValue`.
     ///
     /// - Parameters:

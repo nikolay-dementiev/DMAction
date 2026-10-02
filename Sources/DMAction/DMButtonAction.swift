@@ -48,13 +48,13 @@ public struct DMButtonAction: DMAction {
     private enum Settings {
         static let defaultAttemptCount: UInt = 0
     }
-    
+
     /// The current attempt number of the action.
     public let currentAttempt: UInt
-    
+
     /// The unique identifier of the action.
     public let id: UUID = UUID()
-    
+
     /// The action to be performed.
     public let action: ActionType
 
@@ -75,7 +75,7 @@ public struct DMButtonAction: DMAction {
             plan.run(base: currentAttempt, completion)
         }
     }
-    
+
     /// Initializes a new instance of `DMButtonAction` with the default attempt count and the specified action.
     ///
     /// - Parameter action: The action to be performed.
@@ -83,7 +83,7 @@ public struct DMButtonAction: DMAction {
         self.init(currentAttempt: Settings.defaultAttemptCount,
                   action: action)
     }
-    
+
     /// Initializes a new instance of `DMButtonAction` with the default attempt count and a simple action.
     ///
     /// - Parameter simpleAction: The simple action to be performed.
