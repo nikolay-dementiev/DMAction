@@ -10,6 +10,9 @@ All notable changes to DMAction are recorded in this file. The format follows Ke
 - An example app, `Examples/DMActionExample`, that uses the package from the checkout: a fetch
   retried twice that falls back to a cached quote, with the outcome and its attempt label on the
   screen. Its view model tests, a UIKit test and a UI test with the accessibility audit run in CI.
+- A documentation catalog with the article Running Actions: what a run does, what a producer must
+  do, what the library enforces and what it cannot promise. Every public symbol documents what it
+  does, its range and default, its thread and how it fails.
 
 ### Fixed
 
@@ -88,6 +91,11 @@ without a label arrived.
 
 **Language mode.** The package states the Swift 6 language mode and builds with the upcoming feature
 `ExistentialAny`. The source of a consumer does not change.
+
+### Deprecated
+
+- Installation through CocoaPods. 1.1.0 is the last release published to the CocoaPods trunk; later
+  releases come through Swift Package Manager only.
 
 ### Removed
 

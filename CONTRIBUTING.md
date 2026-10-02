@@ -25,7 +25,9 @@ swift test --sanitize=thread
 
 ## The checks CI runs
 
-Every check is a script in `Scripts/`, and CI runs the same command you run locally.
+The checks below are scripts in `Scripts/`, and CI runs them as you do, except
+`check-example-project.sh`, which needs XcodeGen. The CI jobs that build and test run the commands
+of "Build and test" and of "The example app".
 
 | Script | What it checks |
 |---|---|
@@ -76,11 +78,18 @@ check is yours to run before you commit a change to the example's project.
 
 ## Releases
 
-A release starts from a tag that is the version itself, such as `1.1.0`. Before the tag is pushed,
-the podspec names that version and the newest heading of `CHANGELOG.md` is `## [1.1.0] -` with the
-release date. `Scripts/check-release.sh 1.1.0` checks the three. On the tag, the release workflow
-runs that check and the whole CI workflow, and then drafts a GitHub release from the changelog
-section. Publishing the release, and the pod, stays a manual step.
+A release starts from a tag that is the version itself, such as `1.1.0`, on a commit of `main`:
+merge first, then tag. Before the tag is pushed:
+
+1. The podspec names that version, and the newest heading of `CHANGELOG.md` is `## [1.1.0] -` with
+   the release date and the notes under it. `Scripts/check-release.sh 1.1.0` checks them.
+2. The library's tests pass on an iOS 17 simulator, the oldest version the package supports. CI's
+   oldest runtime is iOS 18.5, so this run is local:
+   `xcodebuild test -scheme DMAction -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5'`.
+
+On the tag, the release workflow runs the check, makes sure the tagged commit is on `main`, runs the
+whole CI workflow, makes sure the tag still points at the commit CI tested, and drafts a GitHub
+release from the changelog section. Publishing the release, and the pod, stays a manual step.
 
 ## Security
 
