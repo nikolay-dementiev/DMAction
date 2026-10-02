@@ -24,34 +24,42 @@ Here’s how this SDK solves the two critical problems mentioned earlier:
 Imagine fetching data from a server. If the request fails due to a temporary network issue, you don’t want to leave your users hanging. With this SDK, you can define a retry mechanism that automatically retries the request up to a specified number of times before failing gracefully.
 
 ```swift
-let action = DMButtonAction {
-    print("Performing task...")
+var attempts = 0
+let action = DMButtonAction { completion in
+    attempts += 1
+    print("Performing task, attempt \(attempts)...")
+    if attempts < 3 {
+        completion(.failure(URLError(.timedOut)))
+    } else {
+        completion(.success("data"))
+    }
 }
 let retriedAction = action.retry(3)
 retriedAction { result in
     switch result.unwrapValue() {
     case .success(let value):
-        print("Success: \(value)")
+        print("Success: \(value) after \(result.attemptCount ?? 0) failed attempts")
     case .failure(let error):
         print("Failed after retries: \(error)")
     }
 }
 ```
-This snippet demonstrates how this SDK handles retries seamlessly, saving you time and effort. Instead of writing nested loops or managing state manually, you simply specify the number of retries, and this SDK takes care of the rest.
+The first two attempts fail and the third succeeds, so the result carries 2: the number of attempts that failed before it. This snippet demonstrates how this SDK handles retries seamlessly, saving you time and effort. Instead of writing nested loops or managing state manually, you simply specify the number of retries, and this SDK takes care of the rest.
 
 ### 2. Fallback Support
 What happens if an action fails completely, even after retries? This SDK allows you to define fallback actions to ensure your app remains robust. For example, if a form submission fails, you can provide a fallback action to notify the user or log the error.
 
 ```swift
-let primaryAction = DMButtonAction {
+let primaryAction = DMButtonAction { completion in
     print("Primary action performed")
+    completion(.failure(URLError(.notConnectedToInternet)))
 }
 let fallbackAction = DMButtonAction {
     print("Fallback action performed")
 }
 let actionWithFallback = primaryAction.fallbackTo(fallbackAction)
 actionWithFallback.action { result in
-    // Handle result
+    // The primary failed, so the fallback ran: its success arrives here.
 }
 ```
 This ensures your app never leaves users stranded, even in the face of failure. By combining retries and fallbacks, this SDK creates a resilient system that gracefully handles errors.
@@ -74,16 +82,15 @@ This SDK is built on a protocol-oriented architecture, making it flexible and ea
 4. Simplified Execution:
  - Use simpleAction to execute actions without worrying about result handling.
 
-##Process and Structure Visualization
-###The structure of the DMAction protocol and its related components:
+## Process and Structure Visualization
 
-###The structure of the DMAction protocol and its related components:
+### The structure of the DMAction protocol and its related components:
 ![](Uml-schema.svg)
 
-###How the retry mechanism works:
+### How the retry mechanism works:
 ![](Retry-Mechanism.svg)
 
-###How fallback actions work:
+### How fallback actions work:
 ![](Fallback-Behavior.svg)
 
 ---
@@ -97,7 +104,7 @@ This SDK is built on a protocol-oriented architecture, making it flexible and ea
 
 ---
 
-##Get Started Today
+## Get Started Today
 Ready to simplify your action handling? Check out the [GitHub repository](https://github.com/nikolay-dementiev/DMAction) for installation instructions, documentation, and examples.
 
 Installing this SDK is simple — just add it to your project using either Swift Package Manager or CocoaPods.
@@ -116,7 +123,7 @@ Happy coding! 🚀
 
 ---
 
-##Additional Resources
+## Additional Resources
 - [GitHub Repository](https://github.com/nikolay-dementiev/DMAction)
 - [Documentation](https://github.com/nikolay-dementiev/DMAction#readme)
 - [Tests](https://github.com/nikolay-dementiev/DMAction/tree/main/Tests/DMActionTests)
