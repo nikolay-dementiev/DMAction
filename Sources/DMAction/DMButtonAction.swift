@@ -58,7 +58,10 @@ public struct DMButtonAction: DMAction {
     
     /// The action to be performed.
     public let action: ActionType
-    
+
+    /// What `action` runs.
+    let plan: ActionPlan
+
     /// Initializes a new instance of `DMButtonAction` with the specified current attempt and action.
     ///
     /// - Parameters:
@@ -66,12 +69,11 @@ public struct DMButtonAction: DMAction {
     ///   - action: The action to be performed.
     internal init(currentAttempt: UInt,
                   action: @escaping ActionType) {
+        let plan = ActionPlan(steps: [.produce(action, .override(currentAttempt))])
         self.currentAttempt = currentAttempt
+        self.plan = plan
         self.action = { completion in
-            action { result in
-                let finalResult = Self.mapResultWithAttempt(result, attempt: currentAttempt)
-                completion(finalResult)
-            }
+            plan.run(completion)
         }
     }
     

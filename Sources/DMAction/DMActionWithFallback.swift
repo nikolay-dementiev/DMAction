@@ -16,7 +16,10 @@ public struct DMActionWithFallback: DMAction {
     
     /// The action to be performed.
     public let action: ActionType
-    
+
+    /// What `action` runs.
+    let plan: ActionPlan
+
     /// Initializes a new instance of `DMActionWithFallback` with the specified primary and fallback actions.
     ///
     /// - Parameters:
@@ -26,20 +29,17 @@ public struct DMActionWithFallback: DMAction {
     public init(currentAttempt: UInt,
                 _ primaryAction: @escaping ActionType,
                 _ fallbackAction: @escaping ActionType) {
+        self.init(currentAttempt: currentAttempt, plan: ActionPlan(steps: [
+            .produce(primaryAction, .keepOrDefault(currentAttempt)),
+            .produce(fallbackAction, .override(currentAttempt.saturatingAdd(1)))
+        ]))
+    }
+
+    init(currentAttempt: UInt, plan: ActionPlan) {
         self.currentAttempt = currentAttempt
-        self.action = { [fallbackAction] completion in
-            primaryAction { result in
-                switch result {
-                case .success:
-                    let finalResult = Self.mapResultWithAttempt(result,
-                                                                attempt: result.attemptCount ?? currentAttempt)
-                    completion(finalResult)
-                case .failure:
-                    let fallbackActionWithIncrement = DMButtonAction(currentAttempt: Self.attempt(after: currentAttempt),
-                                                                     action: fallbackAction)
-                    fallbackActionWithIncrement.action(completion)
-                }
-            }
+        self.plan = plan
+        self.action = { completion in
+            plan.run(completion)
         }
     }
 }

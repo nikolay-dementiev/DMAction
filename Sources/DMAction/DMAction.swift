@@ -60,7 +60,10 @@ public extension DMAction {
     /// }
     /// ```
     func fallbackTo(_ fallback: DMAction) -> DMActionWithFallback {
-        DMActionWithFallback(currentAttempt: Self.attempt(after: currentAttempt), self.action, fallback.action)
+        let attempt = currentAttempt.saturatingAdd(1)
+        let steps = ActionPlan(of: self).relabeled(.keepOrDefault(attempt)).steps
+            + ActionPlan(of: fallback).relabeled(.override(attempt.saturatingAdd(1))).steps
+        return DMActionWithFallback(currentAttempt: attempt, plan: ActionPlan(steps: steps))
     }
     
     /// Returns a new action that retries this action the specified number of times.
@@ -78,13 +81,13 @@ public extension DMAction {
     /// }
     /// ```
     func retry(_ retryCount: UInt) -> DMAction {
-        var currentAction: DMAction = self
-        
-        (0..<retryCount).forEach { _ in
-            currentAction = currentAction.fallbackTo(self)
+        guard retryCount > 0 else {
+            return self
         }
-        
-        return currentAction
+        let attempt = currentAttempt
+        let unit = ActionPlan(of: self)
+        let plan = ActionPlan(steps: [.repeating(unit, retries: retryCount, base: attempt, .keep)])
+        return DMActionWithFallback(currentAttempt: attempt.saturatingAdd(retryCount), plan: plan)
     }
     
     /// Performs the action and calls the completion handler with the result.
