@@ -77,8 +77,10 @@ final class AtMostOnceDeliveryTests: XCTestCase {
 
     func test_run_whenAKeptResultIsFollowedByACompletionFromAnotherThread_ignoresTheSecond() {
         let sut = makeSUT()
+        let primaryCalls = LockedCounter()
         var secondCompletion: DispatchTimeoutResult?
         let primary = DMButtonAction { completion in
+            primaryCalls.increment()
             completion(.failure(MarkedError()))
             let finished = DispatchSemaphore(value: 0)
             BackgroundCaller {
@@ -92,9 +94,11 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         primary.fallbackTo(sut.fallback.action).action(sut.consumer.receive)
 
         XCTAssertEqual(secondCompletion, .success, "the second completion returned before the call did")
+        XCTAssertEqual(primaryCalls.count, 1, "the primary ran once")
         XCTAssertEqual(sut.fallback.callCount, 1, "the fallback runs once, after the first completion")
         XCTAssertEqual(sut.consumer.count, 1, "one delivery")
         XCTAssertEqual(sut.consumer.lastValue, "fallback", "the late success is ignored")
+        XCTAssertEqual(sut.consumer.lastLabel, 1, "labelled after the primary's failure")
     }
 
     // MARK: - Completions after the attempt moved on
@@ -173,6 +177,7 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         completion(.success("first"))
 
         XCTAssertEqual(lateCompletion, .success, "the run holds no lock while the consumer runs")
+        XCTAssertEqual(sut.producer.callCount, 1, "the producer ran once")
         XCTAssertEqual(sut.consumer.count, 1, "one delivery")
         XCTAssertEqual(sut.consumer.lastValue, "first", "the first completion's payload")
         XCTAssertEqual(sut.consumer.lastLabel, 0, "the label of a first-try success")
