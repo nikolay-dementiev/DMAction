@@ -8,9 +8,9 @@ import Foundation
 
 /// A composed action: producers that run in order until one succeeds.
 ///
-/// ``DMAction/fallbackTo(_:)`` and ``DMAction/retry(_:)`` return their compositions as this
-/// type, and ``init(currentAttempt:_:_:)`` builds one from two producers. Every run of it is
-/// guarded, as <doc:RunningActions> describes.
+/// ``DMAction/fallbackTo(_:)`` returns this type, ``DMAction/retry(_:)`` returns one as
+/// `any DMAction` for a count above zero, and ``init(currentAttempt:_:_:)`` builds one from two
+/// producers. Every run of it is guarded, as <doc:RunningActions> describes.
 public struct DMActionWithFallback: DMAction {
     /// The label of a success on the first attempt of a run of this action. A success after
     /// failed attempts is labelled this value plus their number, saturating at `UInt.max`.

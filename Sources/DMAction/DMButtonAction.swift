@@ -16,14 +16,11 @@ import Foundation
 ///
 /// ```swift
 /// let load = DMButtonAction { completion in
-///     URLSession.shared.dataTask(with: url) { data, _, error in
-///         if let data {
-///             completion(.success(data))
-///         } else {
-///             completion(.failure(error ?? URLError(.unknown)))
-///         }
+///     do {
+///         completion(.success(try Data(contentsOf: fileURL)))
+///     } catch {
+///         completion(.failure(error))
 ///     }
-///     .resume()
 /// }
 ///
 /// load { result in
@@ -80,8 +77,9 @@ public struct DMButtonAction: DMAction {
 
     /// Creates an action from a producer.
     ///
-    /// Each run calls `action` on the thread that runs it. The producer calls its completion
-    /// once, before it returns or later, on any thread; a second call is ignored.
+    /// A run calls `action` on the thread that starts it or, as a later attempt of a composed
+    /// action, on the thread where the attempt before it completed. The producer calls its
+    /// completion once, before it returns or later, on any thread; a second call is ignored.
     ///
     /// - Parameter action: The producer.
     public init(_ action: @escaping ActionType) {

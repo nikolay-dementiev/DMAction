@@ -20,7 +20,7 @@ All notable changes to DMAction are recorded in this file. The format follows Ke
   primary fails. It stays at `UInt.max`.
 - `retry(_:)` costs the same for any count. `retry(.max)` never returned.
 - A run no longer grows the stack with the number of attempts or the length of a chain, as long
-  as each producer completes during its call or after its call has returned. Ten thousand
+  as each producer completes on its calling thread during its call, or after its call has returned. Ten thousand
   retries, or a fallback chain ten thousand deep, overflowed the 512 KB stack of a secondary
   thread. A producer that blocks its thread until a completion it handed to another thread has
   returned still takes one level of the stack per attempt.
@@ -64,8 +64,8 @@ replaced by the run's count everywhere. Up to 1.0.5 it was kept in three places:
 `DMActionWithFallback(currentAttempt:_:_:)` as a closure counts as one attempt of the outer run;
 build the chain with `fallbackTo` for an exact count.
 
-**Order of a synchronous producer.** When a producer calls its completion before it returns, the
-completion call now returns at once, the rest of the producer runs, and the next attempt and the
+**Order of a synchronous producer.** When a producer calls its completion on the thread that called
+it, before it returns, the completion call now returns at once, the rest of the producer runs, and the next attempt and the
 consumer follow after the producer has returned. Up to 1.0.5 the next attempt and the consumer ran
 inside the completion call. A producer that blocks after its completion call until the consumer has
 run now waits forever.

@@ -13,17 +13,17 @@ A run is one call of an action: ``DMAction/DMAction/callAsFunction(completion:)`
 ### Order and threads
 
 - The first producer is called on the calling thread, before the call that starts the run returns.
-- When a producer calls its completion before it returns, the completion call returns at once and
-  the result is kept. The rest of the producer runs, and when the producer returns, the next attempt
-  or the delivery follows on the same thread. If every producer completes this way, the whole run
-  finishes before the call that started it returns.
+- When a producer calls its completion on the calling thread before it returns, the completion call
+  returns at once and the result is kept. The rest of the producer runs, and when the producer
+  returns, the next attempt or the delivery follows on the same thread. If every producer completes
+  this way, the whole run finishes on the calling thread before the call that started it returns.
 - When a producer calls its completion after it has returned, on any thread, the run goes on inside
   that completion call, on that thread.
 - When a completion arrives on another thread while the producer is still running, that thread
   goes on at once. It never waits for the producer, which may itself be waiting for an effect of
   that completion. The calling thread stops when the producer returns.
 - The consumer's completion runs where the run finished: on the calling thread when every producer
-  completed during its call, otherwise on the thread of the last completion.
+  completed on that thread during its call, otherwise on the thread of the last completion.
 
 ### Attempt labels
 
@@ -49,15 +49,15 @@ one attempt of the outer run.
 ## What a producer must do
 
 1. Call its completion once per call. Extra calls are ignored, as described below.
-2. Not wait, after calling its completion, for anything the consumer's completion or the next
-   attempt does. Both run only after the producer has returned, so such a producer deadlocks its
-   run. A producer that calls its completion and then keeps working delays the next attempt until
-   it returns.
+2. Not wait, after calling its completion on the calling thread, for anything the consumer's
+   completion or the next attempt does. Both run only after the producer has returned, so such a
+   producer deadlocks its run. A producer that calls its completion and then keeps working delays
+   the next attempt until it returns.
 3. In a long chain of retries or fallbacks, not block its thread until a completion it handed to
    another thread has returned. That completion can arrive on a thread that is still inside an
    older producer call of the run and continue the run there, one level deeper on the stack for
-   every attempt. A producer that completes during its call, or after its call has returned, needs
-   no stack per attempt at any count.
+   every attempt. A producer that completes on the calling thread during its call, or after its
+   call has returned, needs no stack per attempt at any count.
 4. Not rely on a thread: it runs on whatever thread the previous attempt completed on.
 
 ## What the library enforces

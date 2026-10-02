@@ -257,10 +257,10 @@ interface.
 - **No answer, no result.** A producer that never calls its completion stalls its run. Nothing
   times out.
 - **Order.** The first producer runs on your thread before the call returns. When a producer calls
-  its completion before it returns, the next attempt starts after the producer has returned, and if
-  every producer works that way, the result arrives before the call that started the run returns.
-  A producer must not wait, after calling its completion, for something your completion does: it
-  would wait forever.
+  its completion on that thread before it returns, the next attempt starts after the producer has
+  returned, and if every producer works that way, the result arrives on your thread before the call
+  that started the run returns. A producer that calls its completion on its own thread must not
+  then wait for something your completion does: it would wait forever.
 - **Threads.** The result arrives on the thread of the last completion. Nothing is `Sendable`: use
   an action inside one isolation domain, such as the main actor.
 - **Stack.** A run needs no stack per attempt, unless a producer blocks its thread until a
@@ -301,8 +301,8 @@ change with a table. The ones most likely to matter:
 
 - attempt labels count the attempts that failed before the success, so `a.retry(1)` labels a
   success on its second call 1, not 2;
-- when a producer calls its completion before it returns, the next attempt starts after it has
-  returned, not inside the completion call;
+- when a producer calls its completion on its own thread before it returns, the next attempt
+  starts after it has returned, not inside the completion call;
 - a producer that calls its completion twice no longer runs the rest of the chain twice.
 
 ## The family

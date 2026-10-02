@@ -67,9 +67,9 @@ public extension DMAction {
     /// Returns an action that runs this action and, when it fails, the given one.
     ///
     /// The new action delivers the first success, or the error of `fallback`. Building it runs
-    /// nothing; it reads this action's `currentAttempt` and `action`, and the `action` of
-    /// `fallback`, once each. Its ``currentAttempt`` is this action's, and a success of
-    /// `fallback` is labelled one higher for every attempt that failed before it.
+    /// nothing; it reads the `currentAttempt` and `action` of a third-party receiver, and the
+    /// `action` of a third-party `fallback`, once each. Its ``currentAttempt`` is this action's,
+    /// and a success of `fallback` is labelled one higher for every attempt that failed before it.
     ///
     /// A chain of fallbacks of any length runs without growing the stack, with the exception
     /// that ``retry(_:)`` describes: a producer that blocks its thread until a completion it
@@ -99,8 +99,8 @@ public extension DMAction {
     /// A retry starts right after the failure, whatever the error, a `CancellationError`
     /// included. The new action delivers the first success, or the error of the last attempt.
     /// `retry(0)` returns this action itself. Any count, `UInt.max` included, costs the same to
-    /// build; building runs nothing and reads this action's `currentAttempt` and `action` once
-    /// each. Retrying a composite repeats the whole composite.
+    /// build; building runs nothing and, for a third-party conformer, reads its `currentAttempt`
+    /// and `action` once each. Retrying a composite repeats the whole composite.
     ///
     /// Running the new action does not grow the stack with the number of attempts, as long as
     /// each producer completes on its calling thread during its call, or after its call has
@@ -138,9 +138,9 @@ public extension DMAction {
     /// once with the result.
     ///
     /// The first producer runs on the calling thread before this returns. When every producer
-    /// completes before it returns, `completion` runs before this call returns too; otherwise
-    /// it runs on the thread of the last completion. A third-party conformer's `action` and
-    /// then its `currentAttempt` are read when this is called.
+    /// completes on the calling thread before it returns, `completion` runs on that thread before
+    /// this call returns too; otherwise it runs on the thread of the last completion. A
+    /// third-party conformer's `action` and then its `currentAttempt` are read when this is called.
     ///
     /// ```swift
     /// let greet = DMButtonAction { completion in completion(.success("Hello")) }
