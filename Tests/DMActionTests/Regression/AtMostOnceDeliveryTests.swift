@@ -267,6 +267,7 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         final class Token {}
         weak var weakToken: Token?
         var kept: ((DMButtonAction.ResultType) -> Void)?
+        let consumer = ConsumerSpy()
         do {
             let token = Token()
             weakToken = token
@@ -274,11 +275,14 @@ final class AtMostOnceDeliveryTests: XCTestCase {
                 kept = completion
                 completion(.success("value"))
             }
-            action.action { _ in
+            action.action { result in
                 _ = token
+                consumer.receive(result)
             }
         }
 
+        XCTAssertEqual(consumer.count, 1, "one delivery")
+        XCTAssertEqual(consumer.lastValue, "value", "the producer's payload")
         XCTAssertNotNil(kept, "the producer still holds its completion")
         XCTAssertNil(weakToken, "what the consumer captured is released after the delivery")
     }
@@ -291,6 +295,7 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         final class Token {}
         weak var weakToken: Token?
         var kept: ((DMButtonAction.ResultType) -> Void)?
+        let consumer = ConsumerSpy()
         do {
             let token = Token()
             weakToken = token
@@ -299,9 +304,11 @@ final class AtMostOnceDeliveryTests: XCTestCase {
                 kept = completion
                 completion(.success("value"))
             }
-            action.action { _ in }
+            action.action(consumer.receive)
         }
 
+        XCTAssertEqual(consumer.count, 1, "one delivery")
+        XCTAssertEqual(consumer.lastValue, "value", "the producer's payload")
         XCTAssertNotNil(kept, "the producer still holds its completion")
         XCTAssertNil(weakToken, "the plan, and the producer in it, are released with the action")
     }
@@ -323,7 +330,8 @@ final class AtMostOnceDeliveryTests: XCTestCase {
 
     /// Two threads wait at a barrier and complete one attempt at the same moment, thousands of
     /// times. A run that checked the attempt and took it in two steps would let both through now
-    /// and then; the Thread Sanitizer does not see that, because every step holds the lock.
+    /// and then; the Thread Sanitizer does not see that, because every step holds the lock. Each
+    /// time, the run must deliver the fallback's success once, labelled 1.
     func test_run_whenTwoThreadsCompleteOneAttemptAtOnce_runsTheFallbackAndDeliversOnce() {
         let left = SerialThread(stackSize: 512 * 1024)
         let right = SerialThread(stackSize: 512 * 1024)
@@ -332,14 +340,14 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         var wrong: [Int] = []
         for iteration in 0..<3_000 {
             let fallbackCalls = LockedCounter()
-            let deliveries = LockedCounter()
+            let deliveries = Locked<[DMButtonAction.ResultType]>([])
             let producer = ProducerSpy(script: [.hold])
             let fallback = DMButtonAction { completion in
                 fallbackCalls.increment()
                 completion(.success("fallback"))
             }
-            producer.action.fallbackTo(fallback).action { _ in
-                deliveries.increment()
+            producer.action.fallbackTo(fallback).action { result in
+                deliveries.withLock { $0.append(result) }
             }
             guard let held = producer.heldCompletions.first else {
                 return XCTFail("the producer kept its completion")
@@ -356,56 +364,38 @@ final class AtMostOnceDeliveryTests: XCTestCase {
                 }
             }
             done.wait()
-            if fallbackCalls.count != 1 || deliveries.count != 1 {
+            let delivered = deliveries.withLock { $0 }
+            if producer.callCount != 1 || fallbackCalls.count != 1 || delivered.count != 1
+                || delivered.first.flatMap(ConsumerSpy.text(of:)) != "fallback" || delivered.first?.attemptCount != 1 {
                 wrong.append(iteration)
             }
         }
         left.stop()
         right.stop()
 
-        XCTAssertEqual(wrong, [], "iterations where the fallback ran, or the run delivered, other than once")
+        XCTAssertEqual(
+            wrong, [],
+            "iterations where a producer ran other than once, or the run did not deliver the fallback's success, labelled 1, once"
+        )
     }
 
     /// The runs share one action, and each fails a different number of times: a count shared
     /// between runs would give a run the label of another. Four threads complete each attempt
     /// together. A thread knows the run it serves from its thread dictionary, so the producer
-    /// can tell the runs apart.
+    /// can tell the runs apart. The calls of both producers are counted per run as well: work
+    /// done for a run and thrown away would not show in what the run delivers.
     func test_run_whenManyThreadsCompleteEachAttemptTogether_givesEveryRunItsOwnPayloadAndLabel() {
         let runs = 400
         let threadsPerAttempt = 4
         let calls = Locked<[Int: Int]>([:])
+        let fallbackCalls = Locked<[Int: Int]>([:])
         let deliveries = Locked<[Delivery]>([])
         let completions = DispatchGroup()
-        let primary = DMButtonAction { completion in
-            let run = Self.run(of: Thread.current)
-            let call = calls.withLock { counts in
-                counts[run, default: 0] += 1
-                return counts[run, default: 0]
-            }
-            let outcome: DMButtonAction.ResultType =
-                call <= Self.failures(ofRun: run) ? .failure(MarkedError()) : .success("run \(run)")
-            // The threads wait at a gate until all of them exist, then complete together.
-            let ready = DispatchGroup()
-            let gate = DispatchSemaphore(value: 0)
-            for _ in 0..<threadsPerAttempt {
-                completions.enter()
-                ready.enter()
-                BackgroundCaller {
-                    Self.mark(Thread.current, withRun: run)
-                    ready.leave()
-                    _ = gate.wait(timeout: .now() + 5)
-                    completion(outcome)
-                    completions.leave()
-                }
-                .start()
-            }
-            _ = ready.wait(timeout: .now() + 5)
-            for _ in 0..<threadsPerAttempt {
-                gate.signal()
-            }
-        }
+        let primary = Self.primary(countingCallsIn: calls, completingFrom: threadsPerAttempt, in: completions)
         let fallback = DMButtonAction { completion in
-            completion(.success("fallback \(Self.run(of: Thread.current))"))
+            let run = Self.run(of: Thread.current)
+            fallbackCalls.withLock { $0[run, default: 0] += 1 }
+            completion(.success("fallback \(run)"))
         }
         let action = primary.retry(2).fallbackTo(fallback)
 
@@ -422,6 +412,16 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         let byRun = Dictionary(grouping: deliveries.withLock { $0 }, by: \.run)
         let wrong = (0..<runs).filter { byRun[$0] != [Self.expectedDelivery(ofRun: $0)] }
         XCTAssertEqual(wrong, [], "every run delivers once, with its own payload and label")
+        let primaryCalls = calls.withLock { $0 }
+        let fallbacks = fallbackCalls.withLock { $0 }
+        let wrongCalls = (0..<runs).filter { run in
+            primaryCalls[run] != Self.expectedPrimaryCalls(ofRun: run) || fallbacks[run] != Self.expectedFallbackCalls(ofRun: run)
+        }
+        XCTAssertEqual(wrongCalls, [], "every run calls the primary once per attempt, and the fallback once after three failures")
+        XCTAssertTrue(
+            primaryCalls.keys.allSatisfy((0..<runs).contains) && fallbacks.keys.allSatisfy((0..<runs).contains),
+            "every producer call served a run"
+        )
     }
 
     // MARK: - Helpers
@@ -430,6 +430,54 @@ final class AtMostOnceDeliveryTests: XCTestCase {
     /// that fails three times gets the fallback.
     private static func failures(ofRun run: Int) -> Int {
         run % 4
+    }
+
+    /// A producer that fails a run's first `failures(ofRun:)` calls and succeeds after them. Each
+    /// call starts `threadCount` threads that complete it together; every completion call
+    /// leaves `completions` when it returns.
+    private static func primary(
+        countingCallsIn calls: Locked<[Int: Int]>,
+        completingFrom threadCount: Int,
+        in completions: DispatchGroup
+    ) -> DMButtonAction {
+        DMButtonAction { completion in
+            let run = Self.run(of: Thread.current)
+            let call = calls.withLock { counts in
+                counts[run, default: 0] += 1
+                return counts[run, default: 0]
+            }
+            let outcome: DMButtonAction.ResultType =
+                call <= Self.failures(ofRun: run) ? .failure(MarkedError()) : .success("run \(run)")
+            // The threads wait at a gate until all of them exist, then complete together.
+            let ready = DispatchGroup()
+            let gate = DispatchSemaphore(value: 0)
+            for _ in 0..<threadCount {
+                completions.enter()
+                ready.enter()
+                BackgroundCaller {
+                    Self.mark(Thread.current, withRun: run)
+                    ready.leave()
+                    _ = gate.wait(timeout: .now() + 5)
+                    completion(outcome)
+                    completions.leave()
+                }
+                .start()
+            }
+            _ = ready.wait(timeout: .now() + 5)
+            for _ in 0..<threadCount {
+                gate.signal()
+            }
+        }
+    }
+
+    /// One call per attempt, until a success or the third failure.
+    private static func expectedPrimaryCalls(ofRun run: Int) -> Int {
+        min(failures(ofRun: run) + 1, 3)
+    }
+
+    /// One call after the third failure, none otherwise.
+    private static func expectedFallbackCalls(ofRun run: Int) -> Int? {
+        failures(ofRun: run) < 3 ? nil : 1
     }
 
     private static func expectedDelivery(ofRun run: Int) -> Delivery {

@@ -122,22 +122,33 @@ final class ContractCharacterizationTests: XCTestCase {
     func test_run_afterCompletion_releasesWhatItsClosuresCaptured() {
         final class Token {}
         weak var weakToken: Token?
+        var primaryCalls = 0
+        var fallbackCalls = 0
+        let consumer = ConsumerSpy()
         do {
             let token = Token()
             weakToken = token
             let primary = DMButtonAction { completion in
                 _ = token
+                primaryCalls += 1
                 completion(.failure(MarkedError()))
             }
             let fallback = DMButtonAction { completion in
+                fallbackCalls += 1
                 completion(.success("value"))
             }
-            primary.retry(2).fallbackTo(fallback).action { _ in
+            primary.retry(2).fallbackTo(fallback).action { result in
                 _ = token
+                consumer.receive(result)
             }
         }
 
-        XCTAssertNil(weakToken)
+        XCTAssertEqual(primaryCalls, 3, "the primary and its two retries ran")
+        XCTAssertEqual(fallbackCalls, 1, "the fallback ran once")
+        XCTAssertEqual(consumer.count, 1, "one delivery")
+        XCTAssertEqual(consumer.lastValue, "value", "the fallback's payload")
+        XCTAssertEqual(consumer.lastLabel, 3, "labelled after three failed attempts")
+        XCTAssertNil(weakToken, "what the closures captured is released after the delivery")
     }
 
     // MARK: - Helpers
