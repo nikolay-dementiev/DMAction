@@ -31,7 +31,13 @@ func produceValue(completion: @escaping (DMAction.ResultType) -> Void) {
     completion(.success("value"))
 }
 
-func releasedInitializers() -> (DMButtonAction, DMButtonAction, DMButtonAction) {
+struct ReleasedActions {
+    let withResult: DMButtonAction
+    let simple: DMButtonAction
+    let fromFunction: DMButtonAction
+}
+
+func releasedInitializers() -> ReleasedActions {
     let withResult = DMButtonAction { completion in
         completion(.failure(ConsumerError()))
     }
@@ -39,7 +45,7 @@ func releasedInitializers() -> (DMButtonAction, DMButtonAction, DMButtonAction) 
         // A closure with no result: the action always succeeds.
     }
     let fromFunction = DMButtonAction(produceValue)
-    return (withResult, simple, fromFunction)
+    return ReleasedActions(withResult: withResult, simple: simple, fromFunction: fromFunction)
 }
 
 func releasedRequirements(of action: DMButtonAction, and composed: DMActionWithFallback) {
@@ -54,7 +60,10 @@ func releasedRequirements(of action: DMButtonAction, and composed: DMActionWithF
 }
 
 func releasedComposition() {
-    let (withResult, simple, fromFunction) = releasedInitializers()
+    let actions = releasedInitializers()
+    let withResult = actions.withResult
+    let simple = actions.simple
+    let fromFunction = actions.fromFunction
 
     let retried: DMAction = withResult.retry(2)
     let withFallback: DMActionWithFallback = withResult.fallbackTo(simple)

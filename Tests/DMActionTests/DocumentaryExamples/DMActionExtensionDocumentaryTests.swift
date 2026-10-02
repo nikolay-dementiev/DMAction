@@ -24,7 +24,7 @@ final class DMActionExtensionDocumentaryTests: XCTestCase {
         wait(for: [execExpectation], timeout: 0.001)
     }
     
-    func testReturnsANewActionThatFallsBackToTheGivenActionIfThisActionFails () {
+    func testReturnsANewActionThatFallsBackToTheGivenActionIfThisActionFails() {
         let execExpectation1 = expectation(description: "Action 1 should be executed")
         let execExpectation2 = expectation(description: "Action 2 should be executed")
         let action1: DMAction = DMButtonAction { completion in

@@ -38,14 +38,16 @@ private extension ContentView {
         let primaryButtonAction = DMButtonAction(makeActionWithFailureResult)
         let fallbackButtonAction = DMButtonAction(makeActionWithSuccessResult)
 
-        primaryButtonAction
+        let action = primaryButtonAction
             .retry(3)
-            .fallbackTo(fallbackButtonAction)() { result in
-                print("Attempt count: `\(result.attemptCount!)`")
-                print("The result is: `\(result.unwrapValue())")
+            .fallbackTo(fallbackButtonAction)
 
-                // do something with result
-            }
+        action { result in
+            print("Attempt count: `\(String(describing: result.attemptCount))`")
+            print("The result is: `\(result.unwrapValue())")
+
+            // do something with result
+        }
 
         print("`\(#function)` done")
     }
