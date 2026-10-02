@@ -21,6 +21,42 @@ final class StackSafeExecutionTests: XCTestCase {
         XCTAssertTrue(consumer.lastError as? MarkedError === errors.last, "the error of the last attempt")
     }
 
+    /// Two threads, each with a small stack, hand the attempts back and forth: every completion
+    /// arrives on the other thread, after the producer has returned from its call.
+    func test_retry_withTenThousandRetriesCompletedOnAnotherThreadAfterEachCall_callsTheProducerTenThousandAndOneTimes() {
+        let first = SerialThread(stackSize: Self.smallStack)
+        let second = SerialThread(stackSize: Self.smallStack)
+        let firstThread = first.start()
+        _ = second.start()
+        let calls = LockedCounter()
+        let failures = LockedCounter()
+        let delivered = expectation(description: "the run delivered")
+        let producer = DMButtonAction { completion in
+            calls.increment()
+            let returned = DispatchSemaphore(value: 0)
+            (Thread.current === firstThread ? second : first).enqueue {
+                returned.wait()
+                completion(.failure(MarkedError()))
+            }
+            returned.signal()
+        }
+
+        runOnASmallStack {
+            producer.retry(UInt(Self.depth)).action { result in
+                if case .failure = result {
+                    failures.increment()
+                }
+                delivered.fulfill()
+            }
+        }
+        wait(for: [delivered], timeout: 120)
+        first.stop()
+        second.stop()
+
+        XCTAssertEqual(calls.count, Self.depth + 1, "the first attempt and ten thousand retries")
+        XCTAssertEqual(failures.count, 1, "one delivery, the failure of the last attempt")
+    }
+
     func test_fallbackTo_chainedTenThousandDeepToTheLeftOnASmallStack_runsEveryProducerOnce() {
         let (spies, consumer) = makeSUT()
 
