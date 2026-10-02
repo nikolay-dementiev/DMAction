@@ -10,11 +10,11 @@
 #    with an unstable dependency or an unsafe flag as a dependency by version, a build
 #    plugin of a dependency runs in every consumer's build, and a manifest that reads the
 #    environment describes more than one package.
-# 2. The installation manifest of README.md works. Its URL and version are the podspec's.
-#    With only its URL pointed at a throw-away tagged copy of the tracked manifest and
-#    sources, it resolves and builds: a consumer that depends on the checkout by path cannot
-#    show a failure of a version requirement, and only a build shows a wrong product or
-#    package name.
+# 2. The installation manifest of README.md works. Its URL and version are the podspec's,
+#    and no platform it declares is below the package's. With only its URL pointed at a
+#    throw-away tagged copy of the tracked manifest and sources, it resolves and builds: a
+#    consumer that depends on the checkout by path cannot show a failure of a version
+#    requirement, and only a build shows a wrong product or package name.
 # 3. Fixtures/Consumer builds without a warning. It uses the released public declarations
 #    with their exact types and the shapes the downstream package relies on, so if it
 #    stops building, a consumer's code stops building.
@@ -102,25 +102,26 @@ else
 fi
 
 # 2. The installation manifest of README.md, against a throw-away tagged copy of the tracked
-#    files. The copy is named after the module, so the package identity the README names
-#    stays the same when its URL points at the copy.
+#    files. The copy is named after the last component of the README's URL, as SwiftPM names
+#    the package it fetches from there, so the package name the README uses must match it.
 PROBE="$(mktemp -d "$WORK/version-probe.XXXXXX")"
-mkdir -p "$PROBE/$MODULE" "$PROBE/consumer"
-git ls-files -z -- Package.swift Sources | xargs -0 -I{} rsync -R {} "$PROBE/$MODULE/"
+mkdir -p "$PROBE/consumer"
 # The probe repository takes nothing from the git configuration of whoever runs this:
 # no signing, no hooks, no identity.
 probe_git() {
-    git -C "$PROBE/$MODULE" \
+    git -C "$PROBE/$COPY" \
         -c user.name=probe -c user.email=probe@example.invalid \
         -c commit.gpgsign=false -c tag.gpgSign=false -c core.hooksPath=/dev/null \
         "$@"
 }
-# Writes the consumer's manifest and prints the version the README asks for.
-if ! VERSION="$(python3 - "$ROOT/README.md" "$ROOT/$MODULE.podspec" "$PROBE" "$MODULE" <<'PY'
+# Writes the consumer's manifest and prints the version the README asks for and the name of
+# the copy.
+if ! ANSWER="$(python3 - "$ROOT/README.md" "$ROOT/$MODULE.podspec" "$PROBE" "$WORK/manifest.json" <<'PY'
+import json
 import re
 import sys
 
-readme, podspec, probe, module = sys.argv[1:5]
+readme, podspec, probe, package_manifest = sys.argv[1:5]
 blocks = re.findall(r"^```swift\n(.*?)^```$", open(readme, encoding="utf-8").read(), re.S | re.M)
 manifests = [block for block in blocks if "Package(" in block]
 if len(manifests) != 1:
@@ -137,25 +138,62 @@ if not spec_url or url != spec_url.group(1):
     problems.append(f"README.md installs from {url}, the podspec's source is {spec_url and spec_url.group(1)}")
 if not spec_version or version != spec_version.group(1):
     problems.append(f"README.md asks for version {version}, the podspec is {spec_version and spec_version.group(1)}")
+# The build below runs for this Mac, so it cannot see an iOS or watchOS floor: compare them here.
+def version_tuple(text):
+    return tuple(int(part) for part in text.split("."))
+floors = {p["platformName"]: p["version"] for p in json.load(open(package_manifest)).get("platforms", [])}
+declared = re.findall(r"\.(iOS|watchOS|macOS|tvOS|visionOS)\(\.v(\d+)(?:_(\d+))?\)", manifests[0])
+if not declared:
+    problems.append("the manifest of README.md declares no platform")
+for name, major, minor in declared:
+    wanted = f"{major}.{minor or 0}"
+    floor = floors.get(name.lower())
+    if floor is None:
+        problems.append(f"README.md's manifest declares {name}, a platform the package does not declare")
+    elif version_tuple(wanted) < version_tuple(floor):
+        problems.append(f"README.md's manifest declares {name} {wanted}, the package needs {name} {floor}")
 if problems:
     sys.exit("\n".join(f"check-manifest: {problem}" for problem in problems))
+# SwiftPM names a package it fetches after the last component of its URL.
+copy = re.sub(r"\.git$", "", url.rstrip("/").split("/")[-1])
 with open(f"{probe}/consumer/Package.swift", "w", encoding="utf-8") as consumer:
-    consumer.write(manifests[0].replace(f'url: "{url}"', f'url: "file://{probe}/{module}"'))
-print(version)
+    consumer.write(manifests[0].replace(f'url: "{url}"', f'url: "file://{probe}/{copy}"'))
+print(version, copy)
 PY
 )"; then
     FAILED=1
 else
-    probe_git init -q
-    probe_git add -A
-    probe_git commit -q -m probe
-    probe_git tag "$VERSION"
-    # Every target of the consumer gets a source file that imports the module.
-    if ! TARGETS="$(swift package --package-path "$PROBE/consumer" dump-package 2> "$WORK/readme-manifest.log" \
-            | python3 -c 'import json, sys; print("\n".join(t["name"] for t in json.load(sys.stdin)["targets"]))')"; then
-        echo "check-manifest: the manifest of README.md does not evaluate. See ${WORK#"$ROOT"/}/readme-manifest.log" >&2
+    read -r VERSION COPY <<< "$ANSWER"
+    mkdir -p "$PROBE/$COPY"
+    # Without -l, rsync skips a symbolic link and says so only in a warning: the counts below
+    # would show it.
+    git ls-files -z -- Package.swift Sources | xargs -0 -I{} rsync -Rl {} "$PROBE/$COPY/"
+    COPIED="$(cd "$PROBE/$COPY" && find . \( -type f -o -type l \) | wc -l | tr -d ' ')"
+    TRACKED="$(git ls-files -- Package.swift Sources | wc -l | tr -d ' ')"
+    if [ "$COPIED" -eq "$TRACKED" ]; then
+        # SwiftPM resolves the copy as soon as it reads the consumer's manifest.
+        probe_git init -q
+        probe_git add -A
+        probe_git commit -q -m probe
+        probe_git tag "$VERSION"
+    fi
+    if [ "$COPIED" -ne "$TRACKED" ]; then
+        echo "check-manifest: the tagged copy holds $COPIED of the $TRACKED tracked files of the package" >&2
+        FAILED=1
+    elif ! swift package --package-path "$PROBE/consumer" dump-package \
+            > "$WORK/readme-manifest.json" 2> "$WORK/readme-manifest.log"; then
+        echo "check-manifest: the manifest of README.md does not evaluate:" >&2
+        sed 's/^/  /' "$WORK/readme-manifest.log" | head -10 >&2
+        FAILED=1
+    elif ! TARGETS="$(python3 -c 'import json, sys; print("\n".join(t["name"] for t in json.load(sys.stdin)["targets"]))' \
+            < "$WORK/readme-manifest.json")"; then
+        echo "check-manifest: the targets of the README's manifest cannot be read" >&2
+        FAILED=1
+    elif [ -z "$TARGETS" ]; then
+        echo "check-manifest: the manifest of README.md has no target to build" >&2
         FAILED=1
     else
+        # Every target of the consumer gets a source file that imports the module.
         while IFS= read -r TARGET; do
             mkdir -p "$PROBE/consumer/Sources/$TARGET"
             echo "import $MODULE" > "$PROBE/consumer/Sources/$TARGET/$TARGET.swift"
@@ -164,7 +202,12 @@ else
             echo "check-manifest: the manifest of README.md asks for the podspec's URL and version $VERSION, and resolves and builds by version."
         else
             echo "check-manifest: the manifest of README.md does not resolve or build by version:" >&2
-            grep -E "error:|cannot be used|unstable|unsafe" "$WORK/version-build.log" | cut -c1-300 | head -5 >&2 || true
+            ERRORS="$(grep -E "error:|cannot be used|unstable|unsafe" "$WORK/version-build.log" | cut -c1-300 | head -5 || true)"
+            if [ -n "$ERRORS" ]; then
+                printf '%s\n' "$ERRORS" >&2
+            else
+                tail -15 "$WORK/version-build.log" | sed 's/^/  /' >&2
+            fi
             FAILED=1
         fi
     fi
