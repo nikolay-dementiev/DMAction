@@ -9,6 +9,7 @@ included:
 opt_in_rules:
   - force_unwrapping
   - implicitly_unwrapped_optional
+  - missing_docs
 
 # Analyzer rules need the compiler invocations of a build. They run only with
 # `Scripts/lint.sh --analyze <xcodebuild log>`, on the log of a build whose DerivedData is
@@ -35,6 +36,11 @@ function_parameter_count:
 line_length:
   warning: 130
   error: 200
+
+# Every public symbol is documented. By default the rule skips the members of a type that
+# conforms to a protocol, which is every public type of the library.
+missing_docs:
+  excludes_inherited_types: false
 
 custom_rules:
   no_process_termination:
