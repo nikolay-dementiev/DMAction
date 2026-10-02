@@ -12,9 +12,6 @@ end
 current_dependency_manager = dependency_manager
 puts "#{LOG_INFO}: >>> Using #{DEPENDENCY_MANAGER_KEY}: `#{current_dependency_manager}` <<<"
 
-# Run cleanup before installing pods
-clean_xcode_project(PROJECT_NAME)
-
 # Main target configuration
 target PROJECT_NAME do
   # Conditionally include the DMErrorHandling pod
