@@ -3,6 +3,9 @@
 
 import PackageDescription
 
+// Every target compiles with these. Scripts/check-api.sh repeats them in SWIFT_FLAGS.
+let swiftSettings: [SwiftSetting] = [.enableUpcomingFeature("ExistentialAny")]
+
 let package = Package(
     name: "DMAction",
     platforms: [
@@ -17,12 +20,12 @@ let package = Package(
     targets: [
         .target(
             name: "DMAction",
-            swiftSettings: [.enableUpcomingFeature("ExistentialAny")]
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "DMActionTests",
             dependencies: ["DMAction"],
-            swiftSettings: [.enableUpcomingFeature("ExistentialAny")]
+            swiftSettings: swiftSettings
         ),
     ],
     swiftLanguageModes: [.v6]
