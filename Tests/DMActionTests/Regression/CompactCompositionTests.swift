@@ -6,11 +6,15 @@ import XCTest
 final class CompactCompositionTests: XCTestCase {
     func test_retry_withTheMaximumCountAndAnImmediateSuccess_runsTheProducerOnce() {
         let (producer, consumer) = makeSUT(script: [.success("first")])
+        var retried: (any DMAction)?
 
-        let retried = producer.action.retry(.max)
-        retried.action(consumer.receive)
+        runOnAThreadOfItsOwn {
+            let action = producer.action.retry(.max)
+            action.action(consumer.receive)
+            retried = action
+        }
 
-        XCTAssertEqual(retried.currentAttempt, 0, "retry keeps the receiver's attempt")
+        XCTAssertEqual(retried?.currentAttempt, 0, "retry keeps the receiver's attempt")
         XCTAssertEqual(producer.callCount, 1, "one call")
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastLabel, 0, "the label of a first-try success")
@@ -19,7 +23,9 @@ final class CompactCompositionTests: XCTestCase {
     func test_retry_withTheMaximumCount_retriesEachFailureDeliveredByHand() throws {
         let (producer, consumer) = makeSUT(script: [.hold])
 
-        producer.action.retry(.max).action(consumer.receive)
+        runOnAThreadOfItsOwn {
+            producer.action.retry(.max).action(consumer.receive)
+        }
         for call in 1...5 {
             let held = try XCTUnwrap(producer.heldCompletions.last, "the completion of call \(call)")
             held(.failure(MarkedError()))
@@ -40,5 +46,17 @@ final class CompactCompositionTests: XCTestCase {
 
     private func makeSUT(script: [ProducerSpy.Outcome]) -> (producer: ProducerSpy, consumer: ConsumerSpy) {
         (ProducerSpy(script: script), ConsumerSpy())
+    }
+
+    /// Runs `work` on a thread of its own and waits five seconds at most, so that a `retry` that
+    /// builds one action per retry fails this test instead of hanging the whole run.
+    private func runOnAThreadOfItsOwn(_ work: @escaping () -> Void) {
+        let finished = expectation(description: "the work finished")
+        BackgroundCaller {
+            work()
+            finished.fulfill()
+        }
+        .start()
+        wait(for: [finished], timeout: 5)
     }
 }

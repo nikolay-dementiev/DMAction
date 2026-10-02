@@ -33,6 +33,13 @@ final class ConformerCharacterizationTests: XCTestCase {
         let simpleAction: () -> Void
     }
 
+    /// A conformer that starts counting from the attempt it is given.
+    private struct ActionAtAttempt: DMAction {
+        let currentAttempt: UInt
+        let id = UUID()
+        let action: ActionType
+    }
+
     /// A value that reports a label through the protocol, not through the library's wrapper.
     private struct LabelledValue: DMActionResultValueProtocol {
         var attemptCount: UInt? { 9 }
@@ -174,6 +181,19 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(consumer.lastLabel, 0, "call syntax wraps the result with the conformer's attempt")
         XCTAssertEqual(consumer.lastValue, "primary", "and keeps the payload")
+    }
+
+    func test_callSyntax_withANonZeroAttempt_labelsFromThatAttempt() {
+        let customRun = ConsumerSpy()
+        let builtInRun = ConsumerSpy()
+        let custom = ActionAtAttempt(currentAttempt: 7, action: succeed)
+        let builtIn = DMActionWithFallback(currentAttempt: 5, fail, succeedAsFallback)
+
+        custom(completion: customRun.receive)
+        builtIn(completion: builtInRun.receive)
+
+        XCTAssertEqual(customRun.lastLabel, 7, "a third-party action's own attempt")
+        XCTAssertEqual(builtInRun.lastLabel, 6, "the given attempt plus the failed primary")
     }
 
     func test_customConformer_whenItsProducerSuppliesALabel_overwritesItThroughCallSyntaxAndComposition() {

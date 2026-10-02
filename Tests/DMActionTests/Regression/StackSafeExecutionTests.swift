@@ -10,8 +10,7 @@ final class StackSafeExecutionTests: XCTestCase {
 
     func test_retry_withTenThousandRetriesOnASmallStack_callsTheProducerTenThousandAndOneTimes() {
         let errors = (0...Self.depth).map { _ in MarkedError() }
-        let producer = ProducerSpy(script: errors.map { .failure($0) })
-        let consumer = ConsumerSpy()
+        let (producer, consumer) = makeSUT(script: errors.map { .failure($0) })
 
         runOnASmallStack {
             producer.action.retry(UInt(Self.depth)).action(consumer.receive)
@@ -57,12 +56,13 @@ final class StackSafeExecutionTests: XCTestCase {
     }
 
     /// `retry` applied to a composite, again and again, nests one plan per call. Running such
-    /// an action does not grow the stack; destroying it does, by one level per call. The
-    /// documented promise is 1 000 levels on a 512 KB stack. Measured on macOS: about 1 900
-    /// levels in a debug build, between 2 000 and 4 000 in a release build.
+    /// an action does not grow the stack; destroying it does, by one level per call. The test
+    /// pins 1 000 levels, about half of the smallest limit measured. Measured by raising the
+    /// nesting until the process stopped with SIGBUS, with Swift 6.3.3 on macOS 26.5, arm64:
+    /// 1 800 levels passed and 2 000 failed in a debug build, 2 000 passed and 4 000 failed in a
+    /// release build. CI also runs this test with Swift 6.0 and 6.1.
     func test_retry_appliedAThousandTimesToACompositeOnASmallStack_runsAndIsDestroyed() {
-        let producer = ProducerSpy(script: [.success("value")])
-        let consumer = ConsumerSpy()
+        let (producer, consumer) = makeSUT(script: [.success("value")])
 
         runOnASmallStack {
             var action: any DMAction = producer.action.fallbackTo(DMButtonAction { $0(.success("fallback")) })
@@ -78,6 +78,10 @@ final class StackSafeExecutionTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    private func makeSUT(script: [ProducerSpy.Outcome]) -> (producer: ProducerSpy, consumer: ConsumerSpy) {
+        (ProducerSpy(script: script), ConsumerSpy())
+    }
 
     /// Every producer fails except the last one, which succeeds with "last".
     private func makeSUT() -> (spies: [ProducerSpy], consumer: ConsumerSpy) {
