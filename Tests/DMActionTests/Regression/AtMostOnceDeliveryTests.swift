@@ -23,6 +23,15 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         let consumer = ConsumerSpy()
     }
 
+    /// What one run of the concurrent test delivered.
+    private struct Delivery: Equatable {
+        let run: Int
+        let text: String?
+        let label: UInt?
+    }
+
+    private static let runKey = "DMActionTests.run"
+
     // MARK: - Two completions before the call returns
 
     func test_run_whenAProducerSucceedsTwice_deliversTheFirstSuccessOnce() {
@@ -145,22 +154,33 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         XCTAssertEqual(sut.consumer.count, 1, "one delivery")
     }
 
-    func test_run_whenACompletionIsIgnored_writesAFaultToTheUnifiedLog() throws {
+    func test_run_whenTwoCompletionsAreIgnored_writesOneFaultToTheUnifiedLogForEach() throws {
         guard #available(macOS 12, iOS 15, watchOS 8, tvOS 15, *) else {
             throw XCTSkip("Reading the log of this process needs OSLogStore")
         }
-        let store = try OSLogStore(scope: .currentProcessIdentifier)
-        let start = store.position(date: Date())
+        // The lines are counted between two markers of this test. Neither a position nor a date
+        // separated them from the lines of the tests before: the store returned those too.
+        let marker = UUID().uuidString
+        let markers = Logger(subsystem: "DMActionTests", category: "AtMostOnceDeliveryTests")
         let action = DMButtonAction { completion in
             completion(.success("first"))
             completion(.success("second"))
+            completion(.failure(MarkedError()))
         }
 
+        markers.notice("start \(marker, privacy: .public)")
         action.action { _ in }
+        markers.notice("end \(marker, privacy: .public)")
 
-        let entries = try store.getEntries(at: start, matching: NSPredicate(format: "subsystem == %@", "DMAction"))
-        let faults = entries.compactMap { $0 as? OSLogEntryLog }.filter { $0.level == .fault }
-        XCTAssertTrue(faults.contains { $0.composedMessage.contains("completed more than once") })
+        let entries = try OSLogStore(scope: .currentProcessIdentifier)
+            .getEntries(matching: NSPredicate(format: "subsystem IN %@", ["DMAction", "DMActionTests"]))
+            .compactMap { $0 as? OSLogEntryLog }
+        let start = try XCTUnwrap(entries.firstIndex { $0.composedMessage == "start \(marker)" }, "the start marker")
+        let end = try XCTUnwrap(entries.firstIndex { $0.composedMessage == "end \(marker)" }, "the end marker")
+        let faults = entries[start..<end].filter {
+            $0.subsystem == "DMAction" && $0.level == .fault && $0.composedMessage.contains("completed more than once")
+        }
+        XCTAssertEqual(faults.count, 2, "one fault line for each of the two ignored completions")
     }
 
     // MARK: - Lifetime
@@ -185,7 +205,11 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         XCTAssertNil(weakToken, "what the consumer captured is released after the delivery")
     }
 
-    func test_run_afterTheFirstCompletion_releasesWhatTheProducerCapturedWhileItKeepsItsCompletion() {
+    /// The boundary of the release: after the delivery, once every producer call of the run has
+    /// returned. Here the producer completes inside its call, the call returns, and the action
+    /// goes out of scope. A producer call still on a stack would keep its cursor, and with it
+    /// the frames and the plan, until it returns.
+    func test_run_afterDeliveryOnceEveryProducerCallHasReturned_releasesThePlanWhileAProducerKeepsItsCompletion() {
         final class Token {}
         weak var weakToken: Token?
         var kept: ((DMButtonAction.ResultType) -> Void)?
@@ -219,50 +243,86 @@ final class AtMostOnceDeliveryTests: XCTestCase {
 
     // MARK: - Many threads: exact counts first, then the Thread Sanitizer
 
-    func test_run_whenManyThreadsCompleteOneAttemptTogether_runsTheFallbackAndDeliversOncePerRun() {
-        let runs = 500
-        let threadsPerRun = 4
-        let fallbackCalls = LockedCounter()
-        let deliveries = LockedCounter()
+    /// The runs share one action, and each fails a different number of times: a count shared
+    /// between runs would give a run the label of another. Four threads complete each attempt
+    /// together. A thread knows the run it serves from its thread dictionary, so the producer
+    /// can tell the runs apart.
+    func test_run_whenManyThreadsCompleteEachAttemptTogether_givesEveryRunItsOwnPayloadAndLabel() {
+        let runs = 400
+        let threadsPerAttempt = 4
+        let calls = Locked<[Int: Int]>([:])
+        let deliveries = Locked<[Delivery]>([])
         let completions = DispatchGroup()
-        let fallback = DMButtonAction { completion in
-            fallbackCalls.increment()
-            completion(.success("fallback"))
-        }
         let primary = DMButtonAction { completion in
+            let run = Self.run(of: Thread.current)
+            let call = calls.withLock { counts in
+                counts[run, default: 0] += 1
+                return counts[run, default: 0]
+            }
+            let outcome: DMButtonAction.ResultType =
+                call <= Self.failures(ofRun: run) ? .failure(MarkedError()) : .success("run \(run)")
             // The threads wait at a gate until all of them exist, then complete together.
             let ready = DispatchGroup()
             let gate = DispatchSemaphore(value: 0)
-            for _ in 0..<threadsPerRun {
+            for _ in 0..<threadsPerAttempt {
                 completions.enter()
                 ready.enter()
                 BackgroundCaller {
+                    Self.mark(Thread.current, withRun: run)
                     ready.leave()
                     _ = gate.wait(timeout: .now() + 5)
-                    completion(.failure(MarkedError()))
+                    completion(outcome)
                     completions.leave()
                 }
                 .start()
             }
             _ = ready.wait(timeout: .now() + 5)
-            for _ in 0..<threadsPerRun {
+            for _ in 0..<threadsPerAttempt {
                 gate.signal()
             }
         }
-        let action = primary.fallbackTo(fallback)
+        let fallback = DMButtonAction { completion in
+            completion(.success("fallback \(Self.run(of: Thread.current))"))
+        }
+        let action = primary.retry(2).fallbackTo(fallback)
 
-        for _ in 0..<runs {
-            action.action { _ in
-                deliveries.increment()
+        for run in 0..<runs {
+            Self.mark(Thread.current, withRun: run)
+            action.action { result in
+                let delivery = Delivery(run: run, text: ConsumerSpy.text(of: result), label: result.attemptCount)
+                deliveries.withLock { $0.append(delivery) }
             }
         }
+        Thread.current.threadDictionary.removeObject(forKey: Self.runKey)
 
         XCTAssertEqual(completions.wait(timeout: .now() + 60), .success, "every completion call returned")
-        XCTAssertEqual(fallbackCalls.count, runs, "one fallback per run")
-        XCTAssertEqual(deliveries.count, runs, "one delivery per run")
+        let byRun = Dictionary(grouping: deliveries.withLock { $0 }, by: \.run)
+        let wrong = (0..<runs).filter { byRun[$0] != [Self.expectedDelivery(ofRun: $0)] }
+        XCTAssertEqual(wrong, [], "every run delivers once, with its own payload and label")
     }
 
     // MARK: - Helpers
+
+    /// Run n fails n % 4 times. The fetch and its two retries make three attempts, so a run
+    /// that fails three times gets the fallback.
+    private static func failures(ofRun run: Int) -> Int {
+        run % 4
+    }
+
+    private static func expectedDelivery(ofRun run: Int) -> Delivery {
+        let failures = failures(ofRun: run)
+        let text = failures < 3 ? "run \(run)" : "fallback \(run)"
+        return Delivery(run: run, text: text, label: UInt(failures))
+    }
+
+    private static func mark(_ thread: Thread, withRun run: Int) {
+        thread.threadDictionary[runKey] = run
+    }
+
+    /// -1 for a thread no run marked, so that a mix-up shows as a wrong delivery.
+    private static func run(of thread: Thread) -> Int {
+        thread.threadDictionary[runKey] as? Int ?? -1
+    }
 
     private func makeSUT(
         producer: [ProducerSpy.Outcome] = [.hold],
