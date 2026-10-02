@@ -78,21 +78,41 @@ one attempt of the outer run.
 
 These hold for ``DMButtonAction`` and ``DMActionWithFallback`` through all three ways of running
 them, for call syntax on any conformer, and for a third-party conformer composed with
-``DMAction/DMAction/retry(_:)`` or ``DMAction/DMAction/fallbackTo(_:)``. The ``DMAction/DMAction/action``
-of a third-party conformer called directly, its default ``DMAction/DMAction/simpleAction``, and a
-`simpleAction` it supplies itself are its own closures: nothing guards them.
+``DMAction/DMAction/fallbackTo(_:)``, or with ``DMAction/DMAction/retry(_:)`` and a positive count.
+`retry(0)` returns the conformer itself. The ``DMAction/DMAction/action`` of a third-party
+conformer called directly, after `retry(0)` too, its default ``DMAction/DMAction/simpleAction``,
+and a `simpleAction` it supplies itself are its own closures: nothing guards them.
 
 ## What the library cannot promise
 
 - **Liveness.** A producer that never completes stalls its run. Nothing times out.
 - **A thread.** The consumer's completion runs on the thread where the run finished.
 - **Isolation.** No closure type is `@Sendable` and no type is `Sendable`. Use an action inside one
-  isolation domain.
+  isolation domain. The next section shows what the compiler accepts.
 - **Typed payloads.** The success type is erased to `any Copyable`.
 - **Unlimited nesting of composites.** Applying ``DMAction/DMAction/retry(_:)`` to a composite again
   and again nests one level per application. Running such an action does not grow the stack;
   destroying it does, one level per application. A thousand levels are safe on the 512 KB stack of
   a secondary thread.
+
+## Isolation in Swift 6
+
+The compiler keeps an action and its results inside one isolation domain. In the Swift 6 language
+mode:
+
+| Use | Compiles |
+|---|---|
+| A main-actor type runs an action and changes its own state in the completion | Yes |
+| A main-actor type builds an action from one of its own methods | Yes |
+| A producer made in a main-actor method completes from a `Task` it creates | Yes |
+| A producer completes from `Task.detached` | No: passing the closure as a `sending` parameter risks data races |
+| A producer made outside an actor completes from a `Task` it creates | No: the same error |
+| A run is bridged to `async` code with `withCheckedContinuation` | No: sending the result risks data races |
+| A composed action is kept in a `static let` | No: the static property is not concurrency-safe |
+| An action or a result is used as `any Sendable` | No: it does not conform to `Sendable` |
+
+Each of these shapes is a fixture of the repository, in `Fixtures/Consumer` and
+`Fixtures/Rejected`, and CI builds each one.
 
 ## When a third-party conformer's properties are read
 
