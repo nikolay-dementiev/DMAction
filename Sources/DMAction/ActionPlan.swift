@@ -22,11 +22,13 @@ struct ActionPlan {
         steps = [first] + rest
     }
 
+    // Private, so that a plan is only ever built from a first step: `followed(by:)`, the one
+    // caller, joins two plans that each have one. A run reads the first step unchecked.
     private init(steps: [Step]) {
         self.steps = steps
     }
 
-    /// The steps of this plan, then those of `next`.
+    /// One flat list for `fallbackTo`, so that a long chain of fallbacks nests nothing.
     func followed(by next: ActionPlan) -> ActionPlan {
         ActionPlan(steps: steps + next.steps)
     }
