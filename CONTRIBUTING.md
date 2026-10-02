@@ -34,6 +34,21 @@ Every check is a script in `Scripts/`, and CI runs the same command you run loca
 | `Scripts/check-manifest.sh` | the manifest, installation by version, the consumer fixture, the podspec and the uses across isolation domains that the compiler must keep rejecting |
 | `Scripts/coverage-gate.sh <result bundle>` | the line coverage of the library |
 
+## The example app
+
+`Examples/DMActionExample` uses the package from this checkout. Its view model tests, a UIKit
+test and a UI test with the accessibility audit run with:
+
+```bash
+xcodebuild test -project Examples/DMActionExample/DMActionExample.xcodeproj -scheme DMActionExample -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5'
+```
+
+The Xcode project is generated with XcodeGen 2.45.3 from `Examples/DMActionExample/project.yml`,
+and both are committed. Change the spec, not the project:
+`Scripts/check-example-project.sh --update` regenerates the project, and
+`Scripts/check-example-project.sh` checks that the two agree. CI does not install XcodeGen, so this
+check is yours to run before you commit a change to the example's project.
+
 ## Tests
 
 - XCTest, through the public API only: no `@testable import`.

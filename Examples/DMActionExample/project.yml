@@ -1,5 +1,6 @@
 # The example app of DMAction. The Xcode project next to this file is generated from it:
-# change this file and run `xcodegen` here, never edit the project by hand.
+# change this file and run `Scripts/check-example-project.sh --update`, never edit the
+# project by hand. Without `--update`, the script checks that the two agree.
 name: DMActionExample
 options:
   bundleIdPrefix: io.github.nikolaydementiev
