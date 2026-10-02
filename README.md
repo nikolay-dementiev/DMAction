@@ -1,269 +1,315 @@
 # DMAction
 
-<p align="center">
-  <img src="Documentation/DMAction-SDK-logo.png" alt="DMAction SDK logo" height="200">
-</p>
+Compose completion-based actions with retries and fallbacks, and get one result back.
 
-[![Swift](https://img.shields.io/badge/Swift-5%2B-orange?style=flat-square)](https://swift.org) [![Swift tools version](https://img.shields.io/badge/Swift_tools-6.0-darkorange?style=flat-square)](https://swift.org/package-manager/)
-
-[![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_7%2B-yellowgreen?style=flat-square)](#installation)
-[![CocoaPods Compatible](https://img.shields.io/cocoapods/v/DMAction.svg?style=flat-square)](https://cocoapods.org/pods/DMAction)
-[![Swift Package Manager](https://img.shields.io/badge/Swift_Package_Manager-compatible-orange?style=flat-square)](#swift-package-manager)
 [![CI](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml/badge.svg)](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml)
+[![Swift 6.0+](https://img.shields.io/badge/Swift-6.0%2B-orange?style=flat-square)](#requirements)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_7%2B-yellowgreen?style=flat-square)](#requirements)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-- [Overview](#overview)
-- [Features](#features)
-- [UML diagrams](#uml-diagrams)
+<p align="center">
+  <img src="Documentation/DMAction-SDK-logo.png" alt="DMAction logo" height="200">
+</p>
+
+- [What it is](#what-it-is)
+- [Requirements](#requirements)
 - [Installation](#installation)
-  - [CocoaPods](#cocoapods)
-  - [Swift Package Manager](#swift-package-manager)
+- [Quick start](#quick-start)
 - [Usage](#usage)
-  - [Basic usage](#basic-usage)
-  - [Using with UIKit](#using-with-uikit)
-  - [Using with SwiftUI](#using-with-swiftui)
-  - [Retry and fallback example](#retry-and-fallback-example)
-- [License](#license)
-- [Additional resources](#additional-resources)
+- [Behaviour your app must know](#behaviour-your-app-must-know)
+- [Example app and tests](#example-app-and-tests)
+- [Versions and migration](#versions-and-migration)
+- [The family](#the-family)
+- [Contributing, security, licence](#contributing-security-licence)
 
-## Overview
+## What it is
 
-DMAction is a Swift library for composing completion-based actions with retry and fallback behavior. It centralizes execution and result handling behind a protocol-oriented API shared by UIKit and SwiftUI clients.
+An action wraps a producer: a closure that receives a completion and calls it once with a
+`Result`. `retry(_:)` and `fallbackTo(_:)` combine actions into new actions without running
+anything. Running an action calls its producers in order until one succeeds and delivers one
+result, with an attempt label: how many attempts of that run failed before the success.
 
-## Features
+Use it when work reports its result through a completion handler, from an SDK, a network client
+or your own code, and a failure should be tried again or replaced by another source.
 
-- Compose actions with configurable retry and fallback behavior
-- Receive asynchronous results through completion handlers
-- Ignore results through `simpleAction` or handle them through `Result`
-- Use the same small API from UIKit and SwiftUI
+It is not a fit when:
 
-## UML diagrams
-### Protocol overview
+- your code is `async`: a loop around `try await` says the same with less;
+- a retry must wait, back off or look at the error first: DMAction retries right away, after any
+  error;
+- the work has to be cancelled: an action has no cancellation.
 
-<p align="center">
-  <img src="Documentation/Uml-schema.svg" alt="DMAction protocol overview diagram" height="300">
-</p>
+## Requirements
 
-### Retry mechanism
+- Swift 6.0 or later, which is Xcode 16 or later, for Swift Package Manager.
+- iOS 17 or later, or watchOS 7 or later.
 
-<p align="center">
-  <img src="Documentation/Retry-Mechanism.svg" alt="DMAction retry mechanism diagram" height="300">
-</p>
+What each platform is verified with:
 
-### Fallback behavior
-
-<p align="center">
-  <img src="Documentation/Fallback-Behavior.svg" alt="DMAction fallback behavior diagram" height="300">
-</p>
+| Platform | How |
+|---|---|
+| iOS 26.5 (Xcode 26.6), iOS 18.5 (Xcode 16.4) | the tests run on simulators in CI, for the library and the example app |
+| iOS 17.5, iOS 18.6 | the tests run on simulators before a release |
+| macOS, the host | the tests run in CI with Swift 6.0.3, and again under the Thread Sanitizer. macOS is not a declared platform |
+| watchOS | CI builds the library for watchOS with `pod lib lint`. No test runs on watchOS |
 
 ## Installation
 
-### CocoaPods
-
-To integrate `DMAction` into your Xcode project using CocoaPods, specify it in your `Podfile`:
-
-```ruby
-pod 'DMAction'
-```
-
-Then, run the following command:
-
-```bash
-pod install
-```
-
 ### Swift Package Manager
 
-To add `DMAction` through Swift Package Manager, include it in the `dependencies` array of your `Package.swift` file:
+Add the package and the product to your `Package.swift`:
 
 ```swift
-dependencies: [
-    .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "1.0.5")
-]
+// swift-tools-version: 6.0
+import PackageDescription
+
+let package = Package(
+    name: "MyApp",
+    platforms: [.iOS(.v17)],
+    dependencies: [
+        .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "1.1.0"),
+    ],
+    targets: [
+        .target(
+            name: "MyApp",
+            dependencies: [.product(name: "DMAction", package: "DMAction")]
+        ),
+    ]
+)
 ```
+
+In Xcode, choose File > Add Package Dependencies and enter
+`https://github.com/nikolay-dementiev/DMAction.git`.
+
+### CocoaPods
+
+```ruby
+pod 'DMAction', '~> 1.1'
+```
+
+Version 1.1.0 is the last release published to the CocoaPods trunk. Later releases come through
+Swift Package Manager only. The podspec stays in the repository, and CI lints it.
+
+## Quick start
+
+```swift
+import DMAction
+import Foundation
+
+var calls = 0
+let fresh = DMButtonAction { completion in
+    calls += 1
+    if calls < 3 {
+        completion(.failure(URLError(.timedOut)))
+    } else {
+        completion(.success("Fresh quote"))
+    }
+}
+let cached = DMButtonAction { completion in
+    completion(.success("Cached quote"))
+}
+
+let quote = fresh.retry(2).fallbackTo(cached)
+quote { result in
+    switch result.unwrapValue() {
+    case .success(let text):
+        print(text, "after", result.attemptCount ?? 0, "failed attempts")
+    case .failure(let error):
+        print("Failed:", error)
+    }
+}
+// Prints "Fresh quote after 2 failed attempts"
+```
+
+The fetch is tried up to three times. Had the third attempt failed too, the cached quote would
+have been delivered, labelled 3.
 
 ## Usage
 
-### Basic usage
+### Results and attempt labels
 
-For retry and fallback composition, see the [retry and fallback example](#retry-and-fallback-example).
+A run delivers a `DMAction.ResultType`, a `Result<any Copyable, any Error>`. A success comes
+wrapped in a `DMActionResultValue`: `unwrapValue()` gives the payload a producer delivered, and
+`attemptCount` gives the label. A failure is the error of the last attempt, the same instance,
+without a label.
+
+| Action | Success at | Label |
+|---|---|---|
+| `a` | its first call | 0 |
+| `a.retry(n)` | call 1, 2, 3, ... n + 1 | 0, 1, 2, ... n |
+| `a.fallbackTo(b)` | `a`, `b` | 0, 1 |
+| `a.retry(1).fallbackTo(b)` | `a`, `a`, `b` | 0, 1, 2 |
+| `a.fallbackTo(b).retry(1)` | `a`, `b`, `a`, `b` | 0, 1, 2, 3 |
+
+`retry(n)` runs the action again up to n more times, right after each failure, whatever the
+error. `retry(0)` returns the action itself. `fallbackTo(_:)` chains of any length and any count
+of retries, `UInt.max` included, cost the same to build.
+
+### Running without a result
+
+`simpleAction()` runs an action and drops its result, a failure included. An action made from a
+closure without a completion cannot fail:
 
 ```swift
 import DMAction
 
-let buttonAction = DMButtonAction {
-    print("Button action performed")
+let tap = DMButtonAction {
+    print("Tapped")
 }
-
-buttonAction.simpleAction()
+tap.simpleAction()
 ```
 
-### Using with UIKit
+### UIKit
 
 ```swift
+import DMAction
 import Foundation
 import UIKit
-import DMAction
 
-final class ActionViewController: UIViewController {
-    override func loadView() {
-        let ignoreResultButton = UIButton(type: .system)
-        ignoreResultButton.setTitle("Run and ignore result", for: .normal)
-        ignoreResultButton.addTarget(
-            self,
-            action: #selector(performIgnoringResult),
-            for: .touchUpInside
-        )
+final class QuoteViewController: UIViewController {
+    private let label = UILabel()
 
-        let handleResultButton = UIButton(type: .system)
-        handleResultButton.setTitle("Run and handle result", for: .normal)
-        handleResultButton.addTarget(
-            self,
-            action: #selector(performHandlingResult),
-            for: .touchUpInside
-        )
-
-        let stackView = UIStackView(arrangedSubviews: [
-            ignoreResultButton,
-            handleResultButton
-        ])
-        stackView.axis = .vertical
-        stackView.spacing = 12
-        view = stackView
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        let button = UIButton(type: .system, primaryAction: UIAction(title: "Load") { [weak self] _ in
+            self?.load()
+        })
+        let stack = UIStackView(arrangedSubviews: [label, button])
+        stack.axis = .vertical
+        stack.frame = view.bounds
+        view.addSubview(stack)
     }
 
-    @objc
-    private func performIgnoringResult() {
-        makeAction().simpleAction()
-    }
-
-    @objc
-    private func performHandlingResult() {
-        let action = makeAction()
-        action { result in
-            // Handle the result.
+    private func load() {
+        let fresh = DMButtonAction { completion in
+            completion(.failure(URLError(.timedOut)))
         }
-    }
-
-    private func makeAction() -> DMActionWithFallback {
-        let primaryAction = DMButtonAction(makeActionWithFailureResult)
-        let fallbackAction = DMButtonAction(makeActionWithSuccessResult)
-
-        return primaryAction
-            .retry(2)
-            .fallbackTo(fallbackAction)
-    }
-
-    private func makeActionWithFailureResult(
-        completion: @escaping (DMAction.ResultType) -> Void
-    ) {
-        completion(.failure(NSError(
-            domain: "TestDomain",
-            code: 404,
-            userInfo: nil
-        )))
-    }
-
-    private func makeActionWithSuccessResult(
-        completion: @escaping (DMAction.ResultType) -> Void
-    ) {
-        let resultValue: Copyable = "\(#function) succeeded!"
-        completion(.success(resultValue))
+        let cached = DMButtonAction { completion in
+            completion(.success("Kept from the last visit"))
+        }
+        fresh.retry(2).fallbackTo(cached).action { [weak self] result in
+            if case .success(let quote) = result.unwrapValue() {
+                self?.label.text = "\(quote)"
+            }
+        }
     }
 }
 ```
 
-### Using with SwiftUI
+### SwiftUI
 
 ```swift
+import DMAction
 import Foundation
 import SwiftUI
-import DMAction
 
-struct ActionButtonsView: View {
+@MainActor
+@Observable
+final class QuoteModel {
+    private(set) var text = "Nothing loaded yet"
+
+    func load() {
+        let fresh = DMButtonAction { completion in
+            completion(.failure(URLError(.timedOut)))
+        }
+        let cached = DMButtonAction { completion in
+            completion(.success("Kept from the last visit"))
+        }
+        fresh.retry(2).fallbackTo(cached).action { [weak self] result in
+            if case .success(let quote) = result.unwrapValue() {
+                self?.text = "\(quote)"
+            }
+        }
+    }
+}
+
+struct QuoteView: View {
+    @State private var model = QuoteModel()
+
     var body: some View {
         VStack {
-            Button("Run and ignore result", action: performIgnoringResult)
-            Button("Run and handle result", action: performHandlingResult)
+            Text(model.text)
+            Button("Load") {
+                model.load()
+            }
         }
-    }
-
-    private func performIgnoringResult() {
-        makeAction().simpleAction()
-    }
-
-    private func performHandlingResult() {
-        let action = makeAction()
-        action { result in
-            // Handle the result.
-        }
-    }
-
-    private func makeAction() -> DMActionWithFallback {
-        let primaryAction = DMButtonAction(makeActionWithFailureResult)
-        let fallbackAction = DMButtonAction(makeActionWithSuccessResult)
-
-        return primaryAction
-            .retry(2)
-            .fallbackTo(fallbackAction)
-    }
-
-    private func makeActionWithFailureResult(
-        completion: @escaping (DMAction.ResultType) -> Void
-    ) {
-        completion(.failure(NSError(
-            domain: "TestDomain",
-            code: 404,
-            userInfo: nil
-        )))
-    }
-
-    private func makeActionWithSuccessResult(
-        completion: @escaping (DMAction.ResultType) -> Void
-    ) {
-        let resultValue: Copyable = "\(#function) succeeded!"
-        completion(.success(resultValue))
     }
 }
 ```
 
+The producers in these two examples complete on the main thread. A producer that completes on
+another thread has the result delivered there: hand it to the main thread before you touch the
+interface.
 
-### Retry and fallback example
+## Behaviour your app must know
 
-This example allows one retry after the primary action's initial attempt. If both attempts fail, DMAction invokes the fallback action.
+- **One result per run.** The first completion of an attempt moves the run on; a later one is
+  ignored and written to the unified log at fault level (subsystem `DMAction`). The completion you
+  pass is called at most once.
+- **No answer, no result.** A producer that never calls its completion stalls its run. Nothing
+  times out.
+- **Order.** The first producer runs on your thread before the call returns. When a producer calls
+  its completion before it returns, the next attempt starts after the producer has returned, and if
+  every producer works that way, the result arrives before the call that started the run returns.
+  A producer must not wait, after calling its completion, for something your completion does: it
+  would wait forever.
+- **Threads.** The result arrives on the thread of the last completion. Nothing is `Sendable`: use
+  an action inside one isolation domain, such as the main actor.
+- **Stack.** A run needs no stack per attempt, unless a producer blocks its thread until a
+  completion it handed to another thread has returned: then every such attempt takes one level.
+- **A compiler crash.** Swift 6.3 crashes when call syntax is applied directly to the value that
+  `retry(_:)` returns, as in `action.retry(1)(completion: handle)`. Store the action in a constant
+  first, or call `action.retry(1).action(handle)`.
 
-```swift
-import Foundation
-import DMAction
+The full contract, with what a producer must do, what the library enforces and what it cannot
+promise, is the article Running Actions in the documentation catalog
+(`Sources/DMAction/DMAction.docc`). Build it in Xcode with Product > Build Documentation.
 
-let primaryButtonAction = DMButtonAction { completion in
-    completion(.failure(NSError(domain: "TestError", code: 1, userInfo: nil)))
-}
+<p align="center">
+  <img src="Documentation/Retry-Mechanism.svg" alt="Diagram: an action that fails is run again, up to the retry count, before its result is delivered" height="300">
+  <img src="Documentation/Fallback-Behavior.svg" alt="Diagram: when the primary action fails, the fallback action runs and its result is delivered" height="300">
+</p>
 
-let fallbackButtonAction = DMButtonAction { completion in
-    completion(.success("Fallback succeeded"))
-}
+## Example app and tests
 
-let actionWithFallback = primaryButtonAction
-    .retry(1)
-    .fallbackTo(fallbackButtonAction)
+`Examples/DMActionExample` is an app that loads a quote with two retries and a cached fallback,
+and shows the outcome with its attempt label. Open
+`Examples/DMActionExample/DMActionExample.xcodeproj` and run the `DMActionExample` scheme. Its
+tests cover the view model, a UIKit button that runs an action, and the screen through a UI test
+with the accessibility audit.
 
-actionWithFallback { result in
-    let unwrappedResult = result.unwrapValue()
-    print("Attempt count: \(result.attemptCount ?? 0)")
+The library's tests run on iOS simulators and on the host, with the Thread Sanitizer, and their
+line coverage is a gate in CI. CI also checks that the public interface matches its baseline, that
+a consumer of the package builds, that the documentation builds without a warning, that the
+podspec lints, and that every Swift block of this README compiles. `CONTRIBUTING.md` lists the
+commands.
 
-    switch unwrappedResult {
-    case .success(let value):
-        print("Result value: \(value)")
-    case .failure(let error):
-        print("Action failed: \(error)")
-    }
-}
-```
+## Versions and migration
 
-## License
+DMAction follows semantic versioning. `CHANGELOG.md` records every release.
 
-DMAction is available under the MIT License. See [LICENSE](LICENSE) for details.
+Coming from 1.0.x: no declaration changed, but some behaviour did, and `CHANGELOG.md` lists each
+change with a table. The ones most likely to matter:
 
-## Additional resources
+- attempt labels count the attempts that failed before the success, so `a.retry(1)` labels a
+  success on its second call 1, not 2;
+- when a producer calls its completion before it returns, the next attempt starts after it has
+  returned, not inside the completion call;
+- a producer that calls its completion twice no longer runs the rest of the chain twice.
 
-- [The Challenges of Retry Logic and Fallback Mechanisms in App Development](Documentation/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md)
+## The family
+
+DMAction is one of three packages that share their conventions:
+
+- [DMVariableBlurView](https://github.com/nikolay-dementiev/DMVariableBlurView): variable blur
+  effects for SwiftUI.
+- [DMUnLoader](https://github.com/nikolay-dementiev/DMUnLoader): loading, error and success
+  states for SwiftUI and UIKit. It depends on DMAction.
+
+## Contributing, security, licence
+
+- [CONTRIBUTING.md](CONTRIBUTING.md): how to build, test and propose a change.
+- [SECURITY.md](SECURITY.md): how to report a vulnerability. Not in a public issue.
+- DMAction is available under the MIT License. See [LICENSE](LICENSE).
+- [The Challenges of Retry Logic and Fallback Mechanisms in App Development](Documentation/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md),
+  an article about the ideas behind the package.
