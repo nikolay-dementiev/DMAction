@@ -6,36 +6,57 @@
 
 import Foundation
 
-/// Protocol representing an action that can be performed.
-/// It uses `ResultType` for the result and `ActionType` for the action itself.
+/// Work that reports one result through a completion, and that composes with fallbacks and
+/// retries.
+///
+/// The library's conformers are ``DMButtonAction`` and ``DMActionWithFallback``. Run an action
+/// with ``callAsFunction(completion:)`` or through its ``action``. ``fallbackTo(_:)`` and
+/// ``retry(_:)`` build new actions and run nothing.
+///
+/// A run calls the first producer on the calling thread before the call returns, and delivers
+/// at most one result. <doc:RunningActions> says what a producer must do, what the library
+/// enforces and what it cannot promise. Nothing here is `Sendable`: use an action inside one
+/// isolation domain.
 public protocol DMAction {
-    /// Type representing the result of the action, which can either be a `Copyable` or an `Error`.
+    /// The result of a run: a success with any `Copyable` payload, or an error.
+    ///
+    /// A run of the library delivers a success as a ``DMActionResultValue`` that holds the
+    /// payload and its attempt label. `unwrapValue()` and `attemptCount` on `Result` read them.
     typealias ResultType = Result<any Copyable, any Error>
 
-    /// Type representing the action, which is a closure that takes a completion handler.
+    /// A producer: it receives a completion and calls it once with the result of its work,
+    /// before it returns or later, on any thread.
     typealias ActionType = (@escaping (ResultType) -> Void) -> Void
 
-    /// The current attempt number of the action.
+    /// The label of a success on the first attempt of a run of this action.
+    ///
+    /// A run labels a success with this value plus the number of its attempts that failed
+    /// before it, saturating at `UInt.max`. ``fallbackTo(_:)`` and ``retry(_:)`` keep the
+    /// receiver's value.
     var currentAttempt: UInt { get }
 
-    /// The unique identifier of the action.
+    /// An identifier of this value. A copy shares it; every composition gets a new one.
     var id: UUID { get }
 
-    /// The action to be performed.
+    /// Runs the action and calls the given completion with its result.
+    ///
+    /// For the library's conformers this is a guarded run (<doc:RunningActions>). The `action`
+    /// of a third-party conformer is its own closure: called directly, nothing guards it.
     var action: ActionType { get }
 
-    /// A simplified version of the action.
+    /// Runs the action and drops its result, a failure included.
     var simpleAction: () -> Void { get }
 }
 
 public extension DMAction {
-    /// A simplified version of the action that ignores the result.
+    /// Runs the action and drops its result, a failure included.
     ///
-    /// Example:
+    /// A conformer that supplies its own `simpleAction` keeps it. This default calls ``action``,
+    /// so for a third-party conformer it is that conformer's closure, not a guarded run.
     ///
     /// ```swift
-    /// let action: DMAction = // Your DMAction instance
-    /// action.simpleAction()
+    /// let tap: any DMAction = DMButtonAction { print("Tapped") }
+    /// tap.simpleAction()
     /// ```
     var simpleAction: () -> Void {
         {
@@ -43,32 +64,42 @@ public extension DMAction {
         }
     }
 
-    /// Returns a new action that falls back to the given action if this action fails.
+    /// Returns an action that runs this action and, when it fails, the given one.
+    ///
+    /// The new action delivers the first success, or the error of `fallback`. Building it runs
+    /// nothing; it reads this action's `currentAttempt` and `action`, and the `action` of
+    /// `fallback`, once each. Its ``currentAttempt`` is this action's, and a success of
+    /// `fallback` is labelled one higher for every attempt that failed before it.
     ///
     /// A chain of fallbacks of any length runs without growing the stack, with the exception
-    /// that `retry(_:)` describes: a producer that blocks its thread until a completion it
+    /// that ``retry(_:)`` describes: a producer that blocks its thread until a completion it
     /// handed to another thread has returned.
     ///
-    /// - Parameter fallback: The action to fall back to.
-    /// - Returns: A new action with fallback.
-    ///
-    /// Example:
-    ///
     /// ```swift
-    /// let action1: DMAction = // Your DMAction instance
-    /// let action2: DMAction = // Another DMAction instance
-    /// let actionWithFallback = action1.fallbackTo(action2)
-    /// actionWithFallback.action { result in
-    ///     // Handle result
-    /// }
+    /// let fresh: any DMAction = DMButtonAction { completion in completion(.failure(URLError(.timedOut))) }
+    /// let cached: any DMAction = DMButtonAction { completion in completion(.success("cached")) }
+    ///
+    /// fresh.fallbackTo(cached)(completion: { result in
+    ///     print(result.attemptCount ?? 0) // 1: one attempt failed before the success
+    /// })
     /// ```
+    ///
+    /// - Parameter fallback: The action to run when this one fails.
+    /// - Returns: The composed action.
     func fallbackTo(_ fallback: any DMAction) -> DMActionWithFallback {
         let attempt = currentAttempt
         let plan = ActionPlan(of: self).followed(by: ActionPlan(of: fallback))
         return DMActionWithFallback(currentAttempt: attempt, plan: plan)
     }
 
-    /// Returns a new action that retries this action the specified number of times.
+    /// Returns an action that runs this action again, up to `retryCount` more times, while it
+    /// fails.
+    ///
+    /// A retry starts right after the failure, whatever the error, a `CancellationError`
+    /// included. The new action delivers the first success, or the error of the last attempt.
+    /// `retry(0)` returns this action itself. Any count, `UInt.max` included, costs the same to
+    /// build; building runs nothing and reads this action's `currentAttempt` and `action` once
+    /// each. Retrying a composite repeats the whole composite.
     ///
     /// Running the new action does not grow the stack with the number of attempts, as long as
     /// each producer completes on its calling thread during its call, or after its call has
@@ -76,18 +107,20 @@ public extension DMAction {
     /// thread has returned is nested once per attempt, so many such attempts can overflow
     /// the stack.
     ///
-    /// - Parameter retryCount: The number of times to retry the action.
-    /// - Returns: A new action with retries.
-    ///
-    /// Example:
-    ///
     /// ```swift
-    /// let action: DMAction = // Your DMAction instance
-    /// let actionWithRetries = action.retry(3)
-    /// actionWithRetries.action { result in
-    ///     // Handle result
+    /// var calls = 0
+    /// let flaky = DMButtonAction { completion in
+    ///     calls += 1
+    ///     completion(calls < 3 ? .failure(URLError(.timedOut)) : .success("done"))
     /// }
+    ///
+    /// flaky.retry(3)(completion: { result in
+    ///     print(result.attemptCount ?? 0) // 2: two attempts failed before the success
+    /// })
     /// ```
+    ///
+    /// - Parameter retryCount: How many times to run this action again after a failure.
+    /// - Returns: The composed action, or this action for a count of zero.
     func retry(_ retryCount: UInt) -> any DMAction {
         guard retryCount > 0 else {
             return self
@@ -97,23 +130,28 @@ public extension DMAction {
         return DMActionWithFallback(currentAttempt: attempt, plan: plan)
     }
 
-    /// Performs the action and calls the completion handler with the result.
+    /// Runs the action as a guarded run, whatever the conformer, and calls `completion` at most
+    /// once with the result.
     ///
-    /// - Parameter completion: The completion handler to call with the result.
-    ///
-    /// Example:
+    /// The first producer runs on the calling thread before this returns. When every producer
+    /// completes before it returns, `completion` runs before this call returns too; otherwise
+    /// it runs on the thread of the last completion. A third-party conformer's `action` and
+    /// then its `currentAttempt` are read when this is called.
     ///
     /// ```swift
-    /// let action: DMAction = // Your DMAction instance
-    /// action { result in
-    ///     switch result {
+    /// let greet = DMButtonAction { completion in completion(.success("Hello")) }
+    ///
+    /// greet { result in
+    ///     switch result.unwrapValue() {
     ///     case .success(let value):
-    ///         print("Success with value: \(value)")
+    ///         print(value) // Hello
     ///     case .failure(let error):
-    ///         print("Failed with error: \(error)")
+    ///         print(error)
     ///     }
     /// }
     /// ```
+    ///
+    /// - Parameter completion: Receives the first success, or the error of the last attempt.
     func callAsFunction(completion: @escaping (ResultType) -> Void) {
         // The order is part of the contract, for a conformer whose getters have effects:
         // `action`, then `currentAttempt`, both at the call.

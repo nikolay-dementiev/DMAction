@@ -4,33 +4,43 @@
 //  Created by Mykola Dementiev
 //
 
-/// Protocol for result values of `DMAction` that can be copied and have an optional attempt count.
+/// A value that can carry the attempt label of a success.
+///
+/// ``DMActionResultValue`` is the conformer a run delivers. `Result.attemptCount` reads the
+/// label of that type only.
 public protocol DMActionResultValueProtocol: Copyable {
+    /// The attempt label, or `nil` when the value carries none.
     var attemptCount: UInt? { get }
 }
 
-/// Extension to provide a default implementation of `attemptCount` for `DMActionResultValueProtocol`.
 public extension DMActionResultValueProtocol {
+    /// No label: a conformer that carries one implements this property.
     var attemptCount: UInt? { nil }
 }
 
-/// Extension for `Result` where the success type conforms to `Copyable` and the failure type is `Error`.
 public extension Result where Success: Copyable, Failure == any Error {
-    /// Unwrap the original result value that was passed via `ActionType`'s completion closure.
-    ///
-    /// - Returns: The original result value without any wrapper.
-    ///
-    /// Example:
+    /// The result with its payload taken out of every ``DMActionResultValue`` layer. A failure
+    /// stays as it is, the same error instance.
     ///
     /// ```swift
-    /// let result: Result<Copyable, Error> = // Your Result instance
-    /// let unwrappedResult = result.unwrapValue()
+    /// action { result in
+    ///     if case .success(let value) = result.unwrapValue() {
+    ///         print(value) // the payload the producer delivered
+    ///     }
+    /// }
     /// ```
+    ///
+    /// - Returns: The same result, with an unwrapped payload.
     func unwrapValue() -> DMAction.ResultType {
         map { DMActionResultValue.payload(of: $0) }
     }
 
-    /// The attempt count of the result.
+    /// The attempt label of a success that a run delivered: the run's base plus the number of
+    /// its attempts that failed before this success.
+    ///
+    /// `nil` for a failure, for a success whose value is not a ``DMActionResultValue`` (a value
+    /// of another ``DMActionResultValueProtocol`` conformer included), and for a result after
+    /// ``unwrapValue()``.
     var attemptCount: UInt? {
         guard case .success(let value) = self else {
             return nil
