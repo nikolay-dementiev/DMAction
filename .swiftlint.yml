@@ -16,6 +16,8 @@ opt_in_rules:
   - force_unwrapping
   - implicitly_unwrapped_optional
 
+# Analyzer rules need the compiler invocations of a build. They run only with
+# `Scripts/lint.sh --analyze <xcodebuild log>`.
 analyzer_rules:
   - unused_import
 
@@ -43,7 +45,7 @@ custom_rules:
   no_process_termination:
     name: "No process termination"
     included: "Sources/.*\\.swift"
-    regex: '\b(fatalError|preconditionFailure|assertionFailure)\b'
+    regex: '\b(fatalError|preconditionFailure|assertionFailure|precondition|assert|abort|exit)\s*\('
     match_kinds:
       - identifier
     message: "A library never terminates its host. Report the failure to the caller."

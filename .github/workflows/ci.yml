@@ -14,7 +14,9 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A new push to a pull request supersedes its older run. Runs on main are never
+  # cancelled: a merge, the weekly run and a manual run each keep their own record.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -50,6 +52,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Select Xcode
         run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
+      # The tests build in Debug. Code that only a Release build compiles is built here.
+      - name: Build the library in Release
+        run: |
+          xcodebuild build \
+            -scheme DMAction \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Release \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
       - name: Test
         run: |
           xcodebuild test \
@@ -88,7 +99,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.6.app
-      - name: Manifest, installation by version, consumer fixture, podspec
+      - name: Manifest, installation by version, consumer fixture, podspec, rejected shapes
         run: Scripts/check-manifest.sh
 
   api:
@@ -109,5 +120,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      # CocoaPods lints with the newest language mode the podspec lists.
       - name: Lint the podspec
         run: pod lib lint DMAction.podspec
+      - name: Lint the podspec in the Swift 5 language mode
+        run: pod lib lint DMAction.podspec --swift-version=5.0

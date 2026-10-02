@@ -27,13 +27,17 @@ if [ ! -x "$SWIFTLINT" ]; then
     mkdir -p "$TOOLS"
     ARCHIVE="$TOOLS/portable_swiftlint.zip"
     if [ ! -f "$ARCHIVE" ]; then
-        curl --fail --silent --show-error --location \
+        # Fetched under another name, so an interrupted transfer never passes for the archive.
+        curl --fail --silent --show-error --location --retry 3 \
             "https://github.com/realm/SwiftLint/releases/download/$VERSION/portable_swiftlint.zip" \
-            --output "$ARCHIVE"
+            --output "$ARCHIVE.part"
+        mv "$ARCHIVE.part" "$ARCHIVE"
     fi
     ACTUAL="$(shasum -a 256 "$ARCHIVE" | cut -d ' ' -f 1)"
     if [ "$ACTUAL" != "$CHECKSUM" ]; then
-        echo "lint: the SwiftLint $VERSION archive has checksum $ACTUAL, expected $CHECKSUM" >&2
+        # A wrong archive must not block every later run: the next one fetches it again.
+        rm -f "$ARCHIVE"
+        echo "lint: the SwiftLint $VERSION archive had checksum $ACTUAL, expected $CHECKSUM. It was removed." >&2
         exit 2
     fi
     unzip -q -o "$ARCHIVE" swiftlint -d "$TOOLS"
