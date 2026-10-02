@@ -5,14 +5,16 @@
 #
 #   Scripts/check-manifest.sh
 #
-# 1. The manifest has no dependency by branch or revision, uses no plugin on any target
-#    and does not read the environment. SwiftPM refuses a version requirement on a package
-#    that has an unstable dependency, a build plugin of a dependency runs in every
-#    consumer's build, and a manifest that reads the environment describes more than one
-#    package.
-# 2. A consumer that asks for the package by version resolves it. This runs against a
-#    throw-away tagged copy of the tracked manifest and sources: a consumer that depends
-#    on the checkout by path cannot show that failure.
+# 1. The manifest has no dependency by branch or revision, uses no plugin on any target,
+#    passes no unsafe flag and does not read the environment. SwiftPM refuses a package
+#    with an unstable dependency or an unsafe flag as a dependency by version, a build
+#    plugin of a dependency runs in every consumer's build, and a manifest that reads the
+#    environment describes more than one package.
+# 2. The installation manifest of README.md works. Its URL and version are the podspec's.
+#    With only its URL pointed at a throw-away tagged copy of the tracked manifest and
+#    sources, it resolves and builds: a consumer that depends on the checkout by path cannot
+#    show a failure of a version requirement, and only a build shows a wrong product or
+#    package name.
 # 3. Fixtures/Consumer builds without a warning. It uses the released public declarations
 #    with their exact types and the shapes the downstream package relies on, so if it
 #    stops building, a consumer's code stops building.
@@ -84,6 +86,9 @@ for dependency in manifest.get("dependencies", []):
 for target in manifest.get("targets", []):
     for usage in target.get("pluginUsages") or []:
         problems.append(f"target '{target['name']}' uses a plugin: {json.dumps(usage)}")
+    for setting in target.get("settings") or []:
+        if "unsafeFlags" in setting.get("kind", {}):
+            problems.append(f"target '{target['name']}' passes unsafe flags: {json.dumps(setting['kind'])}")
 if re.search(r"ProcessInfo|getenv|\.environment\b", source):
     problems.append("Package.swift reads the environment")
 for problem in problems:
@@ -93,42 +98,76 @@ PY
 then
     FAILED=1
 else
-    echo "check-manifest: no unstable requirement, no plugin and no environment switch in Package.swift."
+    echo "check-manifest: no unstable requirement, no plugin, no unsafe flag and no environment switch in Package.swift."
 fi
 
-# 2. Resolution by version, against a throw-away copy of the tracked files with a tag.
+# 2. The installation manifest of README.md, against a throw-away tagged copy of the tracked
+#    files. The copy is named after the module, so the package identity the README names
+#    stays the same when its URL points at the copy.
 PROBE="$(mktemp -d "$WORK/version-probe.XXXXXX")"
-mkdir -p "$PROBE/package" "$PROBE/consumer/Sources/Probe"
-git ls-files -z -- Package.swift Sources | xargs -0 -I{} rsync -R {} "$PROBE/package/"
+mkdir -p "$PROBE/$MODULE" "$PROBE/consumer"
+git ls-files -z -- Package.swift Sources | xargs -0 -I{} rsync -R {} "$PROBE/$MODULE/"
 # The probe repository takes nothing from the git configuration of whoever runs this:
 # no signing, no hooks, no identity.
 probe_git() {
-    git -C "$PROBE/package" \
+    git -C "$PROBE/$MODULE" \
         -c user.name=probe -c user.email=probe@example.invalid \
         -c commit.gpgsign=false -c tag.gpgSign=false -c core.hooksPath=/dev/null \
         "$@"
 }
-probe_git init -q
-probe_git add -A
-probe_git commit -q -m probe
-probe_git tag 99.0.0
-cat > "$PROBE/consumer/Package.swift" <<EOF
-// swift-tools-version: 6.0
-import PackageDescription
-let package = Package(
-    name: "Probe",
-    platforms: [.iOS(.v17)],
-    dependencies: [.package(url: "file://$PROBE/package", from: "99.0.0")],
-    targets: [.target(name: "Probe", dependencies: [.product(name: "$MODULE", package: "package")])]
-)
-EOF
-echo "import $MODULE" > "$PROBE/consumer/Sources/Probe/Probe.swift"
-if swift package --package-path "$PROBE/consumer" resolve > "$WORK/version-resolution.log" 2>&1; then
-    echo "check-manifest: a version requirement on the package resolves."
-else
-    echo "check-manifest: a version requirement on the package does not resolve:" >&2
-    grep -E "error:|cannot be used|unstable" "$WORK/version-resolution.log" | cut -c1-300 | head -5 >&2 || true
+# Writes the consumer's manifest and prints the version the README asks for.
+if ! VERSION="$(python3 - "$ROOT/README.md" "$ROOT/$MODULE.podspec" "$PROBE" "$MODULE" <<'PY'
+import re
+import sys
+
+readme, podspec, probe, module = sys.argv[1:5]
+blocks = re.findall(r"^```swift\n(.*?)^```$", open(readme, encoding="utf-8").read(), re.S | re.M)
+manifests = [block for block in blocks if "Package(" in block]
+if len(manifests) != 1:
+    sys.exit(f"check-manifest: README.md has {len(manifests)} package manifests; it must have one")
+requirements = re.findall(r'\.package\(url: "([^"]+)", from: "([^"]+)"\)', manifests[0])
+if len(requirements) != 1:
+    sys.exit("check-manifest: the manifest of README.md does not ask for the package with url: and from:")
+url, version = requirements[0]
+spec = open(podspec, encoding="utf-8").read()
+spec_url = re.search(r":git\s*=>\s*'([^']+)'", spec)
+spec_version = re.search(r"\.version\s*=\s*'([^']+)'", spec)
+problems = []
+if not spec_url or url != spec_url.group(1):
+    problems.append(f"README.md installs from {url}, the podspec's source is {spec_url and spec_url.group(1)}")
+if not spec_version or version != spec_version.group(1):
+    problems.append(f"README.md asks for version {version}, the podspec is {spec_version and spec_version.group(1)}")
+if problems:
+    sys.exit("\n".join(f"check-manifest: {problem}" for problem in problems))
+with open(f"{probe}/consumer/Package.swift", "w", encoding="utf-8") as consumer:
+    consumer.write(manifests[0].replace(f'url: "{url}"', f'url: "file://{probe}/{module}"'))
+print(version)
+PY
+)"; then
     FAILED=1
+else
+    probe_git init -q
+    probe_git add -A
+    probe_git commit -q -m probe
+    probe_git tag "$VERSION"
+    # Every target of the consumer gets a source file that imports the module.
+    if ! TARGETS="$(swift package --package-path "$PROBE/consumer" dump-package 2> "$WORK/readme-manifest.log" \
+            | python3 -c 'import json, sys; print("\n".join(t["name"] for t in json.load(sys.stdin)["targets"]))')"; then
+        echo "check-manifest: the manifest of README.md does not evaluate. See ${WORK#"$ROOT"/}/readme-manifest.log" >&2
+        FAILED=1
+    else
+        while IFS= read -r TARGET; do
+            mkdir -p "$PROBE/consumer/Sources/$TARGET"
+            echo "import $MODULE" > "$PROBE/consumer/Sources/$TARGET/$TARGET.swift"
+        done <<< "$TARGETS"
+        if swift build --package-path "$PROBE/consumer" > "$WORK/version-build.log" 2>&1; then
+            echo "check-manifest: the manifest of README.md asks for the podspec's URL and version $VERSION, and resolves and builds by version."
+        else
+            echo "check-manifest: the manifest of README.md does not resolve or build by version:" >&2
+            grep -E "error:|cannot be used|unstable|unsafe" "$WORK/version-build.log" | cut -c1-300 | head -5 >&2 || true
+            FAILED=1
+        fi
+    fi
 fi
 
 # 3. The consumer fixture. xcodebuild finds a package only in the current directory.
