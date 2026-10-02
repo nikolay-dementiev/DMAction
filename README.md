@@ -27,7 +27,8 @@ Compose completion-based actions with retries and fallbacks, and get one result 
 An action wraps a producer: a closure that receives a completion and calls it once with a
 `Result`. `retry(_:)` and `fallbackTo(_:)` combine actions into new actions without running
 anything. Running an action calls its producers in order until one succeeds and delivers one
-result, with an attempt label: how many attempts of that run failed before the success.
+result. A success carries an attempt label: the action's `currentAttempt`, 0 unless it was set,
+plus how many attempts of that run failed before the success.
 
 Use it when work reports its result through a completion handler, from an SDK, a network client
 or your own code, and a failure should be tried again or replaced by another source.
@@ -41,7 +42,9 @@ It is not a fit when:
 
 ## Requirements
 
-- Swift 6.0 or later, which is Xcode 16 or later, for Swift Package Manager.
+- Swift 6.0 or later, which is Xcode 16 or later, for Swift Package Manager and for CocoaPods.
+  The podspec's `swift_versions`, 5.0 and 6.0, are the language modes the pod builds in, not
+  compiler versions.
 - iOS 17 or later, or watchOS 7 or later.
 
 What each platform is verified with:
@@ -133,6 +136,10 @@ wrapped in a `DMActionResultValue`: `unwrapValue()` gives the payload a producer
 `attemptCount` gives the label. Read the label on the result as it was delivered: the result of
 `unwrapValue()` has none. A failure is the error of the last attempt, the same instance, without a
 label.
+
+The label is the action's `currentAttempt` plus the attempts of the run that failed before the
+success. The table is for actions whose `currentAttempt` is 0, as it is for every `DMButtonAction`;
+`DMActionWithFallback(currentAttempt:_:_:)` and your own conformer can start from another value.
 
 | Action | Success at | Label |
 |---|---|---|
@@ -253,7 +260,10 @@ interface.
 
 - **One result per run.** The first completion of an attempt moves the run on; a later one is
   ignored and written to the unified log at fault level (subsystem `DMAction`). The completion you
-  pass is called at most once.
+  pass is called at most once by `DMButtonAction` and `DMActionWithFallback`, however you run them,
+  by call syntax on any action, and by an action built with `fallbackTo(_:)` or with `retry(_:)`
+  and a positive count. Your own conformer's `action` and `simpleAction` are its own closures,
+  also after `retry(0)`, which returns the conformer itself: nothing guards them.
 - **No answer, no result.** A producer that never calls its completion stalls its run. Nothing
   times out.
 - **Order.** The first producer runs on your thread before the call returns. When a producer calls
@@ -289,8 +299,8 @@ with the accessibility audit.
 The library's tests run on iOS simulators and on the host, with the Thread Sanitizer, and their
 line coverage is a gate in CI. CI also checks that the public interface matches its baseline, that
 a consumer of the package builds, that the documentation builds without a warning, that the
-podspec lints, and that every Swift block of this README compiles. `CONTRIBUTING.md` lists the
-commands.
+podspec lints, and that every Swift example, in this README, the documentation catalog and the
+doc comments, compiles as written. `CONTRIBUTING.md` lists the commands.
 
 ## Versions and migration
 
@@ -299,8 +309,8 @@ DMAction follows semantic versioning. `CHANGELOG.md` records every release.
 Coming from 1.0.x: no declaration changed, but some behaviour did, and `CHANGELOG.md` lists each
 change with a table. The ones most likely to matter:
 
-- attempt labels count the attempts that failed before the success, so `a.retry(1)` labels a
-  success on its second call 1, not 2;
+- attempt labels are the action's `currentAttempt` plus the attempts that failed before the
+  success, so `a.retry(1)` labels a success on its second call 1, not 2;
 - when a producer calls its completion on its own thread before it returns, the next attempt
   starts after it has returned, not inside the completion call;
 - a producer that calls its completion twice no longer runs the rest of the chain twice.
