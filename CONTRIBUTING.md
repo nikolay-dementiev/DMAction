@@ -1,0 +1,59 @@
+# Contributing to DMAction
+
+Thank you for helping. This guide says how to build and test the package, what a test must do, and
+how to propose a change.
+
+## Build and test
+
+You need Xcode 16.0 or later (Swift 6.0) and an iOS simulator. CI runs Xcode 16.2, 16.4 and 26.6.
+
+```bash
+swift test
+```
+
+runs the suite on the Mac. The same suite on a simulator, with warnings as errors:
+
+```bash
+xcodebuild test -scheme DMAction -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+```
+
+and once more under the Thread Sanitizer:
+
+```bash
+swift test --sanitize=thread
+```
+
+## The checks CI runs
+
+Every check is a script in `Scripts/`, and CI runs the same command you run locally.
+
+| Script | What it checks |
+|---|---|
+| `Scripts/lint.sh` | SwiftLint, at the version pinned in `.swiftlint.yml`. The first run fetches that version into `.build/tools` and checks its checksum. `--analyze <xcodebuild log>` also runs the analyzer rules |
+| `Scripts/check-api.sh` | the public interface against `Fixtures/API/public-interface.txt`. A deliberate change of the public API runs it with `--update` and commits the new baseline in the same commit |
+| `Scripts/check-manifest.sh` | the manifest, installation by version, the consumer fixture, the podspec and the uses across isolation domains that the compiler must keep rejecting |
+| `Scripts/coverage-gate.sh <result bundle>` | the line coverage of the library |
+
+## Tests
+
+- XCTest, through the public API only: no `@testable import`.
+- One `makeSUT()` factory per test class, and hand-written spies that record calls.
+- Names say the subject, the condition and the expected result:
+  `test_<subject>_<condition>_<expected>`.
+- In a test with two or more assertions, every assertion carries a message.
+- A test must be able to fail. Show it red against the code before your change, or, for a test of
+  behaviour that already holds, with a temporary change of the code it covers.
+- A fix starts with a test that reproduces the defect.
+
+## Commits and pull requests
+
+- One topic per commit, with a conventional prefix: `test:`, `fix:`, `feat:`, `refactor:`, `docs:`,
+  `chore:`, `ci:` or `perf:`.
+- The commit with a failing test comes before the commit that makes it pass.
+- Pull requests go to `main` and are merged with a merge commit, so the test and fix pairs stay
+  visible.
+- A change that people using the package can notice gets an entry in `CHANGELOG.md`.
+
+## Security
+
+Do not report a vulnerability in a public issue. See `SECURITY.md`.
