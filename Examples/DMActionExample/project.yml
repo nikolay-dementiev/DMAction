@@ -30,8 +30,33 @@ targets:
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
+  DMActionExampleTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - DMActionExampleTests
+    dependencies:
+      - target: DMActionExample
+      - package: DMAction
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+  DMActionExampleUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - DMActionExampleUITests
+    dependencies:
+      - target: DMActionExample
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   DMActionExample:
     build:
       targets:
         DMActionExample: all
+    test:
+      targets:
+        - DMActionExampleTests
+        - DMActionExampleUITests

@@ -39,7 +39,31 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "21499337A687702C45187B62"
+               BuildableName = "DMActionExampleTests.xctest"
+               BlueprintName = "DMActionExampleTests"
+               ReferencedContainer = "container:DMActionExample.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C301C8106C322DC9EE1B3367"
+               BuildableName = "DMActionExampleUITests.xctest"
+               BlueprintName = "DMActionExampleUITests"
+               ReferencedContainer = "container:DMActionExample.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
+      <CommandLineArguments>
+      </CommandLineArguments>
    </TestAction>
    <LaunchAction
       buildConfiguration = "Debug"
