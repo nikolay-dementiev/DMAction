@@ -108,8 +108,8 @@ mode:
 | A producer made in a main-actor method completes from a `Task` it creates | Yes |
 | A producer completes from `Task.detached` | No: passing the closure as a `sending` parameter risks data races |
 | A producer made outside an actor completes from a `Task` it creates | No: the same error |
-| A run is bridged to `async` code with `withCheckedContinuation` | No: sending the result risks data races |
-| A composed action is kept in a `static let` | No: the static property is not concurrency-safe |
+| The result, a `DMAction.ResultType`, is sent out of the completion through `withCheckedContinuation` | No: sending the result risks data races |
+| A composed action is kept in a nonisolated `static let` | No: the static property is not concurrency-safe |
 | An action or a result is used as `any Sendable` | No: it does not conform to `Sendable` |
 
 Each of these shapes is a fixture of the repository, in `Fixtures/Consumer` and

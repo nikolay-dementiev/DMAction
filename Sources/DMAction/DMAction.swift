@@ -13,10 +13,12 @@ import Foundation
 /// with ``callAsFunction(completion:)`` or through its ``action``. ``fallbackTo(_:)`` and
 /// ``retry(_:)`` build new actions and run nothing.
 ///
-/// A run calls the first producer on the calling thread before the call returns, and delivers
-/// at most one result. <doc:RunningActions> says what a producer must do, what the library
-/// enforces and what it cannot promise. Nothing here is `Sendable`: use an action inside one
-/// isolation domain.
+/// A run calls the first producer on the calling thread before the call returns. A run of the
+/// library's conformers, call syntax on any conformer and the actions that ``fallbackTo(_:)``
+/// and ``retry(_:)`` with a positive count build deliver at most one result; the ``action``
+/// of a third-party conformer is its own closure. <doc:RunningActions> says what a producer
+/// must do, what the library enforces and what it cannot promise. Nothing here is `Sendable`:
+/// use an action inside one isolation domain.
 public protocol DMAction {
     /// The result of a run: a success with any `Copyable` payload, or an error.
     ///
@@ -103,9 +105,10 @@ public extension DMAction {
     ///
     /// A retry starts right after the failure, whatever the error, a `CancellationError`
     /// included. The new action delivers the first success, or the error of the last attempt.
-    /// `retry(0)` returns this action itself. Any count, `UInt.max` included, costs the same to
-    /// build; building runs nothing and, for a third-party conformer, reads its `currentAttempt`
-    /// and `action` once each. Retrying a composite repeats the whole composite.
+    /// `retry(0)` returns this action itself and reads nothing. Any count, `UInt.max` included,
+    /// costs the same to build; building with a positive count runs nothing and, for a
+    /// third-party conformer, reads its `currentAttempt` and `action` once each. Retrying a
+    /// composite repeats the whole composite.
     ///
     /// Running the new action does not grow the stack with the number of attempts, as long as
     /// each producer completes on its calling thread during its call, or after its call has
