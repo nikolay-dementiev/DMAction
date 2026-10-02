@@ -21,11 +21,25 @@ concurrency:
 jobs:
   lint:
     runs-on: macos-26
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - name: Lint
         run: Scripts/lint.sh
+      # The analyzer rules, unused_import among them, read the compiler invocations of a full build.
+      - name: Build the library for the analyzer
+        run: |
+          xcodebuild build \
+            -scheme DMAction \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            > "$RUNNER_TEMP/build.log" 2>&1 \
+            || { tail -50 "$RUNNER_TEMP/build.log"; exit 1; }
+      - name: Run the analyzer rules
+        run: Scripts/lint.sh --analyze "$RUNNER_TEMP/build.log"
 
   test:
     name: test (${{ matrix.name }})
