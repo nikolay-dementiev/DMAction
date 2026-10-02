@@ -26,9 +26,9 @@ set -euo pipefail
 # The module whose public interface is checked.
 MODULE="DMAction"
 # The directory the manifest compiles for that module, relative to the repository root.
-SOURCE_DIR="Sources"
+SOURCE_DIR="Sources/DMAction"
 # The language mode and the upcoming features the manifest sets for the module.
-SWIFT_FLAGS=(-swift-version 6)
+SWIFT_FLAGS=(-swift-version 6 -enable-upcoming-feature ExistentialAny)
 # "yes" to emit the interface with library evolution, "no" without it.
 LIBRARY_EVOLUTION="yes"
 # Modules of package dependencies that the module imports, compiled first and in this

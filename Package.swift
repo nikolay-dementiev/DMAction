@@ -17,12 +17,13 @@ let package = Package(
     targets: [
         .target(
             name: "DMAction",
-            path: "Sources"
+            swiftSettings: [.enableUpcomingFeature("ExistentialAny")]
         ),
         .testTarget(
             name: "DMActionTests",
             dependencies: ["DMAction"],
-            path: "Tests"
+            swiftSettings: [.enableUpcomingFeature("ExistentialAny")]
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

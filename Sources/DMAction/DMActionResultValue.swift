@@ -13,14 +13,14 @@ public struct DMActionResultValue: DMActionResultValueProtocol {
     public let attemptCount: UInt?
 
     /// The value of the action result.
-    public let value: Copyable
+    public let value: any Copyable
 
     /// Initializes a new instance of `DMActionResultValue`.
     ///
     /// - Parameters:
     ///   - value: The value of the action result.
     ///   - attemptCount: The optional attempt count of the action result.
-    public init(value: Copyable,
+    public init(value: any Copyable,
                 attemptCount: UInt? = nil) {
         self.value = value
         self.attemptCount = attemptCount

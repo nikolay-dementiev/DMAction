@@ -10,7 +10,7 @@ import Foundation
 /// It uses `ResultType` for the result and `ActionType` for the action itself.
 public protocol DMAction {
     /// Type representing the result of the action, which can either be a `Copyable` or an `Error`.
-    typealias ResultType = Result<Copyable, Error>
+    typealias ResultType = Result<any Copyable, any Error>
 
     /// Type representing the action, which is a closure that takes a completion handler.
     typealias ActionType = (@escaping (ResultType) -> Void) -> Void
@@ -58,7 +58,7 @@ public extension DMAction {
     ///     // Handle result
     /// }
     /// ```
-    func fallbackTo(_ fallback: DMAction) -> DMActionWithFallback {
+    func fallbackTo(_ fallback: any DMAction) -> DMActionWithFallback {
         let attempt = currentAttempt
         let plan = ActionPlan(of: self).followed(by: ActionPlan(of: fallback))
         return DMActionWithFallback(currentAttempt: attempt, plan: plan)
@@ -78,7 +78,7 @@ public extension DMAction {
     ///     // Handle result
     /// }
     /// ```
-    func retry(_ retryCount: UInt) -> DMAction {
+    func retry(_ retryCount: UInt) -> any DMAction {
         guard retryCount > 0 else {
             return self
         }

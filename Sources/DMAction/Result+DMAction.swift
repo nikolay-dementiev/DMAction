@@ -15,7 +15,7 @@ public extension DMActionResultValueProtocol {
 }
 
 /// Extension for `Result` where the success type conforms to `Copyable` and the failure type is `Error`.
-public extension Result where Success: Copyable, Failure == Error {
+public extension Result where Success: Copyable, Failure == any Error {
     /// Unwrap the original result value that was passed via `ActionType`'s completion closure.
     ///
     /// - Returns: The original result value without any wrapper.
