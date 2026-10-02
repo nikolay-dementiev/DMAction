@@ -215,6 +215,54 @@ final class AtMostOnceDeliveryTests: XCTestCase {
 
     // MARK: - Lifetime
 
+    /// Work a producer hands over, to be finished later.
+    private final class Pending {
+        var work: (() -> Void)?
+    }
+
+    /// A class conformer whose producer refers to it without retaining it and finishes later.
+    private final class DeferredConformer: DMAction {
+        let currentAttempt: UInt = 0
+        let id = UUID()
+        let payload = "deferred"
+        private let pending: Pending
+
+        init(pending: Pending) {
+            self.pending = pending
+        }
+
+        var action: ActionType {
+            { [unowned self] completion in
+                pending.work = { [unowned self] in
+                    completion(.success(payload))
+                }
+            }
+        }
+    }
+
+    /// Call syntax keeps its receiver until the delivery, as 1.0.5 did. The deferred work runs
+    /// only while the receiver lives, so a released receiver fails the test instead of trapping.
+    func test_callSyntax_onAClassConformerReleasedWhileItsCallIsOutstanding_keepsItUntilTheDelivery() {
+        let pending = Pending()
+        let consumer = ConsumerSpy()
+        weak var weakReceiver: DeferredConformer?
+        do {
+            let receiver = DeferredConformer(pending: pending)
+            weakReceiver = receiver
+            receiver(completion: consumer.receive)
+        }
+        let aliveWhileOutstanding = weakReceiver != nil
+        if aliveWhileOutstanding {
+            pending.work?()
+        }
+        pending.work = nil
+
+        XCTAssertTrue(aliveWhileOutstanding, "the receiver lives while its call is outstanding")
+        XCTAssertEqual(consumer.count, 1, "one delivery")
+        XCTAssertEqual(consumer.lastValue, "deferred", "the receiver's payload")
+        XCTAssertNil(weakReceiver, "the receiver is released after the delivery")
+    }
+
     func test_run_afterDelivery_releasesTheConsumerWhileAProducerKeepsItsCompletion() {
         final class Token {}
         weak var weakToken: Token?
