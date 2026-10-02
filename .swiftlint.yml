@@ -14,7 +14,8 @@ opt_in_rules:
   - implicitly_unwrapped_optional
 
 # Analyzer rules need the compiler invocations of a build. They run only with
-# `Scripts/lint.sh --analyze <xcodebuild log>`.
+# `Scripts/lint.sh --analyze <xcodebuild log>`, on the log of a build whose DerivedData is
+# still on disk: the compiler invocations name their files through lists kept there.
 analyzer_rules:
   - unused_import
 
