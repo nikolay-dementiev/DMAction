@@ -36,6 +36,8 @@ final class ActionRun {
         }
     }
 
+    /// The label of a success when no attempt failed before it.
+    private let base: UInt
     /// The consumer's completion, until the run delivers to it. After that, a producer that
     /// keeps its own completion keeps nothing of the consumer alive.
     private var completion: ActionPlan.Completion?
@@ -43,7 +45,8 @@ final class ActionRun {
     /// completion is ever called while it is held.
     private let lock = NSLock()
 
-    init(completion: @escaping ActionPlan.Completion) {
+    init(base: UInt, completion: @escaping ActionPlan.Completion) {
+        self.base = base
         self.completion = completion
     }
 
@@ -93,7 +96,8 @@ final class ActionRun {
             return
         }
         attempt.cursor = nil
-        let labelled = cursor.relabel.label(result)
+        // A label a producer put on its success is replaced: the run counts its own attempts.
+        let labelled = DMButtonAction.mapResultWithAttempt(result, attempt: base.saturatingAdd(cursor.failed))
         // A completion on the thread that is still inside the producer call is kept for that
         // thread, which goes on when the call returns. A completion on any other thread goes
         // on at once: the producer may be waiting, inside its call, for an effect of this very
@@ -130,27 +134,26 @@ final class ActionRun {
 
 // MARK: - Cursor
 
-/// Where a run is: the frames from the outermost list of steps down to one producer.
+/// Where a run is: the frames from the outermost list of steps down to one producer, and how
+/// many attempts of the run failed before this one.
 struct Cursor {
-    private typealias Leaf = (produce: DMButtonAction.ActionType, relabel: Relabel)
-
     private let frames: [Frame]
     /// The producer this cursor points at.
     let produce: DMButtonAction.ActionType
-    /// What becomes of the label of that producer's success.
-    let relabel: Relabel
+    /// The attempts of the run that failed before this one.
+    let failed: UInt
 
     /// The first producer of `plan`.
     init(first plan: ActionPlan) {
         var frames: [Frame] = []
-        let leaf = Self.enter(plan.steps, relabel: .keep, frames: &frames)
-        self.init(frames: frames, leaf: leaf)
+        let produce = Self.enter(plan.steps, frames: &frames)
+        self.init(frames: frames, produce: produce, failed: 0)
     }
 
-    private init(frames: [Frame], leaf: Leaf) {
+    private init(frames: [Frame], produce: @escaping DMButtonAction.ActionType, failed: UInt) {
         self.frames = frames
-        self.produce = leaf.produce
-        self.relabel = leaf.relabel
+        self.produce = produce
+        self.failed = failed
     }
 
     /// The producer that runs after this one fails, or nil when nothing is left to try.
@@ -158,47 +161,42 @@ struct Cursor {
         var frames = self.frames
         while let frame = frames.popLast() {
             switch frame {
-            case let .list(steps, index, relabel):
+            case let .list(steps, index):
                 guard index + 1 < steps.count else {
                     continue
                 }
-                frames.append(.list(steps, index: index + 1, relabel: relabel))
-                let leaf = Self.descend(into: steps[index + 1], relabel: relabel, frames: &frames)
-                return Cursor(frames: frames, leaf: leaf)
-            case let .repeating(unit, run, remaining, base, relabel):
+                frames.append(.list(steps, index: index + 1))
+                let produce = Self.descend(into: steps[index + 1], frames: &frames)
+                return Cursor(frames: frames, produce: produce, failed: failed.saturatingAdd(1))
+            case let .repeating(unit, remaining):
                 guard remaining > 0 else {
                     continue
                 }
-                let nextRun = run.saturatingAdd(1)
-                frames.append(.repeating(unit, run: nextRun, remaining: remaining - 1, base: base, relabel: relabel))
-                let runRelabel = relabel.applied(over: .override(base.saturatingAdd(nextRun)))
-                let leaf = Self.enter(unit.steps, relabel: runRelabel, frames: &frames)
-                return Cursor(frames: frames, leaf: leaf)
+                frames.append(.repeating(unit, remaining: remaining - 1))
+                let produce = Self.enter(unit.steps, frames: &frames)
+                return Cursor(frames: frames, produce: produce, failed: failed.saturatingAdd(1))
             }
         }
         return nil
     }
 
     /// Opens a list of steps and goes down to its first producer.
-    private static func enter(_ steps: [ActionPlan.Step], relabel: Relabel, frames: inout [Frame]) -> Leaf {
-        frames.append(.list(steps, index: 0, relabel: relabel))
-        return descend(into: steps[0], relabel: relabel, frames: &frames)
+    private static func enter(_ steps: [ActionPlan.Step], frames: inout [Frame]) -> DMButtonAction.ActionType {
+        frames.append(.list(steps, index: 0))
+        return descend(into: steps[0], frames: &frames)
     }
 
     /// Goes down from `step` to its first producer, opening the repeated units on the way. A
     /// loop, not a recursion: units nested by repeated `retry` calls do not grow the stack.
-    private static func descend(into step: ActionPlan.Step, relabel: Relabel, frames: inout [Frame]) -> Leaf {
+    private static func descend(into step: ActionPlan.Step, frames: inout [Frame]) -> DMButtonAction.ActionType {
         var step = step
-        var outer = relabel
         while true {
             switch step {
-            case let .produce(produce, own):
-                return (produce, outer.applied(over: own))
-            case let .repeating(unit, retries, base, own):
-                let unitRelabel = outer.applied(over: own)
-                frames.append(.repeating(unit, run: 1, remaining: retries, base: base, relabel: unitRelabel))
-                outer = unitRelabel.applied(over: .keepOrDefault(base.saturatingAdd(1)))
-                frames.append(.list(unit.steps, index: 0, relabel: outer))
+            case let .produce(produce):
+                return produce
+            case let .repeating(unit, retries):
+                frames.append(.repeating(unit, remaining: retries))
+                frames.append(.list(unit.steps, index: 0))
                 step = unit.steps[0]
             }
         }
@@ -208,7 +206,7 @@ struct Cursor {
 /// One level of a cursor.
 private enum Frame {
     /// A list of steps, and the index of the step that runs.
-    case list([ActionPlan.Step], index: Int, relabel: Relabel)
-    /// A repeated unit: which run of it this is, and how many runs remain after it.
-    case repeating(ActionPlan, run: UInt, remaining: UInt, base: UInt, relabel: Relabel)
+    case list([ActionPlan.Step], index: Int)
+    /// A repeated unit, and how many more runs of it remain.
+    case repeating(ActionPlan, remaining: UInt)
 }

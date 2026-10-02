@@ -29,17 +29,14 @@ public struct DMActionWithFallback: DMAction {
     public init(currentAttempt: UInt,
                 _ primaryAction: @escaping ActionType,
                 _ fallbackAction: @escaping ActionType) {
-        self.init(currentAttempt: currentAttempt, plan: ActionPlan(steps: [
-            .produce(primaryAction, .keepOrDefault(currentAttempt)),
-            .produce(fallbackAction, .override(currentAttempt.saturatingAdd(1)))
-        ]))
+        self.init(currentAttempt: currentAttempt, plan: ActionPlan(steps: [.produce(primaryAction), .produce(fallbackAction)]))
     }
 
     init(currentAttempt: UInt, plan: ActionPlan) {
         self.currentAttempt = currentAttempt
         self.plan = plan
         self.action = { completion in
-            plan.run(completion)
+            plan.run(base: currentAttempt, completion)
         }
     }
 }

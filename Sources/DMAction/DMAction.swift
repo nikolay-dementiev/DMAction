@@ -60,9 +60,8 @@ public extension DMAction {
     /// }
     /// ```
     func fallbackTo(_ fallback: DMAction) -> DMActionWithFallback {
-        let attempt = currentAttempt.saturatingAdd(1)
-        let steps = ActionPlan(of: self).relabeled(.keepOrDefault(attempt)).steps
-            + ActionPlan(of: fallback).relabeled(.override(attempt.saturatingAdd(1))).steps
+        let attempt = currentAttempt
+        let steps = ActionPlan(of: self).steps + ActionPlan(of: fallback).steps
         return DMActionWithFallback(currentAttempt: attempt, plan: ActionPlan(steps: steps))
     }
     
@@ -85,9 +84,8 @@ public extension DMAction {
             return self
         }
         let attempt = currentAttempt
-        let unit = ActionPlan(of: self)
-        let plan = ActionPlan(steps: [.repeating(unit, retries: retryCount, base: attempt, .keep)])
-        return DMActionWithFallback(currentAttempt: attempt.saturatingAdd(retryCount), plan: plan)
+        let plan = ActionPlan(steps: [.repeating(ActionPlan(of: self), retries: retryCount)])
+        return DMActionWithFallback(currentAttempt: attempt, plan: plan)
     }
     
     /// Performs the action and calls the completion handler with the result.
@@ -108,9 +106,7 @@ public extension DMAction {
     /// }
     /// ```
     func callAsFunction(completion: @escaping (ResultType) -> Void) {
-        ActionPlan(of: self).run { result in
-            let finalResult = Self.mapResultWithAttempt(result, attempt: result.attemptCount ?? currentAttempt)
-            completion(finalResult)
-        }
+        let attempt = currentAttempt
+        ActionPlan(of: self).run(base: attempt, completion)
     }
 }

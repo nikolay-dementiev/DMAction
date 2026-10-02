@@ -69,11 +69,11 @@ public struct DMButtonAction: DMAction {
     ///   - action: The action to be performed.
     internal init(currentAttempt: UInt,
                   action: @escaping ActionType) {
-        let plan = ActionPlan(steps: [.produce(action, .override(currentAttempt))])
+        let plan = ActionPlan(steps: [.produce(action)])
         self.currentAttempt = currentAttempt
         self.plan = plan
         self.action = { completion in
-            plan.run(completion)
+            plan.run(base: currentAttempt, completion)
         }
     }
     
