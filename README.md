@@ -84,7 +84,7 @@ In Xcode, choose File > Add Package Dependencies and enter
 ### CocoaPods
 
 ```ruby
-pod 'DMAction', '~> 1.1'
+pod 'DMAction', '1.1.0'
 ```
 
 Version 1.1.0 is the last release published to the CocoaPods trunk. Later releases come through
@@ -143,8 +143,9 @@ label.
 | `a.fallbackTo(b).retry(1)` | `a`, `b`, `a`, `b` | 0, 1, 2, 3 |
 
 `retry(n)` runs the action again up to n more times, right after each failure, whatever the
-error. `retry(0)` returns the action itself. `fallbackTo(_:)` chains of any length and any count
-of retries, `UInt.max` included, cost the same to build.
+error. `retry(0)` returns the action itself. Any count of retries, `UInt.max` included, costs the
+same to build. A chain of n actions built one `fallbackTo(_:)` at a time copies its steps each
+time, which adds up to O(n²) copies.
 
 ### Running without a result
 
