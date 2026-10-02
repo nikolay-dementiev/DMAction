@@ -41,6 +41,12 @@ PREPARE=()
 
 # ==== End of the settings ===============================================================
 
+# An array that a settings block leaves out, or leaves empty, is an empty array from here
+# on. Bash 3.2, the version macOS ships, treats an empty array as unbound under set -u.
+SWIFT_FLAGS=(${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"})
+DEPENDENCIES=(${DEPENDENCIES[@]+"${DEPENDENCIES[@]}"})
+PREPARE=(${PREPARE[@]+"${PREPARE[@]}"})
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASELINE="$ROOT/Fixtures/API/public-interface.txt"
 WORK="$ROOT/.build/check-api"
@@ -62,46 +68,50 @@ normalize() {
     { grep -v -E '^(//|import |$)' "$1" || true; } | python3 -c '
 import sys
 
-def attributes_only(line):
+def balance(text, opening, closing):
+    # Characters inside a string literal, such as a message or a return value, do not count.
+    total, in_string, position = 0, False, 0
+    while position < len(text):
+        character = text[position]
+        if in_string:
+            if character == "\\":
+                position += 1
+            elif character == "\"":
+                in_string = False
+        elif character == "\"":
+            in_string = True
+        elif character == opening:
+            total += 1
+        elif character == closing:
+            total -= 1
+        position += 1
+    return total
+
+def skip_attributes(line):
+    """The rest of the line after its leading attributes, arguments included."""
     position, end = 0, len(line)
-    while position < end:
-        if line[position].isspace():
+    while True:
+        while position < end and line[position].isspace():
             position += 1
-            continue
-        if line[position] != "@":
-            return False
+        if position >= end or line[position] != "@":
+            return line[position:]
         position += 1
         while position < end and (line[position].isalnum() or line[position] in "_."):
             position += 1
         if position < end and line[position] == "(":
-            # Parentheses inside a string literal, such as a message, do not count.
-            depth, in_string = 0, False
+            start = position
             while position < end:
-                character = line[position]
-                if in_string:
-                    if character == "\\":
-                        position += 1
-                    elif character == "\"":
-                        in_string = False
-                elif character == "\"":
-                    in_string = True
-                elif character == "(":
-                    depth += 1
-                elif character == ")":
-                    depth -= 1
                 position += 1
-                if depth == 0:
+                if balance(line[start:position], "(", ")") == 0:
                     break
-    return True
+
+def attributes_only(line):
+    return skip_attributes(line).strip() == ""
 
 HIDDEN = {"private", "fileprivate", "internal", "package"}
 
 def hidden_declaration(line):
-    words = line.split()
-    position = 0
-    while position < len(words) and words[position].startswith("@"):
-        position += 1
-    for word in words[position:]:
+    for word in skip_attributes(line).split():
         if word in HIDDEN:
             return True
         if not word.isidentifier() or word in ("var", "let", "func", "init", "subscript", "case",
@@ -114,14 +124,14 @@ def public_lines(lines):
     kept, held, depth = [], [], 0
     for line in lines:
         if depth > 0:
-            depth += line.count("{") - line.count("}")
+            depth += balance(line, "{", "}")
             continue
         if line.strip() and attributes_only(line):
             held.append(line)
             continue
         if hidden_declaration(line):
             held = []
-            depth = line.count("{") - line.count("}")
+            depth = balance(line, "{", "}")
             continue
         kept.extend(held)
         held = []
@@ -240,7 +250,7 @@ if ! xcrun --sdk iphonesimulator swiftc \
     -target "$TARGET" -sdk "$SDK_PATH" -I "$WORK" \
     -module-name "$MODULE" \
     -package-name "$MODULE" \
-    "${SWIFT_FLAGS[@]}" \
+    ${SWIFT_FLAGS[@]+"${SWIFT_FLAGS[@]}"} \
     ${EVOLUTION_FLAGS[@]+"${EVOLUTION_FLAGS[@]}"} \
     -emit-module -emit-module-path "$WORK/$MODULE.swiftmodule" \
     -emit-module-interface-path "$INTERFACE" \

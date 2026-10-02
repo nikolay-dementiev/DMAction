@@ -1,0 +1,13 @@
+# expect: same
+# The attribute line of a hidden member goes with it and not with the public
+# declaration that follows.
+--- A ---
+public struct First {
+  @available(iOS 18.0, *)
+  private var helper: Swift.Int
+  public func run()
+}
+--- B ---
+public struct First {
+  public func run()
+}

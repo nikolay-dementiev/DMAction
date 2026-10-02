@@ -1,0 +1,11 @@
+# expect: different
+# An enum case named package is a public declaration: removing it is an API change.
+--- A ---
+public enum First {
+  case package
+  case other
+}
+--- B ---
+public enum First {
+  case other
+}
