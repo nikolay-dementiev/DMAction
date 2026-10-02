@@ -103,7 +103,7 @@ final class ContractCharacterizationTests: XCTestCase {
         XCTAssertEqual(consumer.lastValue, "value", "the payload of the retry")
     }
 
-    func test_fallback_whenPrimaryCompletesTwiceWithFailure_runsTwice() {
+    func test_fallbackTo_whenThePrimaryFailsTwice_runsTheFallbackOnce() {
         let fallback = ProducerSpy(script: [.success("fallback")])
         let consumer = ConsumerSpy()
         let primary = DMButtonAction { completion in
@@ -113,8 +113,8 @@ final class ContractCharacterizationTests: XCTestCase {
 
         primary.fallbackTo(fallback.action).action(consumer.receive)
 
-        XCTAssertEqual(fallback.callCount, 2, "every completion of the primary starts the fallback")
-        XCTAssertEqual(consumer.count, 2, "and every fallback result reaches the consumer")
+        XCTAssertEqual(fallback.callCount, 1, "the first completion of the primary starts the fallback, the second is ignored")
+        XCTAssertEqual(consumer.count, 1, "one delivery")
     }
 
     // MARK: - Lifetime
