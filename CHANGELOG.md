@@ -33,7 +33,8 @@ All notable changes to DMAction are recorded in this file. The format follows Ke
 
 ### Changed
 
-Behaviour changes. None of them changes a declaration; each one is pinned by a test.
+Behaviour changes. None of them changes a declaration. Each one is pinned by a test, except the
+copying cost of `fallbackTo`, which is documented.
 
 **Attempt labels.** A success carries the `currentAttempt` of the action that was run plus the
 number of attempts that failed before it in that run. A failure carries no label.
@@ -90,6 +91,11 @@ per run. A producer that never completes still stalls its run.
 | `a` fails, then succeeds, in `a.fallbackTo(b)` | the consumer gets the result of `b`, then the success of `a` | the consumer gets the result of `b` |
 | `a` succeeds, then fails, in `a.fallbackTo(b)` | the consumer gets the success of `a`, then `b` runs and the consumer gets its result | the consumer gets the success of `a` |
 
+**Release.** The consumer's completion is released when the run delivers, even while a producer
+keeps its own completion, and call syntax releases its receiver then too: until the delivery it
+keeps the receiver, as 1.0.5 did. Up to 1.0.5 a producer that kept its completion also kept the
+consumer's completion, and through call syntax the receiver, for as long as it kept it.
+
 **Threads.** Unchanged: a run continues on the thread that completes an attempt, and a completion
 from another thread is not made to wait for the producer's call to return.
 
@@ -99,8 +105,8 @@ time costs O(n^2) copies. `retry` applied to a composite again and again nests o
 such an action is safe to destroy up to 1 000 levels deep on a 512 KB stack.
 
 **Properties of a third-party conformer.** Call syntax reads its `action` and then its
-`currentAttempt`, both when the call is made. Up to 1.0.5 `currentAttempt` was read when a success
-without a label arrived.
+`currentAttempt`, both when the call is made. Up to 1.0.5 `currentAttempt` was read when a result
+arrived, for every result except a success that already carried a label.
 
 **Language mode.** The package states the Swift 6 language mode and builds with the upcoming feature
 `ExistentialAny`. The source of a consumer does not change.
