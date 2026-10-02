@@ -1,0 +1,7 @@
+# The Swift Package Index hosts the documentation of this target. It builds it on iOS, with
+# xcodebuild docbuild, the way the docs job of CI does.
+version: 1
+builder:
+  configs:
+    - documentation_targets: [DMAction]
+      platform: ios
