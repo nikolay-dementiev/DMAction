@@ -33,6 +33,11 @@ package final class DefaultOutcomeViewModel: OutcomeViewModel {
     /// Fetches a quote, retries a failed fetch twice, and shows the cached quote when all three
     /// attempts have failed.
     package func load() {
+        // One run at a time: a second one would deliver into the same state. The view disables
+        // its button while loading, but the view model does not rely on that.
+        guard state != .loading else {
+            return
+        }
         state = .loading
         let failures = failuresBeforeSuccess
         var fetches = 0
