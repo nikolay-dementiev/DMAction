@@ -4,8 +4,6 @@
 //  Created by Mykola Dementiev
 //
 
-import Foundation
-
 /// Protocol for result values of `DMAction` that can be copied and have an optional attempt count.
 public protocol DMActionResultValueProtocol: Copyable {
     var attemptCount: UInt? { get }

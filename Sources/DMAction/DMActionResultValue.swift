@@ -4,8 +4,6 @@
 //  Created by Mykola Dementiev
 //
 
-import Foundation
-
 /// A struct representing the result value of a `DMAction` with an optional attempt count.
 /// Used to wrap Original DMAction.ResultType inside this Object and provide `attemptCount`
 /// for final Result closure
