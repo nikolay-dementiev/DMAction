@@ -1,9 +1,8 @@
 //
-//  DMErrorHandling
+//  DMAction
 //
 //  Created by Mykola Dementiev
 //
-// Check the DMButtonActionObjectsDocumentaryTests.swift to see for implemented examples
 
 import Foundation
 
