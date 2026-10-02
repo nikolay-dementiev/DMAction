@@ -10,9 +10,12 @@ import os
 #endif
 
 /// One run of a plan. Its attempts run in a loop on the thread that continues the run, so
-/// the stack does not grow with the number of attempts or the length of a chain. The first
-/// completion of an attempt moves the run on and any later one is ignored, so the consumer is
-/// called at most once.
+/// the stack does not grow with the number of attempts or the length of a chain, as long as
+/// no producer blocks its thread until a completion it handed to another thread has returned.
+/// Such a completion can arrive on a thread that is still inside an older producer call of the
+/// run. It continues the run there, one level deeper per attempt, because making it wait for
+/// that call could deadlock both. The first completion of an attempt moves the run on and any
+/// later one is ignored, so the consumer is called at most once.
 final class ActionRun {
     /// What the loop does next: start an attempt, or act on the result of one.
     private enum Work {
@@ -79,6 +82,10 @@ final class ActionRun {
 
     /// Calls the producer at `cursor` and returns its first result when that arrived on this
     /// thread before the call returned.
+    ///
+    /// The caller keeps `cursor`, and with it the frames and the plan, until this returns. So
+    /// they are released after the delivery once every producer call of the run has returned,
+    /// not while a producer is still inside its call.
     private func call(_ cursor: Cursor) -> DMButtonAction.ResultType? {
         let attempt = Attempt(cursor: cursor, callingThread: Thread.current)
         // The run is held strongly: a producer may keep its completion and call it after
@@ -143,7 +150,8 @@ final class ActionRun {
 struct Cursor {
     private let frames: [Frame]
     let produce: DMButtonAction.ActionType
-    /// The attempts of the run that failed before this one.
+    /// The attempts of the run that failed before this one. It saturates, although `.max` cannot
+    /// be reached: that many attempts take more than 500 years at a billion attempts a second.
     let failed: UInt
 
     /// The first producer of `plan`.

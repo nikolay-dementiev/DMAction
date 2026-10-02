@@ -45,6 +45,10 @@ public extension DMAction {
 
     /// Returns a new action that falls back to the given action if this action fails.
     ///
+    /// A chain of fallbacks of any length runs without growing the stack, with the exception
+    /// that `retry(_:)` describes: a producer that blocks its thread until a completion it
+    /// handed to another thread has returned.
+    ///
     /// - Parameter fallback: The action to fall back to.
     /// - Returns: A new action with fallback.
     ///
@@ -65,6 +69,12 @@ public extension DMAction {
     }
 
     /// Returns a new action that retries this action the specified number of times.
+    ///
+    /// Running the new action does not grow the stack with the number of attempts, as long as
+    /// each producer completes on its calling thread during its call, or after its call has
+    /// returned. A producer that blocks its thread until a completion it handed to another
+    /// thread has returned is nested once per attempt, so many such attempts can overflow
+    /// the stack.
     ///
     /// - Parameter retryCount: The number of times to retry the action.
     /// - Returns: A new action with retries.
