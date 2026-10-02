@@ -241,9 +241,12 @@ final class ConformerCharacterizationTests: XCTestCase {
 
     func test_identity_copySharesTheIdAndCompositionMintsANewOne() {
         let action = ProducerSpy(script: [.success("value")]).action
+        let other = ProducerSpy(script: [.success("value")]).action
         let copy = action
 
         XCTAssertEqual(copy.id, action.id, "a copy shares the id")
+        XCTAssertNotEqual(other.id, action.id, "two actions created separately differ")
+        XCTAssertNotEqual(action.fallbackTo(copy).id, action.fallbackTo(copy).id, "two compositions differ")
         XCTAssertNotEqual(action.fallbackTo(copy).id, action.id, "fallbackTo mints a new id")
         XCTAssertNotEqual(action.retry(1).id, action.id, "retry mints a new id")
     }
