@@ -190,8 +190,33 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertNil(result.unwrapValue().attemptCount, "the unwrapped result does not")
     }
 
+    func test_unwrapValue_onAFailure_keepsTheErrorInstance() {
+        let error = MarkedError()
+        let result: DMButtonAction.ResultType = .failure(error)
+
+        guard case .failure(let unwrapped) = result.unwrapValue() else {
+            return XCTFail("a failure stays a failure")
+        }
+        XCTAssertTrue(unwrapped as? MarkedError === error)
+    }
+
     func test_resultValue_createdWithoutACount_hasNone() {
         XCTAssertNil(DMActionResultValue(value: "value").attemptCount)
+    }
+
+    func test_valueProtocol_withoutACountOfItsOwn_reportsNone() {
+        struct PlainValue: DMActionResultValueProtocol {}
+
+        XCTAssertNil(PlainValue().attemptCount)
+    }
+
+    func test_buttonAction_whenItsProducerSuppliesALabel_overwritesIt() {
+        let consumer = ConsumerSpy()
+
+        DMButtonAction(succeedWithOwnLabel).action(consumer.receive)
+
+        XCTAssertEqual(consumer.lastLabel, 0, "the action stamps its own attempt over the supplied 9")
+        XCTAssertEqual(consumer.lastValue, "labelled", "and keeps the payload")
     }
 
     func test_attemptCount_onAnotherConformerOfTheValueProtocol_isNil() {

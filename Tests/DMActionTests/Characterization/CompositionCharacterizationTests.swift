@@ -262,6 +262,45 @@ final class CompositionCharacterizationTests: XCTestCase {
         XCTAssertEqual(consumer.count, 2, "one delivery per run")
     }
 
+    func test_retryOnceThenFallback_labelsTheFallbackThree() {
+        let primary = ProducerSpy.alwaysFailing()
+        let fallback = ProducerSpy(script: [.success("fallback")])
+        let consumer = ConsumerSpy()
+
+        primary.action.retry(1).fallbackTo(fallback.action).action(consumer.receive)
+
+        XCTAssertEqual(primary.callCount, 2, "the first attempt and one retry")
+        XCTAssertEqual(consumer.lastLabel, 3, "legacy label of the fallback after two attempts")
+    }
+
+    // MARK: - Entry points
+
+    func test_callSyntax_onBuiltInAction_deliversWhatActionDelivers() {
+        let error = MarkedError()
+        let succeeded = ConsumerSpy()
+        let failed = ConsumerSpy()
+
+        let recovering = ProducerSpy.failing(1, then: "value").action.retry(1)
+        let failing = ProducerSpy.alwaysFailing(with: error).action
+
+        recovering(completion: succeeded.receive)
+        failing(completion: failed.receive)
+
+        XCTAssertEqual(succeeded.lastValue, "value", "the payload")
+        XCTAssertEqual(succeeded.lastLabel, 2, "the same legacy label as through action")
+        XCTAssertTrue(failed.lastError as? MarkedError === error, "a failure keeps its error instance")
+    }
+
+    func test_simpleAction_onBuiltInAction_runsTheChainAndDropsTheResult() {
+        let primary = ProducerSpy.alwaysFailing()
+        let fallback = ProducerSpy.alwaysFailing()
+
+        primary.action.retry(1).fallbackTo(fallback.action).simpleAction()
+
+        XCTAssertEqual(primary.callCount, 2, "the primary and its retry ran")
+        XCTAssertEqual(fallback.callCount, 1, "the fallback ran; its failure went nowhere")
+    }
+
     // MARK: - Helpers
 
     private func makeSUT(script: [ProducerSpy.Outcome]) -> (producer: ProducerSpy, consumer: ConsumerSpy) {
