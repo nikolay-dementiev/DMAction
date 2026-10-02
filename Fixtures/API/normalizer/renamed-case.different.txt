@@ -1,0 +1,10 @@
+# expect: different
+# A renamed enum case.
+--- A ---
+public enum First {
+  case one
+}
+--- B ---
+public enum First {
+  case uno
+}

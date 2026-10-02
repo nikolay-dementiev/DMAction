@@ -1,0 +1,14 @@
+# expect: different
+# A method that moves from one type to another.
+--- A ---
+public struct First {
+  public func run()
+}
+public struct Second {
+}
+--- B ---
+public struct First {
+}
+public struct Second {
+  public func run()
+}

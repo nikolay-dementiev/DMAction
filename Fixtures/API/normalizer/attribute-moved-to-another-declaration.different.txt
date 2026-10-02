@@ -1,0 +1,14 @@
+# expect: different
+# An attribute printed on a line of its own that moves to another declaration.
+--- A ---
+@available(iOS 18.0, *)
+public struct First {
+}
+public struct Second {
+}
+--- B ---
+public struct First {
+}
+@available(iOS 18.0, *)
+public struct Second {
+}

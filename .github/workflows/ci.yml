@@ -110,6 +110,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Check the normalisation of the interface
+        run: Scripts/check-api.sh --self-test
       - name: Public interface against the baseline
         run: Scripts/check-api.sh
 

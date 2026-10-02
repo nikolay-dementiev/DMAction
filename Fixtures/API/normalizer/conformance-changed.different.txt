@@ -1,0 +1,6 @@
+# expect: different
+# An extension that declares another conformance.
+--- A ---
+extension Module.First : Swift.Sendable {}
+--- B ---
+extension Module.First : Swift.Equatable {}
