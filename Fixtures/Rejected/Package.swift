@@ -3,14 +3,16 @@
 import PackageDescription
 
 // Uses of DMAction across isolation domains that the Swift 6 compiler rejects today.
-// Scripts/check-manifest.sh builds each target on its own and expects it to fail: a target
-// that starts to compile means the documented concurrency limits have changed.
+// Scripts/check-manifest.sh builds each target on its own and expects the error the shape
+// names in its `// expected-error:` line. A target that starts to compile means the
+// concurrency limits of the library have changed.
 let shapes = [
     "TaskInNonisolatedClosure",
     "DetachedTask",
     "ContinuationBridge",
     "GlobalStorage",
-    "SendableConformance"
+    "SendableAction",
+    "SendableResult"
 ]
 
 let package = Package(

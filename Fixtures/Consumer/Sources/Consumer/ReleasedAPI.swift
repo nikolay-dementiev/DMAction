@@ -4,6 +4,7 @@ import Foundation
 // Every public declaration of DMAction 1.0.5, written the way a consumer writes it.
 // Nothing here is executed. The file is compiled by Scripts/check-manifest.sh: a renamed
 // symbol, a removed default value or a changed argument label stops it from building.
+// ExactTypes.swift pins the types these calls would let drift.
 
 struct ConsumerError: Error {}
 
@@ -42,7 +43,7 @@ func releasedInitializers() -> ReleasedActions {
         completion(.failure(ConsumerError()))
     }
     let simple = DMButtonAction {
-        // A closure with no result: the action always succeeds.
+        // A closure with no result.
     }
     let fromFunction = DMButtonAction(produceValue)
     return ReleasedActions(withResult: withResult, simple: simple, fromFunction: fromFunction)
