@@ -126,14 +126,14 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertEqual(fallback.attemptReads, 0, "the fallback's attempt is not used")
     }
 
-    func test_retry_onCustomConformer_readsItsActionOncePerAttemptAtComposition() {
+    func test_retry_onCustomConformer_readsItsActionOnceAtComposition() {
         let retried = makeSUT()
         let untouched = makeSUT()
 
         _ = retried.retry(3)
         _ = untouched.retry(0)
 
-        XCTAssertEqual(retried.actionReads, 4, "one read per attempt")
+        XCTAssertEqual(retried.actionReads, 1, "the action is read once, whatever the count")
         XCTAssertEqual(retried.attemptReads, 1, "the attempt is read once")
         XCTAssertEqual(untouched.actionReads + untouched.attemptReads, 0, "retry(0) reads nothing")
     }
