@@ -160,6 +160,12 @@ public extension DMAction {
         // The order is part of the contract, for a conformer whose getters have effects:
         // `action`, then `currentAttempt`, both at the call.
         let plan = ActionPlan(of: self)
-        plan.run(base: currentAttempt, completion)
+        // The run keeps the receiver until it delivers, as call syntax did in 1.0.5: a
+        // conformer's producer may refer to the conformer without retaining it.
+        plan.run(base: currentAttempt) { result in
+            withExtendedLifetime(self) {
+                completion(result)
+            }
+        }
     }
 }
