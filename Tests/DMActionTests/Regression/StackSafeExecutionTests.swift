@@ -21,43 +21,56 @@ final class StackSafeExecutionTests: XCTestCase {
         XCTAssertTrue(consumer.lastError as? MarkedError === errors.last, "the error of the last attempt")
     }
 
-    /// Two threads, each with a small stack, hand the attempts back and forth: every completion
-    /// arrives on the other thread, after the producer has returned from its call. It proves that
-    /// such a completion goes on with the run every time. It cannot show stack growth: on this
-    /// path no run nests a call, even a recursive one, because every producer returns at once. The
-    /// small stacks guard against a design that would wait inside a call.
+    /// Two threads, each with a small stack, hand the attempts back and forth. A producer hands
+    /// its completion to a later job on its own thread, which runs only once the job that called
+    /// the producer has returned, and that job completes on the other thread. So every completion
+    /// arrives on another thread after the call that received it has returned, and the run goes
+    /// on there. It cannot show stack growth: on this path no run nests a call, because every
+    /// producer returns at once. The small stacks guard against a design that would wait inside
+    /// a call.
     func test_retry_withTenThousandRetriesCompletedOnAnotherThreadAfterEachCall_callsTheProducerTenThousandAndOneTimes() {
         let first = SerialThread(stackSize: Self.smallStack)
         let second = SerialThread(stackSize: Self.smallStack)
         let firstThread = first.start()
         _ = second.start()
-        let calls = LockedCounter()
-        let failures = LockedCounter()
+        let errors = (0...Self.depth).map { _ in MarkedError() }
+        let calls = Locked(0)
+        let callsInProgress = Locked(0)
+        let completedDuringACall = LockedCounter()
+        let consumer = ConsumerSpy()
         let delivered = expectation(description: "the run delivered")
+        delivered.assertForOverFulfill = false
         let producer = DMButtonAction { completion in
-            calls.increment()
-            let returned = DispatchSemaphore(value: 0)
-            (Thread.current === firstThread ? second : first).enqueue {
-                returned.wait()
-                completion(.failure(MarkedError()))
+            let call = calls.withLock { count in
+                count += 1
+                return count - 1
             }
-            returned.signal()
+            callsInProgress.withLock { $0 += 1 }
+            defer { callsInProgress.withLock { $0 -= 1 } }
+            let (own, other) = Thread.current === firstThread ? (first, second) : (second, first)
+            own.enqueue {
+                other.enqueue {
+                    if callsInProgress.withLock({ $0 }) > 0 {
+                        completedDuringACall.increment()
+                    }
+                    completion(.failure(call < errors.count ? errors[call] : MarkedError()))
+                }
+            }
         }
 
-        runOnASmallStack {
+        first.enqueue {
             producer.retry(UInt(Self.depth)).action { result in
-                if case .failure = result {
-                    failures.increment()
-                }
+                consumer.receive(result)
                 delivered.fulfill()
             }
         }
         wait(for: [delivered], timeout: 120)
-        first.stop()
-        second.stop()
+        drainAndStop(first, second)
 
-        XCTAssertEqual(calls.count, Self.depth + 1, "the first attempt and ten thousand retries")
-        XCTAssertEqual(failures.count, 1, "one delivery, the failure of the last attempt")
+        XCTAssertEqual(calls.withLock { $0 }, Self.depth + 1, "the first attempt and ten thousand retries")
+        XCTAssertEqual(completedDuringACall.count, 0, "no completion arrived while a producer call was running")
+        XCTAssertEqual(consumer.count, 1, "one delivery")
+        XCTAssertTrue(consumer.lastError as? MarkedError === errors.last, "the error of the last attempt")
     }
 
     func test_fallbackTo_chainedTenThousandDeepToTheLeftOnASmallStack_runsEveryProducerOnce() {
@@ -150,6 +163,17 @@ final class StackSafeExecutionTests: XCTestCase {
             index == Self.depth ? ProducerSpy(script: [.success("last")]) : ProducerSpy.alwaysFailing()
         }
         return (spies, ConsumerSpy())
+    }
+
+    /// Waits until each thread has run every job handed to it so far, and lets the threads end.
+    private func drainAndStop(_ threads: SerialThread...) {
+        let drained = expectation(description: "the threads ran their jobs")
+        drained.expectedFulfillmentCount = threads.count
+        for thread in threads {
+            thread.enqueue { drained.fulfill() }
+            thread.stop()
+        }
+        wait(for: [drained], timeout: 120)
     }
 
     /// Runs `work` on a new thread with a 512 KB stack and waits until it has finished.
