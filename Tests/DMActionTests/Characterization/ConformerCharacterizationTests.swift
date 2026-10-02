@@ -3,10 +3,12 @@ import XCTest
 
 /// Pins what the public fallback initializer, custom conformers and the value types do today.
 final class ConformerCharacterizationTests: XCTestCase {
-    /// A conformer with computed requirements that counts how often they are read.
+    /// A conformer with computed requirements that counts how often they are read, and in
+    /// which order.
     private final class CountingAction: DMAction {
         private(set) var actionReads = 0
         private(set) var attemptReads = 0
+        private(set) var reads: [String] = []
         let id = UUID()
         private let work: ActionType
 
@@ -16,11 +18,13 @@ final class ConformerCharacterizationTests: XCTestCase {
 
         var currentAttempt: UInt {
             attemptReads += 1
+            reads.append("currentAttempt")
             return 0
         }
 
         var action: ActionType {
             actionReads += 1
+            reads.append("action")
             return work
         }
     }
@@ -151,15 +155,15 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertEqual(untouched.actionReads + untouched.attemptReads, 0, "retry(0) reads nothing")
     }
 
-    func test_callSyntax_onCustomConformer_readsItsActionAtTheCall() {
-        let receiver = makeSUT()
-        let readsBeforeTheCall = receiver.actionReads
+    /// The producer never completes, so a read that waited for a result would not happen.
+    func test_callSyntax_onCustomConformer_readsItsActionThenItsAttemptAtTheCall() {
+        let receiver = makeSUT { _ in }
+        let readsBeforeTheCall = receiver.reads
 
         receiver { _ in }
 
-        XCTAssertEqual(readsBeforeTheCall, 0, "nothing is read before the call")
-        XCTAssertEqual(receiver.actionReads, 1, "the action is read when the call is made")
-        XCTAssertEqual(receiver.attemptReads, 1, "the attempt is read when a success arrives without a label")
+        XCTAssertEqual(readsBeforeTheCall, [], "nothing is read before the call")
+        XCTAssertEqual(receiver.reads, ["action", "currentAttempt"], "the action, then the attempt, both at the call")
     }
 
     // MARK: - Custom conformers: what they deliver
