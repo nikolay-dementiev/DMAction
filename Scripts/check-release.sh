@@ -27,9 +27,9 @@ if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     exit 2
 fi
 
-if [ "$NOTES" -eq 1 ]; then
-    # The lines between the version's heading and the next release heading, without the blank
-    # lines at either end.
+# The lines between the version's heading and the next release heading, without the blank lines
+# at either end. Empty when the version has no heading or nothing under it.
+notes() {
     awk -v heading="## [$VERSION]" '
         index($0, heading) == 1 { inside = 1; next }
         inside && /^## \[/ { exit }
@@ -40,10 +40,23 @@ if [ "$NOTES" -eq 1 ]; then
             for (line = first; line <= last; line++) print lines[line]
         }
     ' "$CHANGELOG"
+}
+
+if [ "$NOTES" -eq 1 ]; then
+    TEXT="$(notes)"
+    if [ -z "$TEXT" ]; then
+        echo "check-release: CHANGELOG.md has no notes under a heading for $VERSION" >&2
+        exit 1
+    fi
+    printf '%s\n' "$TEXT"
     exit 0
 fi
 
 PROBLEMS=()
+
+if [ -z "$(notes)" ]; then
+    PROBLEMS+=("CHANGELOG.md has no notes under a heading for $VERSION")
+fi
 
 PODSPEC_VERSION="$(sed -n "s/^ *s\.version *= *'\([^']*\)'.*/\1/p" "$PODSPEC")"
 if [ "$PODSPEC_VERSION" != "$VERSION" ]; then
