@@ -10,6 +10,14 @@ final class DefaultOutcomeViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.state, .idle)
     }
 
+    /// The UI test expects the label of one failed attempt, so it relies on this default.
+    @MainActor
+    func test_failuresBeforeSuccess_byDefault_isOne() {
+        let viewModel = DefaultOutcomeViewModel(source: QuoteSourceSpy())
+
+        XCTAssertEqual(viewModel.failuresBeforeSuccess, 1)
+    }
+
     @MainActor
     func test_load_whileTheFetchIsOutstanding_isLoading() {
         let (viewModel, source) = makeSUT()
