@@ -40,10 +40,12 @@ cd "$ROOT"
 # tracked sources and build output, and they leave with the run. The logs stay.
 PROBE=""
 DERIVED=""
+REJECTED_BUILD=""
 # shellcheck disable=SC2329  # invoked by the trap below
 cleanup() {
     if [ -n "$PROBE" ]; then rm -rf "$PROBE"; fi
     if [ -n "$DERIVED" ]; then rm -rf "$DERIVED"; fi
+    if [ -n "$REJECTED_BUILD" ]; then rm -rf "$REJECTED_BUILD"; fi
 }
 trap cleanup EXIT
 
@@ -211,6 +213,9 @@ fi
 # 6. The rejected shapes. Each names the error it expects in an `// expected-error:` line.
 #    Every error the compiler reports for it must be that one: a typo or a missing module
 #    also stops a build, and proves nothing about isolation.
+#    The shapes build in a new folder on every run: a build folder kept between runs can
+#    hold a plan of the library made before a source file was added, and builds from it.
+REJECTED_BUILD="$(mktemp -d "$WORK/RejectedBuild.XXXXXX")"
 STILL_REJECTED=0
 for shape in "$ROOT"/Fixtures/Rejected/Sources/*/; do
     name="$(basename "$shape")"
@@ -224,7 +229,7 @@ for shape in "$ROOT"/Fixtures/Rejected/Sources/*/; do
     if [ -z "$expected" ]; then
         echo "check-manifest: the shape $name does not name the error it expects." >&2
         FAILED=1
-    elif swift build --package-path "$ROOT/Fixtures/Rejected" --target "$name" > "$log" 2>&1; then
+    elif swift build --package-path "$ROOT/Fixtures/Rejected" --scratch-path "$REJECTED_BUILD" --target "$name" > "$log" 2>&1; then
         echo "check-manifest: the shape $name compiles now: what the compiler rejects across isolation domains has changed." >&2
         echo "  Update the documentation of the concurrency limits and this fixture." >&2
         FAILED=1
