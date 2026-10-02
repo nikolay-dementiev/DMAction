@@ -5,6 +5,12 @@ All notable changes to DMAction are recorded in this file. The format follows Ke
 
 ## [1.1.0] - Unreleased
 
+### Added
+
+- An example app, `Examples/DMActionExample`, that uses the package from the checkout: a fetch
+  retried twice that falls back to a cached quote, with the outcome and its attempt label on the
+  screen. Its view model tests, a UIKit test and a UI test with the accessibility audit run in CI.
+
 ### Fixed
 
 - The package can be added by version, for example `.package(url: ..., from: "1.1.0")`. Up to
@@ -13,9 +19,11 @@ All notable changes to DMAction are recorded in this file. The format follows Ke
 - An attempt number of `UInt.max` no longer stops the host when an action is composed or when its
   primary fails. It stays at `UInt.max`.
 - `retry(_:)` costs the same for any count. `retry(.max)` never returned.
-- A run no longer grows the stack with the number of attempts or the length of a chain. Ten
-  thousand retries, or a fallback chain ten thousand deep, overflowed the 512 KB stack of a
-  secondary thread.
+- A run no longer grows the stack with the number of attempts or the length of a chain, as long
+  as each producer completes during its call or after its call has returned. Ten thousand
+  retries, or a fallback chain ten thousand deep, overflowed the 512 KB stack of a secondary
+  thread. A producer that blocks its thread until a completion it handed to another thread has
+  returned still takes one level of the stack per attempt.
 - A producer that calls its completion more than once no longer runs the rest of the chain again
   and no longer calls the consumer again.
 - The pod no longer links XCTest, and it lists the Swift 5 and Swift 6 language modes.
@@ -74,12 +82,18 @@ from another thread is not made to wait for the producer's call to return.
 time costs O(n^2) copies. `retry` applied to a composite again and again nests one level per call;
 such an action is safe to destroy up to 1 000 levels deep on a 512 KB stack.
 
+**Properties of a third-party conformer.** Call syntax reads its `action` and then its
+`currentAttempt`, both when the call is made. Up to 1.0.5 `currentAttempt` was read when a success
+without a label arrived.
+
 **Language mode.** The package states the Swift 6 language mode and builds with the upcoming feature
 `ExistentialAny`. The source of a consumer does not change.
 
 ### Removed
 
 - The dependency on the lint plugin package, and the environment variable that switched it on.
+- The CocoaPods example project. Its Pod helper deleted the machine's Xcode DerivedData folder on
+  every install. `Examples/DMActionExample` replaces it.
 
 ## [1.0.5] - 2025-03-21
 
