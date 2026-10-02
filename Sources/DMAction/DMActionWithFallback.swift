@@ -29,7 +29,7 @@ public struct DMActionWithFallback: DMAction {
     public init(currentAttempt: UInt,
                 _ primaryAction: @escaping ActionType,
                 _ fallbackAction: @escaping ActionType) {
-        self.init(currentAttempt: currentAttempt, plan: ActionPlan(steps: [.produce(primaryAction), .produce(fallbackAction)]))
+        self.init(currentAttempt: currentAttempt, plan: ActionPlan(.produce(primaryAction), [.produce(fallbackAction)]))
     }
 
     init(currentAttempt: UInt, plan: ActionPlan) {

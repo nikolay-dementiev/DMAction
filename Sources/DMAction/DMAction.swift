@@ -61,8 +61,8 @@ public extension DMAction {
     /// ```
     func fallbackTo(_ fallback: DMAction) -> DMActionWithFallback {
         let attempt = currentAttempt
-        let steps = ActionPlan(of: self).steps + ActionPlan(of: fallback).steps
-        return DMActionWithFallback(currentAttempt: attempt, plan: ActionPlan(steps: steps))
+        let plan = ActionPlan(of: self).followed(by: ActionPlan(of: fallback))
+        return DMActionWithFallback(currentAttempt: attempt, plan: plan)
     }
     
     /// Returns a new action that retries this action the specified number of times.
@@ -84,7 +84,7 @@ public extension DMAction {
             return self
         }
         let attempt = currentAttempt
-        let plan = ActionPlan(steps: [.repeating(ActionPlan(of: self), retries: retryCount)])
+        let plan = ActionPlan(.repeating(ActionPlan(of: self), retries: retryCount))
         return DMActionWithFallback(currentAttempt: attempt, plan: plan)
     }
     

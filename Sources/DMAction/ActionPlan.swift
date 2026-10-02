@@ -15,8 +15,21 @@ struct ActionPlan {
         case repeating(ActionPlan, retries: UInt)
     }
 
-    /// Run in order until one of them succeeds. Never empty.
+    /// Run in order until one of them succeeds. Never empty: every plan starts from a first step.
     let steps: [Step]
+
+    init(_ first: Step, _ rest: [Step] = []) {
+        steps = [first] + rest
+    }
+
+    private init(steps: [Step]) {
+        self.steps = steps
+    }
+
+    /// The steps of this plan, then those of `next`.
+    func followed(by next: ActionPlan) -> ActionPlan {
+        ActionPlan(steps: steps + next.steps)
+    }
 }
 
 extension ActionPlan {
@@ -31,7 +44,7 @@ extension ActionPlan {
         case let composed as DMActionWithFallback:
             self = composed.plan
         default:
-            self.init(steps: [.produce(action.action)])
+            self.init(.produce(action.action))
         }
     }
 
