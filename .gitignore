@@ -9,3 +9,4 @@ DerivedData/
 Fixtures/Consumer/.build/
 Fixtures/Consumer/.swiftpm/
 Fixtures/Consumer/Package.resolved
+Package.resolved

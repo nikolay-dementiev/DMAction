@@ -94,8 +94,7 @@ else
 fi
 
 # 3. The consumer fixture. xcodebuild finds a package only in the current directory.
-#    The plugin validation is skipped only as long as the manifest still carries the lint
-#    plugin: a consumer has to do the same today.
+#    No flag skips the plugin validation: a consumer must not need one.
 DERIVED="$(mktemp -d "$WORK/DerivedData.XXXXXX")"
 cd "$ROOT/Fixtures/Consumer"
 if xcodebuild build \
@@ -103,7 +102,6 @@ if xcodebuild build \
     -sdk iphonesimulator \
     -destination 'generic/platform=iOS Simulator' \
     -derivedDataPath "$DERIVED" \
-    -skipPackagePluginValidation \
     ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
     > "$WORK/consumer-build.log" 2>&1; then
     echo "check-manifest: Fixtures/Consumer builds against this checkout."
