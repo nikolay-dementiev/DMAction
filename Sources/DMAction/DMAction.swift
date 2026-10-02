@@ -55,6 +55,8 @@ public extension DMAction {
     /// so for a third-party conformer it is that conformer's closure, not a guarded run.
     ///
     /// ```swift
+    /// import DMAction
+    ///
     /// let tap: any DMAction = DMButtonAction { print("Tapped") }
     /// tap.simpleAction()
     /// ```
@@ -76,6 +78,9 @@ public extension DMAction {
     /// handed to another thread has returned.
     ///
     /// ```swift
+    /// import DMAction
+    /// import Foundation
+    ///
     /// let fresh: any DMAction = DMButtonAction { completion in completion(.failure(URLError(.timedOut))) }
     /// let cached: any DMAction = DMButtonAction { completion in completion(.success("cached")) }
     ///
@@ -109,6 +114,9 @@ public extension DMAction {
     /// the stack.
     ///
     /// ```swift
+    /// import DMAction
+    /// import Foundation
+    ///
     /// var calls = 0
     /// let flaky = DMButtonAction { completion in
     ///     calls += 1
@@ -143,6 +151,8 @@ public extension DMAction {
     /// third-party conformer's `action` and then its `currentAttempt` are read when this is called.
     ///
     /// ```swift
+    /// import DMAction
+    ///
     /// let greet = DMButtonAction { completion in completion(.success("Hello")) }
     ///
     /// greet { result in

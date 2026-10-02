@@ -24,6 +24,9 @@ Here’s how this SDK solves the two critical problems mentioned earlier:
 Imagine fetching data from a server. If the request fails due to a temporary network issue, you don’t want to leave your users hanging. With this SDK, you can define a retry mechanism that automatically retries the request up to a specified number of times before failing gracefully.
 
 ```swift
+import DMAction
+import Foundation
+
 var attempts = 0
 let action = DMButtonAction { completion in
     attempts += 1
@@ -50,6 +53,9 @@ The first two attempts fail and the third succeeds, so the result carries 2: the
 What happens if an action fails completely, even after retries? This SDK allows you to define fallback actions to ensure your app remains robust. For example, if a form submission fails, you can provide a fallback action to notify the user or log the error.
 
 ```swift
+import DMAction
+import Foundation
+
 let primaryAction = DMButtonAction { completion in
     print("Primary action performed")
     completion(.failure(URLError(.notConnectedToInternet)))

@@ -23,9 +23,12 @@ public extension Result where Success: Copyable, Failure == any Error {
     /// stays as it is, the same error instance.
     ///
     /// ```swift
-    /// action { result in
+    /// import DMAction
+    ///
+    /// let greet = DMButtonAction { completion in completion(.success("Hello")) }
+    /// greet { result in
     ///     if case .success(let value) = result.unwrapValue() {
-    ///         print(value) // the payload the producer delivered
+    ///         print(value) // Hello, the payload the producer delivered
     ///     }
     /// }
     /// ```

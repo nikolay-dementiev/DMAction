@@ -15,6 +15,10 @@ import Foundation
 /// A producer that reports a result:
 ///
 /// ```swift
+/// import DMAction
+/// import Foundation
+///
+/// let fileURL = URL.temporaryDirectory.appending(path: "notes.txt")
 /// let load = DMButtonAction { completion in
 ///     do {
 ///         completion(.success(try Data(contentsOf: fileURL)))
@@ -36,6 +40,8 @@ import Foundation
 /// A closure that cannot fail:
 ///
 /// ```swift
+/// import DMAction
+///
 /// let tap = DMButtonAction {
 ///     print("Tapped")
 /// }
