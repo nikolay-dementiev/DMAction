@@ -73,6 +73,40 @@ final class ThreadCharacterizationTests: XCTestCase {
         XCTAssertTrue(threads.delivery === caller?.thread, "and so does the delivery")
     }
 
+    /// The same with the run started on a background thread, so that neither thread is the main
+    /// one: the calling thread is told apart by identity.
+    func test_run_whenABackgroundCallIsCompletedFromAnotherBackgroundThread_continuesThereWithoutWaiting() {
+        let fallbackStarted = DispatchSemaphore(value: 0)
+        let (threads, fallback) = makeSUT(whenTheFallbackRuns: { fallbackStarted.signal() })
+        let delivered = expectation(description: "the consumer completion ran")
+        let callReturned = expectation(description: "the call that started the run returned")
+        var completer: BackgroundCaller?
+        var waitForTheFallback: DispatchTimeoutResult?
+        let primary = DMButtonAction { completion in
+            let background = BackgroundCaller {
+                completion(.failure(MarkedError()))
+            }
+            completer = background
+            background.start()
+            waitForTheFallback = fallbackStarted.wait(timeout: .now() + 5)
+        }
+
+        BackgroundCaller {
+            primary.fallbackTo(fallback).action { _ in
+                threads.delivery = Thread.current
+                delivered.fulfill()
+            }
+            callReturned.fulfill()
+        }
+        .start()
+        wait(for: [delivered, callReturned], timeout: 10)
+
+        XCTAssertEqual(waitForTheFallback, .success, "the fallback started while the primary was still in its call")
+        XCTAssertNotNil(completer?.thread, "the completing thread")
+        XCTAssertTrue(threads.fallback === completer?.thread, "the fallback runs on the completing thread")
+        XCTAssertTrue(threads.delivery === completer?.thread, "and so does the delivery")
+    }
+
     // MARK: - Helpers
 
     /// A fallback that succeeds and records the thread it ran on.

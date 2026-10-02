@@ -166,6 +166,39 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertEqual(receiver.reads, ["action", "currentAttempt"], "the action, then the attempt, both at the call")
     }
 
+    func test_callSyntax_onCustomConformer_whenTheResultArrives_readsNothingMore() {
+        let consumer = ConsumerSpy()
+        let receiver = makeSUT()
+
+        receiver(completion: consumer.receive)
+
+        XCTAssertEqual(consumer.count, 1, "the result arrived")
+        XCTAssertEqual(receiver.reads, ["action", "currentAttempt"], "each read once, at the call, none at the delivery")
+    }
+
+    func test_retry_onCustomConformer_whenRun_readsItsActionOnceForAllAttempts() {
+        let producer = ProducerSpy.succeeding(onCall: 4)
+        let receiver = makeSUT(producer.produce)
+        let consumer = ConsumerSpy()
+
+        receiver.retry(5).action(consumer.receive)
+
+        XCTAssertEqual(producer.callCount, 4, "four attempts ran")
+        XCTAssertEqual(consumer.lastLabel, 3, "three failed before the success")
+        XCTAssertEqual(receiver.reads, ["currentAttempt", "action"], "each read once, at composition, not per attempt")
+    }
+
+    /// The default `simpleAction` calls the conformer's own `action`: it is not a guarded run.
+    func test_simpleAction_onCustomConformer_readsItsActionOnceAndNotItsAttempt() {
+        let receiver = makeSUT()
+        let readsBeforeTheCall = receiver.reads
+
+        receiver.simpleAction()
+
+        XCTAssertEqual(readsBeforeTheCall, [], "nothing is read before the call")
+        XCTAssertEqual(receiver.reads, ["action"], "the action, once, and not the attempt")
+    }
+
     // MARK: - Custom conformers: what they deliver
 
     func test_fallbackTo_onCustomConformer_labelsAFirstTrySuccessZero() {

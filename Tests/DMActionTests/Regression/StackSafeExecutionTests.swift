@@ -94,6 +94,28 @@ final class StackSafeExecutionTests: XCTestCase {
         XCTAssertEqual(consumer.lastLabel, UInt(Self.depth), "ten thousand failed attempts before the last")
     }
 
+    /// Running a composite nested twenty thousand times needs no stack per level. The action is
+    /// leaked on purpose: destroying it recurses once per level, which the next test bounds.
+    func test_retry_appliedTwentyThousandTimesToACompositeOnASmallStack_runsTheProducerOnce() {
+        final class Keeper {
+            let action: any DMAction
+            init(_ action: any DMAction) { self.action = action }
+        }
+        let (producer, consumer) = makeSUT(script: [.success("value")])
+
+        runOnASmallStack {
+            var action: any DMAction = producer.action.fallbackTo(DMButtonAction { $0(.success("fallback")) })
+            for _ in 0..<20_000 {
+                action = action.retry(1)
+            }
+            _ = Unmanaged.passRetained(Keeper(action))
+            action.action(consumer.receive)
+        }
+
+        XCTAssertEqual(producer.callCount, 1, "one call")
+        XCTAssertEqual(consumer.lastLabel, 0, "the label of a first-try success")
+    }
+
     /// `retry` applied to a composite, again and again, nests one plan per call. Running such
     /// an action does not grow the stack; destroying it does, by one level per call. The test
     /// pins 1 000 levels, about half of the smallest limit measured. Measured by raising the

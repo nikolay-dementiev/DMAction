@@ -116,6 +116,28 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         XCTAssertEqual(sut.consumer.lastValue, "fallback", "the fallback's result")
     }
 
+    /// A request that timed out and answered late: the retry has started, then the first
+    /// attempt's answer arrives.
+    func test_retry_whenAnEarlierAttemptCompletesAfterItsRetryStarted_ignoresIt() throws {
+        let sut = makeSUT(producer: [.hold])
+
+        sut.producer.action.retry(1).action(sut.consumer.receive)
+        let first = try XCTUnwrap(sut.producer.heldCompletions.first, "the first attempt kept its completion")
+        first(.failure(MarkedError()))
+        let callsAfterTheFailure = sut.producer.callCount
+        first(.success("late"))
+        let deliveriesAfterTheLateSuccess = sut.consumer.count
+        let second = try XCTUnwrap(sut.producer.heldCompletions.last, "the retry kept its completion")
+        second(.success("retry"))
+
+        XCTAssertEqual(callsAfterTheFailure, 2, "the failure started the retry")
+        XCTAssertEqual(deliveriesAfterTheLateSuccess, 0, "the late success of the first attempt delivers nothing")
+        XCTAssertEqual(sut.producer.callCount, 2, "nothing runs again")
+        XCTAssertEqual(sut.consumer.count, 1, "one delivery")
+        XCTAssertEqual(sut.consumer.lastValue, "retry", "the retry's result")
+        XCTAssertEqual(sut.consumer.lastLabel, 1, "one failed attempt before it")
+    }
+
     func test_run_whenACompletionArrivesAfterTheRunFinished_ignoresIt() throws {
         let sut = makeSUT(producer: [.hold])
 
@@ -173,20 +195,22 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         markers.notice("end \(marker, privacy: .public)")
 
         // An entry may reach the store a moment after it was written: read until the end marker
-        // is there, for two seconds at most.
+        // is there, three reads at most. One read takes seconds, so a deadline would allow one.
         var entries: [OSLogEntryLog] = []
-        let deadline = Date().addingTimeInterval(2)
-        repeat {
+        for _ in 0..<3 {
             entries = try OSLogStore(scope: .currentProcessIdentifier)
                 .getEntries(matching: NSPredicate(format: "subsystem IN %@", ["DMAction", "DMActionTests"]))
                 .compactMap { $0 as? OSLogEntryLog }
-        } while !entries.contains(where: { $0.composedMessage == "end \(marker)" }) && Date() < deadline
+            if entries.contains(where: { $0.composedMessage == "end \(marker)" }) {
+                break
+            }
+        }
         let start = try XCTUnwrap(entries.firstIndex { $0.composedMessage == "start \(marker)" }, "the start marker")
         let end = try XCTUnwrap(entries.firstIndex { $0.composedMessage == "end \(marker)" }, "the end marker")
-        let faults = entries[start..<end].filter {
-            $0.subsystem == "DMAction" && $0.level == .fault && $0.composedMessage.contains("completed more than once")
-        }
+        let lines = entries[start..<end].filter { $0.subsystem == "DMAction" }
+        let faults = lines.filter { $0.level == .fault && $0.composedMessage.contains("completed more than once") }
         XCTAssertEqual(faults.count, 2, "one fault line for each of the two ignored completions")
+        XCTAssertEqual(Set(lines.map(\.category)), ["ActionRun"], "in the category the documentation names")
     }
 
     // MARK: - Lifetime
@@ -248,6 +272,51 @@ final class AtMostOnceDeliveryTests: XCTestCase {
     }
 
     // MARK: - Many threads: exact counts first, then the Thread Sanitizer
+
+    /// Two threads wait at a barrier and complete one attempt at the same moment, thousands of
+    /// times. A run that checked the attempt and took it in two steps would let both through now
+    /// and then; the Thread Sanitizer does not see that, because every step holds the lock.
+    func test_run_whenTwoThreadsCompleteOneAttemptAtOnce_runsTheFallbackAndDeliversOnce() {
+        let left = SerialThread(stackSize: 512 * 1024)
+        let right = SerialThread(stackSize: 512 * 1024)
+        _ = left.start()
+        _ = right.start()
+        var wrong: [Int] = []
+        for iteration in 0..<3_000 {
+            let fallbackCalls = LockedCounter()
+            let deliveries = LockedCounter()
+            let producer = ProducerSpy(script: [.hold])
+            let fallback = DMButtonAction { completion in
+                fallbackCalls.increment()
+                completion(.success("fallback"))
+            }
+            producer.action.fallbackTo(fallback).action { _ in
+                deliveries.increment()
+            }
+            guard let held = producer.heldCompletions.first else {
+                return XCTFail("the producer kept its completion")
+            }
+            let arrived = Locked(0)
+            let done = DispatchGroup()
+            for thread in [left, right] {
+                done.enter()
+                thread.enqueue {
+                    arrived.withLock { $0 += 1 }
+                    while arrived.withLock({ $0 }) < 2 {}
+                    held(.failure(MarkedError()))
+                    done.leave()
+                }
+            }
+            done.wait()
+            if fallbackCalls.count != 1 || deliveries.count != 1 {
+                wrong.append(iteration)
+            }
+        }
+        left.stop()
+        right.stop()
+
+        XCTAssertEqual(wrong, [], "iterations where the fallback ran, or the run delivered, other than once")
+    }
 
     /// The runs share one action, and each fails a different number of times: a count shared
     /// between runs would give a run the label of another. Four threads complete each attempt

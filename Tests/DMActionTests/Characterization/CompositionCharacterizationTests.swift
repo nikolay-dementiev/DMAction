@@ -224,6 +224,18 @@ final class CompositionCharacterizationTests: XCTestCase {
         XCTAssertEqual(consumer.lastLabel, 3, "three failed attempts before the fourth call")
     }
 
+    func test_retry_onAFallbackPair_whenThePrimarySucceedsOnTheRerun_labelsItTwo() {
+        let primary = ProducerSpy.succeeding(onCall: 2, with: "primary")
+        let fallback = ProducerSpy.alwaysFailing()
+        let consumer = ConsumerSpy()
+
+        primary.action.fallbackTo(fallback.action).retry(1).action(consumer.receive)
+
+        XCTAssertEqual(fallback.callCount, 1, "the fallback ran once, in the first pair")
+        XCTAssertEqual(consumer.lastValue, "primary", "the rerun of the primary delivers")
+        XCTAssertEqual(consumer.lastLabel, 2, "the primary and the fallback failed before it")
+    }
+
     func test_fallbackTo_whenNestedRightOrLeft_labelsTheLastActionTheSameEitherWay() {
         let rightNested = ConsumerSpy()
         let leftNested = ConsumerSpy()
