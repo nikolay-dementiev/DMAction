@@ -92,6 +92,18 @@ jobs:
           swift --version
           swift test
 
+  thread-sanitizer:
+    # A run continues on whichever thread completes an attempt. The suite runs once more
+    # under the Thread Sanitizer, on the host, where it is fastest.
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Test with the Thread Sanitizer
+        run: swift test --sanitize=thread
+
   consumer:
     runs-on: macos-26
     timeout-minutes: 15
