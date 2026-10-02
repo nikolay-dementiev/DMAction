@@ -150,6 +150,12 @@ public extension DMAction {
     /// this call returns too; otherwise it runs on the thread of the last completion. A
     /// third-party conformer's `action` and then its `currentAttempt` are read when this is called.
     ///
+    /// The run keeps this action until it delivers, so a conformer whose producer refers to it
+    /// without retaining it lives while its call is outstanding, and its last release can happen
+    /// on the thread that delivers. A conformer that keeps its own run's completion keeps itself
+    /// alive until that run delivers; a run that never delivers keeps it for as long as the
+    /// completion is kept. Running ``action`` keeps only what that closure captures.
+    ///
     /// ```swift
     /// import DMAction
     ///
@@ -171,7 +177,8 @@ public extension DMAction {
         // `action`, then `currentAttempt`, both at the call.
         let plan = ActionPlan(of: self)
         // The run keeps the receiver until it delivers, as call syntax did in 1.0.5: a
-        // conformer's producer may refer to the conformer without retaining it.
+        // conformer's producer may refer to the conformer without retaining it. Naming `self`
+        // in the closure is what captures it; `completion(result)` alone would not.
         plan.run(base: currentAttempt) { result in
             withExtendedLifetime(self) {
                 completion(result)

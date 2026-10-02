@@ -18,7 +18,7 @@ import Foundation
 /// import DMAction
 /// import Foundation
 ///
-/// let fileURL = URL.temporaryDirectory.appending(path: "notes.txt")
+/// let fileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("notes.txt")
 /// let load = DMButtonAction { completion in
 ///     do {
 ///         completion(.success(try Data(contentsOf: fileURL)))

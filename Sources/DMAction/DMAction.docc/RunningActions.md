@@ -74,7 +74,8 @@ one attempt of the outer run.
   more to build than `retry(1)`.
 - **Release.** The consumer's completion is released when the run delivers, even while a producer
   keeps its own completion. The steps of the run are released after the delivery once every
-  producer call of the run has returned.
+  producer call of the run has returned. Call syntax also keeps its receiver until the run
+  delivers: a conformer that keeps its own run's completion keeps itself alive until then.
 
 These hold for ``DMButtonAction`` and ``DMActionWithFallback`` through all three ways of running
 them, for call syntax on any conformer, and for a third-party conformer composed with
