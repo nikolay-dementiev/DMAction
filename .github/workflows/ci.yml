@@ -167,6 +167,16 @@ jobs:
               exit 1
             fi
           done
+      # A bundle whose tests were all skipped passes too: the counts come from the result bundle.
+      - name: Check the test counts
+        run: |
+          xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/example.xcresult" > "$RUNNER_TEMP/summary.json"
+          if ! jq -e '.totalTestCount > 0 and .passedTests == .totalTestCount and .failedTests == 0 and .skippedTests == 0' \
+              "$RUNNER_TEMP/summary.json" > /dev/null; then
+            echo "The example's tests did not all run and pass:"
+            jq '{totalTestCount, passedTests, failedTests, skippedTests}' "$RUNNER_TEMP/summary.json"
+            exit 1
+          fi
       # Xcode compiles the package with its warnings suppressed, so warnings as errors cannot
       # cover the whole build. The library's own warnings fail the test job; this step covers
       # the sources of the example.
