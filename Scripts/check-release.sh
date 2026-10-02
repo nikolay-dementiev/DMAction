@@ -71,6 +71,8 @@ if [[ "$NEWEST" =~ ^##\ \[([^]]+)\]\ -\ (.*)$ ]]; then
         PROBLEMS+=("the newest changelog heading is for $HEADING_VERSION, not $VERSION")
     elif ! [[ "$HEADING_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
         PROBLEMS+=("the changelog heading of $VERSION has '$HEADING_DATE' where the release date belongs")
+    elif ! python3 -c 'import datetime, sys; datetime.date.fromisoformat(sys.argv[1])' "$HEADING_DATE" 2> /dev/null; then
+        PROBLEMS+=("the changelog heading of $VERSION has '$HEADING_DATE', which is not a day of the calendar")
     fi
 else
     PROBLEMS+=("CHANGELOG.md has no heading of the form '## [version] - date'")
