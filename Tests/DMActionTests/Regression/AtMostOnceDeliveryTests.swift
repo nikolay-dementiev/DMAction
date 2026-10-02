@@ -315,6 +315,28 @@ final class AtMostOnceDeliveryTests: XCTestCase {
 
     // MARK: - Call syntax on a third-party action
 
+    func test_retry_withAPositiveCountOnACustomActionThatCompletesTwice_deliversOnce() {
+        let sut = makeSUT()
+
+        TwiceCompletingAction().retry(1).action(sut.consumer.receive)
+
+        XCTAssertEqual(sut.consumer.count, 1, "the composition delivers once")
+        XCTAssertEqual(sut.consumer.lastValue, "first", "the first completion wins")
+    }
+
+    /// `retry(0)` returns the action itself, so its `action` is the conformer's own closure,
+    /// which nothing guards.
+    func test_retry_withZeroOnACustomActionThatCompletesTwice_leavesItsOwnClosureUnguarded() {
+        let sut = makeSUT()
+
+        TwiceCompletingAction().retry(0).action(sut.consumer.receive)
+
+        XCTAssertEqual(
+            sut.consumer.deliveries.compactMap(ConsumerSpy.text(of:)), ["first", "second"],
+            "both completions of its own closure arrive"
+        )
+    }
+
     func test_callSyntax_onACustomActionThatCompletesTwice_deliversOnce() {
         let sut = makeSUT()
         let action = TwiceCompletingAction()
