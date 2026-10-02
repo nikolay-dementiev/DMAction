@@ -11,28 +11,37 @@ import Foundation
 /// in the Swift 5 language mode still completes from other threads, and the library has
 /// to behave when it does.
 ///
-/// `Thread.detachNewThreadSelector(_:toTarget:with:)` is an Objective-C entry point of
-/// Foundation that takes its target as `Any`, which the compiler does not check. So this
-/// type is an unchecked hand-off, on purpose and in test code only.
+/// `Thread.init(target:selector:object:)` is an Objective-C entry point of Foundation that
+/// takes its target as `Any`, which the compiler does not check. So this type is an
+/// unchecked hand-off, on purpose and in test code only.
 ///
 /// What keeps a test that uses it free of a data race: the closure is handed over once,
 /// the creating thread never touches it again, and the test reads what the closure wrote
 /// only after waiting for an expectation that the closure fulfils last.
+///
+/// `stackSize` gives the thread a stack of that many bytes. 512 KB is what a secondary
+/// thread gets by default (Apple's Threading Programming Guide, Thread Management).
 final class BackgroundCaller: NSObject {
     private let work: () -> Void
-    /// The thread the closure runs on. Set before the closure starts.
+    private let stackSize: Int?
+    /// The thread the closure runs on. Set before the thread starts.
     private(set) var thread: Thread?
 
-    init(_ work: @escaping () -> Void) {
+    init(stackSize: Int? = nil, _ work: @escaping () -> Void) {
+        self.stackSize = stackSize
         self.work = work
     }
 
     func start() {
-        Thread.detachNewThreadSelector(#selector(run), toTarget: self, with: nil)
+        let thread = Thread(target: self, selector: #selector(run), object: nil)
+        if let stackSize {
+            thread.stackSize = stackSize
+        }
+        self.thread = thread
+        thread.start()
     }
 
     @objc private func run() {
-        thread = Thread.current
         work()
     }
 }

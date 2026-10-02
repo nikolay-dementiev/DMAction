@@ -7,7 +7,7 @@ final class ContractCharacterizationTests: XCTestCase {
 
     // MARK: - Ordering
 
-    func test_run_withSynchronousProducers_startsTheFallbackInsideTheCompletionCall() {
+    func test_run_withSynchronousProducers_startsTheFallbackAfterThePrimaryReturns() {
         let log = EventLog()
         let primary = ProducerSpy.alwaysFailing(name: "primary", log: log)
         let fallback = ProducerSpy("fallback", log: log, script: [.success("value")])
@@ -17,7 +17,7 @@ final class ContractCharacterizationTests: XCTestCase {
 
         XCTAssertEqual(
             log.events,
-            ["primary call 1", "fallback call 1", "consumer", "fallback return 1", "primary return 1"]
+            ["primary call 1", "primary return 1", "fallback call 1", "fallback return 1", "consumer"]
         )
     }
 
