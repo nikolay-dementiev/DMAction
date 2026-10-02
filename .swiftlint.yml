@@ -6,9 +6,6 @@ included:
   - Examples
   - Fixtures
 
-excluded:
-  - Examples/DMActionTestProject/Pods
-
 opt_in_rules:
   - force_unwrapping
   - implicitly_unwrapped_optional
