@@ -1,0 +1,19 @@
+# expect: same
+# A stored property that is not public, renamed: a build without library evolution
+# prints it in the interface, and it is not API.
+--- A ---
+public struct First {
+  private var count: Swift.Int
+  final fileprivate let cache: Swift.Int
+  @_hasStorage internal var flag: Swift.Bool
+  package var shared: Swift.Int
+  public var visible: Swift.Int
+}
+--- B ---
+public struct First {
+  private var total: Swift.Int
+  final fileprivate let store: Swift.Int
+  @_hasStorage internal var enabled: Swift.Bool
+  package var common: Swift.Int
+  public var visible: Swift.Int
+}

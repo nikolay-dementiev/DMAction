@@ -35,6 +35,9 @@ LIBRARY_EVOLUTION="yes"
 # order. One entry per module: "<module>|<source directory>|<compiler flags>", where the
 # flags mirror the manifest of the dependency, including its -package-name.
 DEPENDENCIES=()
+# A command run from the repository root before anything is compiled, for example
+# (swift package resolve) to check out the dependencies. Empty: nothing to prepare.
+PREPARE=()
 
 # ==== End of the settings ===============================================================
 
@@ -52,7 +55,9 @@ mkdir -p "$WORK"
 # another file must not look like an API change. An attribute that the compiler prints
 # on a line of its own, such as @available, stays with the declaration below it, and a
 # compiler condition (#if ... #endif) stays one block with what it guards: moving either
-# to another declaration is an API change.
+# to another declaration is an API change. A declaration whose own access level is
+# private, fileprivate, internal or package is not API: it is dropped with its attribute
+# lines and its body. A build without library evolution prints such stored properties.
 normalize() {
     { grep -v -E '^(//|import |$)' "$1" || true; } | python3 -c '
 import sys
@@ -89,8 +94,42 @@ def attributes_only(line):
                     break
     return True
 
+HIDDEN = {"private", "fileprivate", "internal", "package"}
+
+def hidden_declaration(line):
+    words = line.split()
+    position = 0
+    while position < len(words) and words[position].startswith("@"):
+        position += 1
+    for word in words[position:]:
+        if word in HIDDEN:
+            return True
+        if not word.isidentifier() or word in ("var", "let", "func", "init", "subscript", "case",
+                                              "struct", "class", "enum", "protocol", "extension",
+                                              "typealias", "actor", "associatedtype", "deinit"):
+            return False
+    return False
+
+def public_lines(lines):
+    kept, held, depth = [], [], 0
+    for line in lines:
+        if depth > 0:
+            depth += line.count("{") - line.count("}")
+            continue
+        if line.strip() and attributes_only(line):
+            held.append(line)
+            continue
+        if hidden_declaration(line):
+            held = []
+            depth = line.count("{") - line.count("}")
+            continue
+        kept.extend(held)
+        held = []
+        kept.append(line)
+    return kept + held
+
 blocks, current, conditions = [], [], 0
-for line in sys.stdin.read().splitlines():
+for line in public_lines(sys.stdin.read().splitlines()):
     starts_declaration = bool(line) and not line[0].isspace() and line != "}"
     if starts_declaration and current and conditions == 0 and not all(attributes_only(held) for held in current):
         blocks.append("\n".join(current))
@@ -149,6 +188,14 @@ TARGET="arm64-apple-ios17.0-simulator"
 
 # Bash 3.2, the version macOS ships, treats an empty array as unbound under set -u, hence
 # the ${name[@]+"${name[@]}"} form for arrays that may be empty.
+if [ "${#PREPARE[@]}" -gt 0 ]; then
+    if ! (cd "$ROOT" && "${PREPARE[@]}") > "$WORK/prepare.log" 2>&1; then
+        echo "check-api: the preparation (${PREPARE[*]}) failed. See ${WORK#"$ROOT"/}/prepare.log" >&2
+        tail -5 "$WORK/prepare.log" >&2
+        exit 2
+    fi
+fi
+
 for DEPENDENCY in ${DEPENDENCIES[@]+"${DEPENDENCIES[@]}"}; do
     DEPENDENCY_MODULE="${DEPENDENCY%%|*}"
     REST="${DEPENDENCY#*|}"
