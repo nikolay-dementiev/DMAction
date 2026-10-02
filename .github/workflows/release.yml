@@ -19,8 +19,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Check that the tag, the podspec and the changelog agree
         run: Scripts/check-release.sh "$GITHUB_REF_NAME"
+      # A version tag on a branch that was never merged would release unreviewed code.
+      - name: Check that the tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "The tag $GITHUB_REF_NAME is on a commit that main does not contain." >&2
+            exit 1
+          fi
 
   ci:
     needs: check
@@ -36,11 +44,25 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Draft the release from the changelog
+      - name: Write the release notes from the changelog
+        run: Scripts/check-release.sh --notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+      # The tag could have been moved while CI ran. The draft must name the commit CI tested.
+      - name: Check that the tag still points at the tested commit
+        run: |
+          TESTED="$(git rev-parse HEAD)"
+          NOW="$(git ls-remote origin "refs/tags/$GITHUB_REF_NAME^{}" | cut -f1)"
+          if [ -z "$NOW" ]; then
+            NOW="$(git ls-remote origin "refs/tags/$GITHUB_REF_NAME" | cut -f1)"
+          fi
+          if [ "$NOW" != "$TESTED" ]; then
+            echo "The tag $GITHUB_REF_NAME points at ${NOW:-nothing} now, not at the tested commit $TESTED." >&2
+            exit 1
+          fi
+      # Only this step holds the token that can write.
+      - name: Draft the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Scripts/check-release.sh --notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
           gh release create "$GITHUB_REF_NAME" \
             --repo "$GITHUB_REPOSITORY" \
             --draft \
