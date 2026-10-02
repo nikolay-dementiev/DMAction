@@ -70,6 +70,14 @@ check is yours to run before you commit a change to the example's project.
   visible.
 - A change that people using the package can notice gets an entry in `CHANGELOG.md`.
 
+## Releases
+
+A release starts from a tag that is the version itself, such as `1.1.0`. Before the tag is pushed,
+the podspec names that version and the newest heading of `CHANGELOG.md` is `## [1.1.0] -` with the
+release date. `Scripts/check-release.sh 1.1.0` checks the three. On the tag, the release workflow
+runs that check and the whole CI workflow, and then drafts a GitHub release from the changelog
+section. Publishing the release, and the pod, stays a manual step.
+
 ## Security
 
 Do not report a vulnerability in a public issue. See `SECURITY.md`.

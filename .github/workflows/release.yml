@@ -1,0 +1,49 @@
+name: Release
+
+# A version tag, such as 1.1.0, starts it. It checks the tag against the podspec and the
+# changelog, runs the whole CI workflow on the tag, and then drafts a GitHub release from the
+# changelog. It never creates or moves a tag and never publishes: the draft waits for a person.
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check that the tag, the podspec and the changelog agree
+        run: Scripts/check-release.sh "$GITHUB_REF_NAME"
+
+  ci:
+    needs: check
+    uses: ./.github/workflows/ci.yml
+
+  draft:
+    needs: ci
+    runs-on: macos-26
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Draft the release from the changelog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Scripts/check-release.sh --notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md"
