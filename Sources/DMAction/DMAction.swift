@@ -79,9 +79,10 @@ public extension DMAction {
     /// let fresh: any DMAction = DMButtonAction { completion in completion(.failure(URLError(.timedOut))) }
     /// let cached: any DMAction = DMButtonAction { completion in completion(.success("cached")) }
     ///
-    /// fresh.fallbackTo(cached)(completion: { result in
+    /// let freshOrCached = fresh.fallbackTo(cached)
+    /// freshOrCached { result in
     ///     print(result.attemptCount ?? 0) // 1: one attempt failed before the success
-    /// })
+    /// }
     /// ```
     ///
     /// - Parameter fallback: The action to run when this one fails.
@@ -114,10 +115,13 @@ public extension DMAction {
     ///     completion(calls < 3 ? .failure(URLError(.timedOut)) : .success("done"))
     /// }
     ///
-    /// flaky.retry(3)(completion: { result in
+    /// flaky.retry(3).action { result in
     ///     print(result.attemptCount ?? 0) // 2: two attempts failed before the success
-    /// })
+    /// }
     /// ```
+    ///
+    /// Swift 6.3 crashes when call syntax is applied directly to the value this returns, as in
+    /// `flaky.retry(3)(completion: handle)`. Store it in a constant first, or call ``action``.
     ///
     /// - Parameter retryCount: How many times to run this action again after a failure.
     /// - Returns: The composed action, or this action for a count of zero.
