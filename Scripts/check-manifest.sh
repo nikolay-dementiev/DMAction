@@ -32,6 +32,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODULE="DMAction"
 WORK="$ROOT/.build/check-manifest"
 FAILED=0
+SKIPPED=""
 
 mkdir -p "$WORK"
 cd "$ROOT"
@@ -137,8 +138,18 @@ if ! xcodebuild build \
     grep -E "error:" "$WORK/consumer-build.log" | sort -u | cut -c1-240 | head -20 >&2 || true
     FAILED=1
 else
+    # No warning means something only if the log shows every source of the fixture compiled.
+    NOT_COMPILED=""
+    while IFS= read -r SOURCE; do
+        if ! grep -qE "^SwiftCompile .*/$SOURCE( |$)" "$WORK/consumer-build.log"; then
+            NOT_COMPILED="$NOT_COMPILED $SOURCE"
+        fi
+    done < <(git -C "$ROOT" ls-files 'Fixtures/Consumer/Sources/*.swift')
     WARNINGS="$(grep -F "/Fixtures/Consumer/" "$WORK/consumer-build.log" | grep -F ": warning: " | sort -u || true)"
-    if [ -n "$WARNINGS" ]; then
+    if [ -n "$NOT_COMPILED" ]; then
+        echo "check-manifest: the build log of Fixtures/Consumer does not show these compiled:$NOT_COMPILED" >&2
+        FAILED=1
+    elif [ -n "$WARNINGS" ]; then
         echo "check-manifest: Fixtures/Consumer builds with warnings, and so does a consumer's code:" >&2
         echo "$WARNINGS" | cut -c1-240 | head -20 >&2
         FAILED=1
@@ -155,9 +166,20 @@ RECURSIVE_RM='(^|[^[:alnum:]_.-])rm[[:space:]]+(-[[:alnum:]-]+[[:space:]]+)*(-[a
 RM_AS_ARGUMENT='["'\'']rm["'\''][[:space:]]*,'
 TREE_REMOVAL='FileUtils\.(rm_rf|rm_r|remove_dir|remove_entry)|rmtree|find[[:space:]].*[[:space:]]-delete'
 MACHINE_FOLDER='DerivedData|Library/Developer'
-DELETES="$(git grep -nE "$RECURSIVE_RM|$RM_AS_ARGUMENT|$TREE_REMOVAL|$MACHINE_FOLDER" \
-    -- Examples ':(exclude,glob)**/.gitignore' || true)"
-if [ -n "$DELETES" ]; then
+DELETE_PATTERN="$RECURSIVE_RM|$RM_AS_ARGUMENT|$TREE_REMOVAL|$MACHINE_FOLDER"
+# The patterns must still catch the calls they are for, with the same engine as the search.
+printf '%s\n' 'rm -rf ~/Library/Developer/Xcode/DerivedData' "FileUtils.rm_rf(path)" \
+    "system('rm', '-r', path)" "find . -name '*.tmp' -delete" > "$WORK/delete-probe.txt"
+PROBE_HITS="$(git grep --no-index -hcE "$DELETE_PATTERN" -- "$WORK/delete-probe.txt" || true)"
+GREP_STATUS=0
+DELETES="$(git grep -nE "$DELETE_PATTERN" -- Examples ':(exclude,glob)**/.gitignore')" || GREP_STATUS=$?
+if [ "$PROBE_HITS" != "4" ]; then
+    echo "check-manifest: the delete patterns match ${PROBE_HITS:-0} of the 4 calls they must catch" >&2
+    FAILED=1
+elif [ "$GREP_STATUS" -gt 1 ]; then
+    echo "check-manifest: the search for recursive deletes failed (git grep exit $GREP_STATUS)" >&2
+    FAILED=1
+elif [ -n "$DELETES" ]; then
     echo "check-manifest: the example's tooling deletes directory trees:" >&2
     echo "$DELETES" | cut -c1-160 | sed 's/^/  /' >&2
     FAILED=1
@@ -171,7 +193,7 @@ if ! command -v pod > /dev/null; then
         echo "check-manifest: CocoaPods is not installed on this runner; the podspec cannot be checked." >&2
         FAILED=1
     else
-        echo "check-manifest: CocoaPods is not installed; the podspec was not checked."
+        SKIPPED="the podspec (CocoaPods is not installed)"
     fi
 elif ! pod ipc spec "$ROOT/$MODULE.podspec" > "$WORK/podspec.json" 2> "$WORK/podspec.log"; then
     echo "check-manifest: the podspec cannot be read. See ${WORK#"$ROOT"/}/podspec.log" >&2
@@ -246,4 +268,8 @@ for shape in "$ROOT"/Fixtures/Rejected/Sources/*/; do
 done
 echo "check-manifest: $STILL_REJECTED cross-isolation shapes are rejected by the compiler, each with the error it names."
 
+# Last, so that a skipped step is not lost in the middle of the output.
+if [ -n "$SKIPPED" ]; then
+    echo "check-manifest: not checked on this machine: $SKIPPED."
+fi
 exit "$FAILED"
