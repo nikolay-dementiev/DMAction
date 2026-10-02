@@ -316,23 +316,29 @@ final class ConformerCharacterizationTests: XCTestCase {
     }
 
     func test_run_whenNestedWrappersArriveFromAnotherThread_deliversOneWrapperAroundTheInnermostValue() {
+        let primary = ProducerSpy.alwaysFailing()
+        let fallbackCalls = LockedCounter()
+        let completers = DispatchGroup()
         let consumer = ConsumerSpy()
-        let finished = expectation(description: "the run delivered")
         let nested = DMActionResultValue(value: DMActionResultValue(value: "deep", attemptCount: 1), attemptCount: 2)
         let fromAnotherThread = DMButtonAction { completion in
+            fallbackCalls.increment()
+            completers.enter()
             BackgroundCaller {
                 completion(.success(nested))
+                completers.leave()
             }
             .start()
         }
 
-        DMButtonAction(fail).fallbackTo(fromAnotherThread).action { result in
-            consumer.receive(result)
-            finished.fulfill()
-        }
-        wait(for: [finished], timeout: 5)
+        primary.action.fallbackTo(fromAnotherThread).action(consumer.receive)
+        let completersReturned = completers.wait(timeout: .now() + 5)
 
         let delivered = consumer.lastDelivered as? DMActionResultValue
+        XCTAssertEqual(completersReturned, .success, "the completing thread returned from the completion")
+        XCTAssertEqual(primary.callCount, 1, "the primary ran once")
+        XCTAssertEqual(fallbackCalls.count, 1, "the fallback ran once")
+        XCTAssertEqual(consumer.count, 1, "one delivery")
         XCTAssertEqual(delivered?.value as? String, "deep", "one wrapper, around the innermost value")
         XCTAssertEqual(delivered?.attemptCount, 1, "the run's label: one failed attempt before it")
     }
