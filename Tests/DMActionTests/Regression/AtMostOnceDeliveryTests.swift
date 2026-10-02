@@ -172,9 +172,15 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         action.action { _ in }
         markers.notice("end \(marker, privacy: .public)")
 
-        let entries = try OSLogStore(scope: .currentProcessIdentifier)
-            .getEntries(matching: NSPredicate(format: "subsystem IN %@", ["DMAction", "DMActionTests"]))
-            .compactMap { $0 as? OSLogEntryLog }
+        // An entry may reach the store a moment after it was written: read until the end marker
+        // is there, for two seconds at most.
+        var entries: [OSLogEntryLog] = []
+        let deadline = Date().addingTimeInterval(2)
+        repeat {
+            entries = try OSLogStore(scope: .currentProcessIdentifier)
+                .getEntries(matching: NSPredicate(format: "subsystem IN %@", ["DMAction", "DMActionTests"]))
+                .compactMap { $0 as? OSLogEntryLog }
+        } while !entries.contains(where: { $0.composedMessage == "end \(marker)" }) && Date() < deadline
         let start = try XCTUnwrap(entries.firstIndex { $0.composedMessage == "start \(marker)" }, "the start marker")
         let end = try XCTUnwrap(entries.firstIndex { $0.composedMessage == "end \(marker)" }, "the end marker")
         let faults = entries[start..<end].filter {

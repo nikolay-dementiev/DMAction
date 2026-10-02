@@ -9,7 +9,7 @@ final class Locked<Value> {
         self.value = value
     }
 
-    func withLock<Result>(_ body: (inout Value) -> Result) -> Result {
+    func withLock<Answer>(_ body: (inout Value) -> Answer) -> Answer {
         lock.lock()
         defer { lock.unlock() }
         return body(&value)

@@ -22,7 +22,10 @@ final class StackSafeExecutionTests: XCTestCase {
     }
 
     /// Two threads, each with a small stack, hand the attempts back and forth: every completion
-    /// arrives on the other thread, after the producer has returned from its call.
+    /// arrives on the other thread, after the producer has returned from its call. It proves that
+    /// such a completion goes on with the run every time. It cannot show stack growth: on this
+    /// path no run nests a call, even a recursive one, because every producer returns at once. The
+    /// small stacks guard against a design that would wait inside a call.
     func test_retry_withTenThousandRetriesCompletedOnAnotherThreadAfterEachCall_callsTheProducerTenThousandAndOneTimes() {
         let first = SerialThread(stackSize: Self.smallStack)
         let second = SerialThread(stackSize: Self.smallStack)
