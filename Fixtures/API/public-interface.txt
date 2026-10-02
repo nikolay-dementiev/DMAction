@@ -1,5 +1,10 @@
-public protocol DMActionResultValueProtocol {
-  var attemptCount: Swift.UInt? { get }
+extension DMAction.DMAction {
+  public var simpleAction: () -> Swift.Void {
+    get
+  }
+  public func fallbackTo(_ fallback: any DMAction.DMAction) -> DMAction.DMActionWithFallback
+  public func retry(_ retryCount: Swift.UInt) -> any DMAction.DMAction
+  public func callAsFunction(completion: @escaping (Self.ResultType) -> Swift.Void)
 }
 extension DMAction.DMActionResultValueProtocol {
   public var attemptCount: Swift.UInt? {
@@ -20,21 +25,13 @@ public protocol DMAction {
   var action: Self.ActionType { get }
   var simpleAction: () -> Swift.Void { get }
 }
-extension DMAction.DMAction {
-  public var simpleAction: () -> Swift.Void {
-    get
-  }
-  public func fallbackTo(_ fallback: any DMAction.DMAction) -> DMAction.DMActionWithFallback
-  public func retry(_ retryCount: Swift.UInt) -> any DMAction.DMAction
-  public func callAsFunction(completion: @escaping (Self.ResultType) -> Swift.Void)
+public protocol DMActionResultValueProtocol {
+  var attemptCount: Swift.UInt? { get }
 }
 public struct DMActionResultValue : DMAction.DMActionResultValueProtocol {
   public let attemptCount: Swift.UInt?
   public let value: any Swift.Copyable
   public init(value: any Swift.Copyable, attemptCount: Swift.UInt? = nil)
-}
-public struct PlaceholderCopyable : Swift.Copyable {
-  public init()
 }
 public struct DMActionWithFallback : DMAction.DMAction {
   public let currentAttempt: Swift.UInt
@@ -48,4 +45,7 @@ public struct DMButtonAction : DMAction.DMAction {
   public let action: DMAction.DMButtonAction.ActionType
   public init(_ action: @escaping DMAction.DMButtonAction.ActionType)
   public init(_ simpleAction: @escaping () -> Swift.Void)
+}
+public struct PlaceholderCopyable : Swift.Copyable {
+  public init()
 }
