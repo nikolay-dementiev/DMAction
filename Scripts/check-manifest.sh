@@ -36,7 +36,7 @@ FAILED=0
 mkdir -p "$WORK"
 cd "$ROOT"
 
-# The two folders this run creates with mktemp inside $WORK. They hold a copy of the
+# The folders this run creates with mktemp inside $WORK. They hold a copy of the
 # tracked sources and build output, and they leave with the run. The logs stay.
 PROBE=""
 DERIVED=""

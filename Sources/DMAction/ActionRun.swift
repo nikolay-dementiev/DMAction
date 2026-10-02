@@ -20,7 +20,8 @@ final class ActionRun {
         case finish(Cursor, DMButtonAction.ResultType)
     }
 
-    /// One call of a producer.
+    /// Each producer call gets its own, so that a late completion of an earlier call can be told
+    /// apart from the completion of the current one.
     private final class Attempt {
         /// Where the attempt is in the plan. Its first completion takes it: a completion that
         /// finds it gone is a second one.
@@ -54,8 +55,9 @@ final class ActionRun {
         drive(.start(Cursor(first: plan)))
     }
 
-    /// Runs the attempts on this thread, one after another, until the run delivers or until
-    /// an attempt waits for a completion that has not arrived yet.
+    /// Runs the attempts on this thread, one after another, until the run delivers, until an
+    /// attempt waits for a completion that has not arrived yet, or until a completion on another
+    /// thread has taken over the attempt this thread started.
     private func drive(_ first: Work) {
         var next: Work? = first
         while let work = next {
@@ -77,6 +79,8 @@ final class ActionRun {
     /// thread before the call returned.
     private func call(_ cursor: Cursor) -> DMButtonAction.ResultType? {
         let attempt = Attempt(cursor: cursor, callingThread: Thread.current)
+        // The run is held strongly: a producer may keep its completion and call it after
+        // everything else has let go of the run.
         cursor.produce { result in
             self.complete(attempt, with: result)
         }
@@ -138,7 +142,6 @@ final class ActionRun {
 /// many attempts of the run failed before this one.
 struct Cursor {
     private let frames: [Frame]
-    /// The producer this cursor points at.
     let produce: DMButtonAction.ActionType
     /// The attempts of the run that failed before this one.
     let failed: UInt
@@ -203,7 +206,6 @@ struct Cursor {
     }
 }
 
-/// One level of a cursor.
 private enum Frame {
     /// A list of steps, and the index of the step that runs.
     case list([ActionPlan.Step], index: Int)
