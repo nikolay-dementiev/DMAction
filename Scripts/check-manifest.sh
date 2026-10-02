@@ -22,6 +22,9 @@
 #    script has no side effect.
 # 5. The podspec describes the same product as the manifest: the same platforms, the
 #    language mode the package is built in, and no link against a test framework.
+# 6. The uses across isolation domains that the Swift 6 compiler rejects today are still
+#    rejected. Each one is a target of Fixtures/Rejected. One that starts to compile means
+#    the documented concurrency limits have changed.
 
 set -euo pipefail
 
@@ -163,5 +166,21 @@ then
 else
     echo "check-manifest: the podspec matches the manifest and links no test framework."
 fi
+
+# 6. The rejected shapes.
+STILL_REJECTED=0
+for shape in "$ROOT"/Fixtures/Rejected/Sources/*/; do
+    name="$(basename "$shape")"
+    if swift build --package-path "$ROOT/Fixtures/Rejected" --target "$name" > "$WORK/rejected-$name.log" 2>&1; then
+        echo "check-manifest: the shape $name compiles now: the documented concurrency limits have changed." >&2
+        FAILED=1
+    elif ! grep -q "error: " "$WORK/rejected-$name.log"; then
+        echo "check-manifest: the shape $name failed without a compiler error. See ${WORK#"$ROOT"/}/rejected-$name.log" >&2
+        FAILED=1
+    else
+        STILL_REJECTED=$((STILL_REJECTED + 1))
+    fi
+done
+echo "check-manifest: $STILL_REJECTED cross-isolation shapes are rejected by the compiler."
 
 exit "$FAILED"
