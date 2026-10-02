@@ -56,6 +56,27 @@ final class StackSafeExecutionTests: XCTestCase {
         XCTAssertEqual(consumer.lastLabel, 2, "the legacy label of a right-nested chain")
     }
 
+    /// `retry` applied to a composite, again and again, nests one plan per call. Running such
+    /// an action does not grow the stack; destroying it does, by one level per call. The
+    /// documented promise is 1 000 levels on a 512 KB stack. Measured on macOS: about 1 900
+    /// levels in a debug build, between 2 000 and 4 000 in a release build.
+    func test_retry_appliedAThousandTimesToACompositeOnASmallStack_runsAndIsDestroyed() {
+        let producer = ProducerSpy(script: [.success("value")])
+        let consumer = ConsumerSpy()
+
+        runOnASmallStack {
+            var action: any DMAction = producer.action.fallbackTo(DMButtonAction { $0(.success("fallback")) })
+            for _ in 0..<1_000 {
+                action = action.retry(1)
+            }
+            action.action(consumer.receive)
+        }
+
+        XCTAssertEqual(producer.callCount, 1, "one call")
+        XCTAssertEqual(consumer.count, 1, "one delivery")
+        XCTAssertEqual(consumer.lastLabel, 0, "the label of a first-try success")
+    }
+
     // MARK: - Helpers
 
     /// Every producer fails except the last one, which succeeds with "last".
