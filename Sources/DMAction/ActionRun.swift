@@ -150,9 +150,9 @@ final class ActionRun {
 struct Cursor {
     private let frames: [Frame]
     let produce: DMButtonAction.ActionType
-    /// The attempts of the run that failed before this one. It saturates at `.max`: with a
-    /// 64-bit `UInt` that many attempts take more than 500 years at a billion a second, but
-    /// watchOS on arm64_32 has a 32-bit `UInt`, which that rate fills in about four seconds.
+    /// The attempts of the run that failed before this one. It saturates at `.max`. Even at a
+    /// billion attempts a second, a 64-bit `UInt` would take more than 500 years to get there;
+    /// watchOS on arm64_32 has a 32-bit `UInt`, which a long enough run can reach.
     let failed: UInt
 
     /// The first producer of `plan`.

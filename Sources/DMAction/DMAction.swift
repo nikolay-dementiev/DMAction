@@ -13,12 +13,16 @@ import Foundation
 /// with ``callAsFunction(completion:)`` or through its ``action``. ``fallbackTo(_:)`` and
 /// ``retry(_:)`` build new actions and run nothing.
 ///
-/// A run calls the first producer on the calling thread before the call returns. A run of the
-/// library's conformers, call syntax on any conformer and the actions that ``fallbackTo(_:)``
-/// and ``retry(_:)`` with a positive count build deliver at most one result; the ``action``
-/// of a third-party conformer is its own closure. <doc:RunningActions> says what a producer
-/// must do, what the library enforces and what it cannot promise. Nothing here is `Sendable`:
-/// use an action inside one isolation domain.
+/// A run calls the first producer on the calling thread before the call returns. These runs
+/// deliver at most one result:
+///
+/// - a run of ``DMButtonAction`` or ``DMActionWithFallback``, however it is started;
+/// - call syntax on any conformer;
+/// - a run of what ``fallbackTo(_:)``, or ``retry(_:)`` with a positive count, builds.
+///
+/// The ``action`` of a third-party conformer is its own closure. <doc:RunningActions> says what
+/// a producer must do, what the library enforces and what it cannot promise. Nothing here is
+/// `Sendable`: use an action inside one isolation domain.
 public protocol DMAction {
     /// The result of a run: a success with any `Copyable` payload, or an error.
     ///

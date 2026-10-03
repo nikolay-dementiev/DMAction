@@ -6,11 +6,11 @@ Pod::Spec.new do |s|
   s.description      = <<-DESC
     Runs completion-based work as an action that can be retried up to N more times after a
     failure, and can fall back to another action. A run calls its producers in order until one
-    succeeds, and delivers one result: a success carries the action's attempt plus the
+    succeeds, and delivers at most one result: a success carries the action's attempt plus the
     attempts that failed before it.
 
-    DMButtonAction wraps one producer. fallbackTo(_:) and retry(_:) compose actions into a
-    DMActionWithFallback.
+    DMButtonAction wraps one producer. fallbackTo(_:) and retry(_:) build compositions of
+    actions.
                        DESC
 
   s.homepage         = 'https://github.com/nikolay-dementiev/DMAction'
