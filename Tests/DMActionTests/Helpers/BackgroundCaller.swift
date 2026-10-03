@@ -25,11 +25,14 @@ import Foundation
 final class BackgroundCaller: NSObject {
     private let work: () -> Void
     private let stackSize: Int?
+    private let qualityOfService: QualityOfService?
     /// The thread the closure runs on. Set before the thread starts.
     private(set) var thread: Thread?
 
-    init(stackSize: Int? = nil, _ work: @escaping () -> Void) {
+    /// `qualityOfService` sets the thread's level; `nil` leaves the default.
+    init(stackSize: Int? = nil, qualityOfService: QualityOfService? = nil, _ work: @escaping () -> Void) {
         self.stackSize = stackSize
+        self.qualityOfService = qualityOfService
         self.work = work
     }
 
@@ -37,6 +40,9 @@ final class BackgroundCaller: NSObject {
         let thread = Thread(target: self, selector: #selector(run), object: nil)
         if let stackSize {
             thread.stackSize = stackSize
+        }
+        if let qualityOfService {
+            thread.qualityOfService = qualityOfService
         }
         self.thread = thread
         thread.start()

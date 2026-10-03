@@ -465,7 +465,13 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         let fallbackCalls = Locked<[Int: Int]>([:])
         let deliveries = Locked<[Delivery]>([])
         let completions = DispatchGroup()
-        let primary = Self.primary(countingCallsIn: calls, completingFrom: threadsPerAttempt, in: completions)
+        let barrierTimeouts = LockedCounter()
+        let primary = Self.primary(
+            countingCallsIn: calls,
+            completingFrom: threadsPerAttempt,
+            in: completions,
+            barrierTimeouts: barrierTimeouts
+        )
         let fallback = DMButtonAction { completion in
             let run = Self.run(of: Thread.current)
             fallbackCalls.withLock { $0[run, default: 0] += 1 }
@@ -482,7 +488,12 @@ final class AtMostOnceDeliveryTests: XCTestCase {
         }
         Thread.current.threadDictionary.removeObject(forKey: Self.runKey)
 
-        XCTAssertEqual(completions.wait(timeout: .now() + 60), .success, "every completion call returned")
+        // The runs take well under a second. The wait allows a minute, so only a completion
+        // call that never returns reaches it, not threads that a loaded machine starts late.
+        guard completions.wait(timeout: .now() + 60) == .success else {
+            return XCTFail("a completion call did not return")
+        }
+        XCTAssertEqual(barrierTimeouts.count, 0, "parties that left a barrier alone, so their attempt raced nothing")
         let byRun = Dictionary(grouping: deliveries.withLock { $0 }, by: \.run)
         let wrong = (0..<runs).filter { byRun[$0] != [Self.expectedDelivery(ofRun: $0)] }
         XCTAssertEqual(wrong, [], "every run delivers once, with its own payload and label")
@@ -507,12 +518,14 @@ final class AtMostOnceDeliveryTests: XCTestCase {
     }
 
     /// A producer that fails a run's first `failures(ofRun:)` calls and succeeds after them. Each
-    /// call starts `threadCount` threads that complete it together; every completion call
-    /// leaves `completions` when it returns.
+    /// call starts `threadCount` threads and waits with them at a barrier, so that they complete
+    /// it together as the call returns. Every completion call leaves `completions` when it
+    /// returns; a party that waited at the barrier past its deadline raises `barrierTimeouts`.
     private static func primary(
         countingCallsIn calls: Locked<[Int: Int]>,
         completingFrom threadCount: Int,
-        in completions: DispatchGroup
+        in completions: DispatchGroup,
+        barrierTimeouts: LockedCounter
     ) -> DMButtonAction {
         DMButtonAction { completion in
             let run = Self.run(of: Thread.current)
@@ -522,25 +535,18 @@ final class AtMostOnceDeliveryTests: XCTestCase {
             }
             let outcome: DMButtonAction.ResultType =
                 call <= Self.failures(ofRun: run) ? .failure(MarkedError()) : .success("run \(run)")
-            // The threads wait at a gate until all of them exist, then complete together.
-            let ready = DispatchGroup()
-            let gate = DispatchSemaphore(value: 0)
+            let barrier = Barrier(parties: threadCount + 1)
             for _ in 0..<threadCount {
                 completions.enter()
-                ready.enter()
-                BackgroundCaller {
+                BackgroundCaller(qualityOfService: .userInitiated) {
                     Self.mark(Thread.current, withRun: run)
-                    ready.leave()
-                    _ = gate.wait(timeout: .now() + 5)
+                    Self.arrive(at: barrier, countingTimeoutsIn: barrierTimeouts)
                     completion(outcome)
                     completions.leave()
                 }
                 .start()
             }
-            _ = ready.wait(timeout: .now() + 5)
-            for _ in 0..<threadCount {
-                gate.signal()
-            }
+            Self.arrive(at: barrier, countingTimeoutsIn: barrierTimeouts)
         }
     }
 
