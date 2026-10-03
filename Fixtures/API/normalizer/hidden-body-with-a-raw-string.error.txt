@@ -1,0 +1,14 @@
+# expect: error
+# message: a raw string literal
+# A raw string has its own delimiters and no escapes, which the brace count does not follow.
+# The normalisation stops with an error that names it instead of guessing.
+--- A ---
+public struct First {
+  @inlinable internal func helper() -> Swift.String {
+    return #"{ \"#
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+}

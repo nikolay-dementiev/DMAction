@@ -1,0 +1,14 @@
+# expect: error
+# message: a string interpolation
+# An interpolation holds code, and strings of its own, inside a string literal. The brace
+# count does not follow them, so the normalisation stops with an error that names it.
+--- A ---
+public struct First {
+  @inlinable internal func helper() -> Swift.String {
+    return "\("{")"
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+}
