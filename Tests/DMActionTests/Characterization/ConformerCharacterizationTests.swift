@@ -332,10 +332,11 @@ final class ConformerCharacterizationTests: XCTestCase {
         }
 
         primary.action.fallbackTo(fromAnotherThread).action(consumer.receive)
-        let completersReturned = completers.wait(timeout: .now() + 5)
+        guard completers.wait(timeout: .now() + 5) == .success else {
+            return XCTFail("the completing thread did not return from the completion")
+        }
 
         let delivered = consumer.lastDelivered as? DMActionResultValue
-        XCTAssertEqual(completersReturned, .success, "the completing thread returned from the completion")
         XCTAssertEqual(primary.callCount, 1, "the primary ran once")
         XCTAssertEqual(fallbackCalls.count, 1, "the fallback ran once")
         XCTAssertEqual(consumer.count, 1, "one delivery")
