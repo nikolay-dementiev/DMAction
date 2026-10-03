@@ -65,7 +65,9 @@ mkdir -p "$WORK"
 # private, fileprivate, internal or package is not API: it is dropped with its attribute
 # lines and its body. A build without library evolution prints such stored properties.
 normalize() {
-    { grep -v -E '^(//|import |$)' "$1" || true; } | python3 -c '
+    # grep exits 1 when it selects no line, as for an interface without declarations; any
+    # other failure, such as a file it cannot read, stops the normalisation.
+    { grep -v -E '^(//|import |$)' "$1" || [ $? -eq 1 ]; } | python3 -c '
 import sys
 
 def balance(text, opening, closing):
@@ -164,6 +166,11 @@ if [ "${1:-}" = "--self-test" ]; then
     FAILED=0
     for CASE in "$CASES"/*.txt; do
         NAME="$(basename "$CASE" .txt)"
+        if ! grep -qx -- '--- A ---' "$CASE" || ! grep -qx -- '--- B ---' "$CASE"; then
+            echo "check-api: FAIL $NAME: the case needs a line '--- A ---' and a line '--- B ---'" >&2
+            FAILED=1
+            continue
+        fi
         EXPECTED="$(sed -n 's/^# expect: //p' "$CASE")"
         awk '/^--- A ---$/ { part = "A"; next } /^--- B ---$/ { part = "B"; next } part == "A"' "$CASE" > "$WORK/case-a.txt"
         awk '/^--- B ---$/ { part = "B"; next } part == "B"' "$CASE" > "$WORK/case-b.txt"
@@ -180,6 +187,13 @@ if [ "${1:-}" = "--self-test" ]; then
             FAILED=1
         fi
     done
+    # A file that cannot be read is an error, not an interface without declarations.
+    if normalize "$WORK/no-such-interface.txt" > /dev/null 2>&1; then
+        echo "check-api: FAIL unreadable-input: the normalisation of a missing file succeeded" >&2
+        FAILED=1
+    else
+        echo "check-api: ok   unreadable-input"
+    fi
     exit "$FAILED"
 fi
 
@@ -246,6 +260,8 @@ if [ "$LIBRARY_EVOLUTION" = "yes" ]; then
     EVOLUTION_FLAGS=(-enable-library-evolution)
 fi
 
+# The interface of an earlier run must not stand in for this one.
+rm -f "$INTERFACE"
 if ! xcrun --sdk iphonesimulator swiftc \
     -target "$TARGET" -sdk "$SDK_PATH" -I "$WORK" \
     -module-name "$MODULE" \
@@ -262,7 +278,17 @@ if ! xcrun --sdk iphonesimulator swiftc \
     exit 2
 fi
 
-normalize "$INTERFACE" > "$CURRENT"
+if ! normalize "$INTERFACE" > "$CURRENT"; then
+    echo "check-api: the interface ${INTERFACE#"$ROOT"/} could not be normalised." >&2
+    exit 2
+fi
+
+# Every package here has public API: an interface without a declaration means the check went
+# wrong, so it is neither saved nor compared.
+if ! grep -q '[^[:space:]]' "$CURRENT"; then
+    echo "check-api: the public interface is empty: the check could not read it." >&2
+    exit 2
+fi
 
 if [ "${1:-}" = "--update" ]; then
     mkdir -p "$(dirname "$BASELINE")"
@@ -278,7 +304,10 @@ fi
 
 # The baseline goes through the same normalization, so the comparison does not depend on
 # the order of the declarations in either file.
-normalize "$BASELINE" > "$WORK/baseline.txt"
+if ! normalize "$BASELINE" > "$WORK/baseline.txt"; then
+    echo "check-api: the baseline ${BASELINE#"$ROOT"/} could not be normalised." >&2
+    exit 2
+fi
 
 if diff -u --label "$(basename "$BASELINE")" --label "current interface" "$WORK/baseline.txt" "$CURRENT" > "$WORK/api.diff"; then
     echo "check-api: the public interface matches the baseline."
