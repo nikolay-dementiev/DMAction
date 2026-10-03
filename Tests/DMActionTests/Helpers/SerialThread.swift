@@ -17,9 +17,13 @@ final class SerialThread: NSObject {
     }
 
     /// Starts the thread and returns it. The thread keeps this object until it stops.
+    ///
+    /// The thread runs at the user-initiated quality of service: on a loaded machine, a thread
+    /// at the default level can wait for a processor long enough to fail a test that waits for it.
     func start() -> Thread {
         let thread = Thread(target: self, selector: #selector(run), object: nil)
         thread.stackSize = stackSize
+        thread.qualityOfService = .userInitiated
         thread.start()
         return thread
     }
