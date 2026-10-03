@@ -32,6 +32,10 @@ final class AtMostOnceDeliveryTests: XCTestCase {
 
     private static let runKey = "DMActionTests.run"
 
+    /// How long a thread waits at a barrier for the others. The work around a barrier takes
+    /// microseconds; the deadline only keeps a test from hanging when a thread never arrives.
+    private static let barrierDeadline: TimeInterval = 10
+
     // MARK: - Two completions before the call returns
 
     func test_run_whenAProducerSucceedsTwice_deliversTheFirstSuccessOnce() {
@@ -392,7 +396,8 @@ final class AtMostOnceDeliveryTests: XCTestCase {
     /// Two threads wait at a barrier and complete one attempt at the same moment, thousands of
     /// times. A run that checked the attempt and took it in two steps would let both through now
     /// and then; the Thread Sanitizer does not see that, because every step holds the lock. Each
-    /// time, the run must deliver the fallback's success once, labelled 1.
+    /// time, the run must deliver the fallback's success once, labelled 1. The barrier sleeps
+    /// instead of spinning, so a loaded machine cannot starve the thread it waits for.
     func test_run_whenTwoThreadsCompleteOneAttemptAtOnce_runsTheFallbackAndDeliversOnce() {
         let left = SerialThread(stackSize: 512 * 1024)
         let right = SerialThread(stackSize: 512 * 1024)
@@ -403,6 +408,7 @@ final class AtMostOnceDeliveryTests: XCTestCase {
             right.stop()
         }
         var wrong: [Int] = []
+        let barrierTimeouts = LockedCounter()
         for iteration in 0..<3_000 {
             let fallbackCalls = LockedCounter()
             let deliveries = Locked<[DMButtonAction.ResultType]>([])
@@ -417,20 +423,20 @@ final class AtMostOnceDeliveryTests: XCTestCase {
             guard let held = producer.heldCompletions.first else {
                 return XCTFail("the producer kept its completion")
             }
-            let arrived = Locked(0)
+            let barrier = Barrier(parties: 2)
             let done = DispatchGroup()
             for thread in [left, right] {
                 done.enter()
                 thread.enqueue {
-                    arrived.withLock { $0 += 1 }
-                    // A thread whose partner never arrives gives up after a second.
-                    let deadline = DispatchTime.now() + 1
-                    while arrived.withLock({ $0 }) < 2, DispatchTime.now() < deadline {}
+                    Self.arrive(at: barrier, countingTimeoutsIn: barrierTimeouts)
                     held(.failure(MarkedError()))
                     done.leave()
                 }
             }
-            guard done.wait(timeout: .now() + 10) == .success else {
+            // An iteration takes microseconds. The wait allows three barrier deadlines, so only
+            // a completion call that never returns reaches it, not a thread that a loaded
+            // machine left waiting for a processor.
+            guard done.wait(timeout: .now() + 3 * Self.barrierDeadline) == .success else {
                 return XCTFail("iteration \(iteration): a completion call did not return")
             }
             let delivered = deliveries.withLock { $0 }
@@ -444,6 +450,7 @@ final class AtMostOnceDeliveryTests: XCTestCase {
             wrong, [],
             "iterations where a producer ran other than once, or the run did not deliver the fallback's success, labelled 1, once"
         )
+        XCTAssertEqual(barrierTimeouts.count, 0, "threads that left the barrier alone, so their iteration raced nothing")
     }
 
     /// The runs share one action, and each fails a different number of times: a count shared
@@ -534,6 +541,14 @@ final class AtMostOnceDeliveryTests: XCTestCase {
             for _ in 0..<threadCount {
                 gate.signal()
             }
+        }
+    }
+
+    /// Waits at the barrier, and counts a wait that ended at the deadline instead of with the
+    /// other parties.
+    private static func arrive(at barrier: Barrier, countingTimeoutsIn timeouts: LockedCounter) {
+        if !barrier.arriveAndWait(deadline: Date(timeIntervalSinceNow: barrierDeadline)) {
+            timeouts.increment()
         }
     }
 
