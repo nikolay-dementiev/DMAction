@@ -74,16 +74,17 @@ final class ContractCharacterizationTests: XCTestCase {
                 $0.results.append(result)
             }
         }
-        let completersReturned = completers.wait(timeout: .now() + 5)
+        guard completers.wait(timeout: .now() + 5) == .success else {
+            return XCTFail("the completing thread did not return from the completion")
+        }
 
-        let final = record.withLock { $0 }
-        XCTAssertEqual(completersReturned, .success, "the completing thread returned from the completion")
-        XCTAssertEqual(final.producerCalls, 1, "the producer ran once")
-        XCTAssertEqual(final.results.count, 1, "one delivery")
-        XCTAssertTrue(final.deliveryThread === caller?.thread, "delivered on the thread the producer completed on")
-        XCTAssertFalse(final.deliveryThread === Thread.current, "which is not the thread that started the run")
-        XCTAssertEqual(final.results.first.flatMap(ConsumerSpy.text(of:)), "background", "the payload the producer delivered")
-        XCTAssertEqual(final.results.first?.attemptCount, 0, "the label of a first-try success")
+        let seen = record.withLock { $0 }
+        XCTAssertEqual(seen.producerCalls, 1, "the producer ran once")
+        XCTAssertEqual(seen.results.count, 1, "one delivery")
+        XCTAssertTrue(seen.deliveryThread === caller?.thread, "delivered on the thread the producer completed on")
+        XCTAssertFalse(seen.deliveryThread === Thread.current, "which is not the thread that started the run")
+        XCTAssertEqual(seen.results.first.flatMap(ConsumerSpy.text(of:)), "background", "the payload the producer delivered")
+        XCTAssertEqual(seen.results.first?.attemptCount, 0, "the label of a first-try success")
     }
 
     // MARK: - Missing, duplicate and cancelled completions
