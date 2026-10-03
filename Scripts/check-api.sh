@@ -70,16 +70,63 @@ normalize() {
     { grep -v -E '^(//|import |$)' "$1" || [ $? -eq 1 ]; } | python3 -c '
 import sys
 
-def balance(text, opening, closing):
-    # Characters inside a string literal, such as a message or a return value, do not count.
+def balance(text, opening, closing, state=None):
+    # Characters inside a string literal, such as a message or a return value, or inside a
+    # comment do not count. Block comments nest, so their depth is counted. A block comment
+    # and a multiline string literal can go on over the next lines: the caller passes `state`
+    # to carry them to the next line.
+    # The normaliser balances braces outside comments and plain string literals; a construct
+    # it does not model inside a hidden body stops the check, it is never assumed balanced.
+    # Such a construct is named in `state`: a raw string, whose delimiters and escapes are its
+    # own, and a string interpolation, which holds code and strings of its own.
     total, in_string, position = 0, False, 0
+    comments = state.get("comment", 0) if state else 0
+    multiline = bool(state.get("multiline")) if state else False
     while position < len(text):
+        if comments:
+            if text.startswith("/*", position):
+                comments += 1
+                position += 2
+            elif text.startswith("*/", position):
+                comments -= 1
+                position += 2
+            else:
+                position += 1
+            continue
+        if multiline:
+            if state is not None and text.startswith("\\(", position):
+                state["unmodelled"] = "a string interpolation"
+                break
+            if text[position] == "\\":
+                position += 2
+            elif text.startswith("\"\"\"", position):
+                multiline = False
+                position += 3
+            else:
+                position += 1
+            continue
         character = text[position]
         if in_string:
+            if state is not None and text.startswith("\\(", position):
+                state["unmodelled"] = "a string interpolation"
+                break
             if character == "\\":
                 position += 1
             elif character == "\"":
                 in_string = False
+        elif text.startswith("//", position):
+            break
+        elif text.startswith("/*", position):
+            comments = 1
+            position += 2
+            continue
+        elif state is not None and character == "#" and text[position:].lstrip("#").startswith("\""):
+            state["unmodelled"] = "a raw string literal"
+            break
+        elif text.startswith("\"\"\"", position):
+            multiline = True
+            position += 3
+            continue
         elif character == "\"":
             in_string = True
         elif character == opening:
@@ -87,6 +134,9 @@ def balance(text, opening, closing):
         elif character == closing:
             total -= 1
         position += 1
+    if state is not None:
+        state["comment"] = comments
+        state["multiline"] = multiline
     return total
 
 def skip_attributes(line):
@@ -122,22 +172,34 @@ def hidden_declaration(line):
             return False
     return False
 
+def refuse_unmodelled(state, line):
+    construct = state.get("unmodelled")
+    if construct:
+        sys.exit("check-api: " + construct + " in a hidden body is not supported: " + line.strip())
+
 def public_lines(lines):
-    kept, held, depth = [], [], 0
+    kept, held, depth, state = [], [], 0, {"comment": 0, "multiline": False}
     for line in lines:
         if depth > 0:
-            depth += balance(line, "{", "}")
+            depth += balance(line, "{", "}", state)
+            refuse_unmodelled(state, line)
             continue
         if line.strip() and attributes_only(line):
             held.append(line)
             continue
         if hidden_declaration(line):
             held = []
-            depth = balance(line, "{", "}")
+            state["comment"] = 0
+            state["multiline"] = False
+            depth = balance(line, "{", "}", state)
+            refuse_unmodelled(state, line)
             continue
         kept.extend(held)
         held = []
         kept.append(line)
+    # A body still open here would have hidden everything after it.
+    if depth > 0:
+        sys.exit("check-api: a hidden body is still open where the interface ends")
     return kept + held
 
 blocks, current, conditions = [], [], 0
@@ -174,6 +236,24 @@ if [ "${1:-}" = "--self-test" ]; then
         EXPECTED="$(sed -n 's/^# expect: //p' "$CASE")"
         awk '/^--- A ---$/ { part = "A"; next } /^--- B ---$/ { part = "B"; next } part == "A"' "$CASE" > "$WORK/case-a.txt"
         awk '/^--- B ---$/ { part = "B"; next } part == "B"' "$CASE" > "$WORK/case-b.txt"
+        # A case that expects an error passes when the normalisation of its text A fails with
+        # the message the case names: a crash, or another error, must not stand in for it.
+        if [ "$EXPECTED" = "error" ]; then
+            MESSAGE="$(sed -n 's/^# message: //p' "$CASE")"
+            if [ -z "$MESSAGE" ]; then
+                echo "check-api: FAIL $NAME: an error case needs a line '# message: <text of the error>'" >&2
+                FAILED=1
+            elif normalize "$WORK/case-a.txt" > /dev/null 2> "$WORK/case-a.error"; then
+                echo "check-api: FAIL $NAME: expected an error, the normalisation of A succeeded" >&2
+                FAILED=1
+            elif ! grep -qF -- "$MESSAGE" "$WORK/case-a.error"; then
+                echo "check-api: FAIL $NAME: expected the error '$MESSAGE', the normalisation said: $(head -c 300 "$WORK/case-a.error")" >&2
+                FAILED=1
+            else
+                echo "check-api: ok   $NAME"
+            fi
+            continue
+        fi
         if ! normalize "$WORK/case-a.txt" > "$WORK/case-a.normalized" || ! normalize "$WORK/case-b.txt" > "$WORK/case-b.normalized"; then
             echo "check-api: FAIL $NAME: the normalisation stopped with an error" >&2
             FAILED=1
@@ -207,7 +287,11 @@ swift_sources() {
 # The compiler is called for the iOS simulator, a platform the packages are released
 # for. It is called directly, because a module that shares its name with one of its
 # types cannot pass the interface verifier that a build through xcodebuild always runs.
-SDK_PATH="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+# Exit 1 says that the interface differs. An SDK that cannot be located is not that.
+if ! SDK_PATH="$(xcrun --sdk iphonesimulator --show-sdk-path)" || [ ! -d "$SDK_PATH" ]; then
+    echo "check-api: the iOS simulator SDK cannot be located." >&2
+    exit 2
+fi
 TARGET="arm64-apple-ios17.0-simulator"
 
 # Bash 3.2, the version macOS ships, treats an empty array as unbound under set -u, hence
