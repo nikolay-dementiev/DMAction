@@ -17,7 +17,8 @@ import Foundation
 ///
 /// What keeps a test that uses it free of a data race: the closure is handed over once,
 /// the creating thread never touches it again, and the test reads what the closure wrote
-/// only after waiting for an expectation that the closure fulfils last.
+/// only after waiting for a signal the closure sends last: an expectation it fulfils, or a
+/// dispatch group it leaves.
 ///
 /// `stackSize` gives the thread a stack of that many bytes. 512 KB is what a secondary
 /// thread gets by default (Apple's Threading Programming Guide, Thread Management).

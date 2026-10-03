@@ -26,33 +26,39 @@ final class ThreadCharacterizationTests: XCTestCase {
             Self.receive(result, in: record)
         }
 
-        let final = record.withLock { $0 }
-        assertOneDeliveryOfTheFallback(final, primaryCalls: final.primaryCalls)
-        XCTAssertTrue(final.fallbackThread === Thread.current, "the fallback runs on the calling thread")
-        XCTAssertTrue(final.deliveryThread === Thread.current, "and so does the delivery")
+        let seen = record.withLock { $0 }
+        assertOneDeliveryOfTheFallback(seen)
+        XCTAssertTrue(seen.fallbackThread === Thread.current, "the fallback runs on the calling thread")
+        XCTAssertTrue(seen.deliveryThread === Thread.current, "and so does the delivery")
     }
 
     func test_run_whenACompletionArrivesOnAnotherThreadAfterTheCall_continuesOnThatThread() throws {
         let (record, fallback) = makeSUT()
-        let primary = ProducerSpy(script: [.hold])
+        var kept: ((DMButtonAction.ResultType) -> Void)?
+        let primary = DMButtonAction { completion in
+            record.withLock { $0.primaryCalls += 1 }
+            kept = completion
+        }
         let completionReturned = expectation(description: "the completing thread's call to the completion returned")
-        primary.action.fallbackTo(fallback).action { result in
+        primary.fallbackTo(fallback).action { result in
             Self.receive(result, in: record)
         }
-        let held = try XCTUnwrap(primary.heldCompletions.first, "the primary kept its completion")
+        let held = try XCTUnwrap(kept, "the primary kept its completion")
 
         let caller = BackgroundCaller {
             held(.failure(MarkedError()))
             completionReturned.fulfill()
         }
         caller.start()
-        wait(for: [completionReturned], timeout: 5)
+        guard XCTWaiter.wait(for: [completionReturned], timeout: 5) == .completed else {
+            return XCTFail("the completing thread did not return from the completion")
+        }
 
-        let final = record.withLock { $0 }
-        assertOneDeliveryOfTheFallback(final, primaryCalls: primary.callCount)
+        let seen = record.withLock { $0 }
+        assertOneDeliveryOfTheFallback(seen)
         XCTAssertNotNil(caller.thread, "the completing thread")
-        XCTAssertTrue(final.fallbackThread === caller.thread, "the fallback runs on the completing thread")
-        XCTAssertTrue(final.deliveryThread === caller.thread, "and so does the delivery")
+        XCTAssertTrue(seen.fallbackThread === caller.thread, "the fallback runs on the completing thread")
+        XCTAssertTrue(seen.deliveryThread === caller.thread, "and so does the delivery")
     }
 
     func test_run_whenACompletionArrivesOnAnotherThreadDuringTheCall_continuesThereWithoutWaiting() {
@@ -77,15 +83,16 @@ final class ThreadCharacterizationTests: XCTestCase {
         primary.fallbackTo(fallback).action { result in
             Self.receive(result, in: record)
         }
-        let completersReturned = completers.wait(timeout: .now() + 10)
+        guard completers.wait(timeout: .now() + 10) == .success else {
+            return XCTFail("a completing thread did not return from the completion")
+        }
 
-        let final = record.withLock { $0 }
-        XCTAssertEqual(completersReturned, .success, "every completing thread returned from the completion")
+        let seen = record.withLock { $0 }
         XCTAssertEqual(waitForTheFallback, .success, "the fallback started while the primary was still in its call")
-        assertOneDeliveryOfTheFallback(final, primaryCalls: final.primaryCalls)
+        assertOneDeliveryOfTheFallback(seen)
         XCTAssertNotNil(caller?.thread, "the completing thread")
-        XCTAssertTrue(final.fallbackThread === caller?.thread, "the fallback runs on the completing thread")
-        XCTAssertTrue(final.deliveryThread === caller?.thread, "and so does the delivery")
+        XCTAssertTrue(seen.fallbackThread === caller?.thread, "the fallback runs on the completing thread")
+        XCTAssertTrue(seen.deliveryThread === caller?.thread, "and so does the delivery")
     }
 
     /// The same with the run started on a background thread, so that neither thread is the main
@@ -116,16 +123,19 @@ final class ThreadCharacterizationTests: XCTestCase {
             callReturned.fulfill()
         }
         .start()
-        wait(for: [callReturned], timeout: 10)
-        let completersReturned = completers.wait(timeout: .now() + 10)
+        guard XCTWaiter.wait(for: [callReturned], timeout: 10) == .completed else {
+            return XCTFail("the call that started the run did not return")
+        }
+        guard completers.wait(timeout: .now() + 10) == .success else {
+            return XCTFail("a completing thread did not return from the completion")
+        }
 
-        let final = record.withLock { $0 }
-        XCTAssertEqual(completersReturned, .success, "every completing thread returned from the completion")
+        let seen = record.withLock { $0 }
         XCTAssertEqual(waitForTheFallback, .success, "the fallback started while the primary was still in its call")
-        assertOneDeliveryOfTheFallback(final, primaryCalls: final.primaryCalls)
+        assertOneDeliveryOfTheFallback(seen)
         XCTAssertNotNil(completer?.thread, "the completing thread")
-        XCTAssertTrue(final.fallbackThread === completer?.thread, "the fallback runs on the completing thread")
-        XCTAssertTrue(final.deliveryThread === completer?.thread, "and so does the delivery")
+        XCTAssertTrue(seen.fallbackThread === completer?.thread, "the fallback runs on the completing thread")
+        XCTAssertTrue(seen.deliveryThread === completer?.thread, "and so does the delivery")
     }
 
     // MARK: - Helpers
@@ -153,13 +163,8 @@ final class ThreadCharacterizationTests: XCTestCase {
 
     /// The primary ran once and failed, so the fallback ran once and its success was delivered
     /// once, labelled 1.
-    private func assertOneDeliveryOfTheFallback(
-        _ record: Record,
-        primaryCalls: Int,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) {
-        XCTAssertEqual(primaryCalls, 1, "the primary ran once", file: file, line: line)
+    private func assertOneDeliveryOfTheFallback(_ record: Record, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(record.primaryCalls, 1, "the primary ran once", file: file, line: line)
         XCTAssertEqual(record.fallbackCalls, 1, "the fallback ran once", file: file, line: line)
         XCTAssertEqual(record.results.count, 1, "one delivery", file: file, line: line)
         XCTAssertEqual(
