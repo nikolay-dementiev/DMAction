@@ -147,8 +147,9 @@ final class StackSafeExecutionTests: XCTestCase {
             let probe = Probe()
             weakProbe = probe
             var action: any DMAction = producer.action.fallbackTo(DMButtonAction { completion in
-                _ = probe
-                completion(.success("fallback"))
+                withExtendedLifetime(probe) {
+                    completion(.success("fallback"))
+                }
             })
             for _ in 0..<1_000 {
                 action = action.retry(1)
