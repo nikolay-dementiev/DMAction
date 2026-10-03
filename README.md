@@ -7,10 +7,6 @@ Compose completion-based actions with retries and fallbacks, and get one result 
 [![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_7%2B-yellowgreen?style=flat-square)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
-<p align="center">
-  <img src="Documentation/DMAction-SDK-logo.png" alt="DMAction logo" height="200">
-</p>
-
 - [What it is](#what-it-is)
 - [Requirements](#requirements)
 - [Installation](#installation)
