@@ -1,0 +1,12 @@
+# expect: same
+# An attribute with arguments in front of a hidden member: the member is still hidden.
+--- A ---
+public struct First {
+  @SwiftUI.ScaledMetric(relativeTo: .body) private var size: CoreFoundation.CGFloat
+  public var visible: Swift.Int
+}
+--- B ---
+public struct First {
+  @SwiftUI.ScaledMetric(relativeTo: .body) private var scale: CoreFoundation.CGFloat
+  public var visible: Swift.Int
+}

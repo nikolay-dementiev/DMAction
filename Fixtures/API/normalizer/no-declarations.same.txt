@@ -1,0 +1,8 @@
+# expect: same
+# An interface with comments and imports only.
+--- A ---
+// swift-interface-format-version: 1.0
+import Swift
+--- B ---
+// swift-module-flags: -target arm64-apple-ios17.0-simulator
+import Foundation

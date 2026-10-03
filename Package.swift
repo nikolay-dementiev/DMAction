@@ -2,9 +2,9 @@
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
-import Foundation
 
-let isCI = ProcessInfo.processInfo.environment["CI_ENV"] == "true"
+// Every target compiles with these. Scripts/check-api.sh repeats them in SWIFT_FLAGS.
+let swiftSettings: [SwiftSetting] = [.enableUpcomingFeature("ExistentialAny")]
 
 let package = Package(
     name: "DMAction",
@@ -17,20 +17,16 @@ let package = Package(
             name: "DMAction",
             targets: ["DMAction"]),
     ],
-    dependencies: [
-        .package(url: "https://github.com/GayleDunham/SwiftLintPlugin.git", branch: "main")
-    ],
     targets: [
         .target(
             name: "DMAction",
-            path: "Sources",
-            plugins: isCI ? [] : [.plugin(name: "SwiftLintBuildTool", package: "SwiftLintPlugin")]
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "DMActionTests",
             dependencies: ["DMAction"],
-            path: "Tests",
-            plugins: isCI ? [] : [.plugin(name: "SwiftLintBuildTool", package: "SwiftLintPlugin")]
+            swiftSettings: swiftSettings
         ),
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )

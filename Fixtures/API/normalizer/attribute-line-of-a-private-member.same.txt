@@ -1,0 +1,19 @@
+# expect: same
+# An attribute on a line of its own goes with the member that is not public, and an
+# inlinable body goes with its declaration.
+--- A ---
+public struct First {
+  @usableFromInline
+  internal func helper() -> Swift.Int {
+    return 1
+  }
+  public func run()
+}
+--- B ---
+public struct First {
+  @usableFromInline
+  internal func assist() -> Swift.Int {
+    return 2
+  }
+  public func run()
+}

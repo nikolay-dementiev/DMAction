@@ -1,64 +1,71 @@
 //
-//  DMErrorHandling
+//  DMAction
 //
 //  Created by Mykola Dementiev
 //
-// Check the DMButtonActionObjectsDocumentaryTests.swift to see for implemented examples
 
 import Foundation
 
-/// A struct representing a button action that conforms to the `DMAction` protocol.
+/// An action made of one producer.
 ///
-/// Example of how to use `DMButtonAction` with a simple action:
+/// Every run of it, through ``action``, call syntax or ``DMAction/simpleAction``, is guarded:
+/// the first completion wins and the result is delivered at most once, labelled with
+/// ``currentAttempt``, which is 0.
+///
+/// A producer that reports a result:
 ///
 /// ```swift
-/// let buttonAction = DMButtonAction {
-///     print("Button action performed")
+/// import DMAction
+/// import Foundation
+///
+/// let fileURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("notes.txt")
+/// let load = DMButtonAction { completion in
+///     do {
+///         completion(.success(try Data(contentsOf: fileURL)))
+///     } catch {
+///         completion(.failure(error))
+///     }
 /// }
 ///
-/// buttonAction.action { result in
-///     switch result {
-///     case .success(let value):
-///         print("Success with value: \(value)")
+/// load { result in
+///     switch result.unwrapValue() {
+///     case .success(let data):
+///         print(data) // the Data the producer delivered, out of its wrapper
 ///     case .failure(let error):
-///         print("Failed with error: \(error)")
+///         print(error)
 ///     }
 /// }
 /// ```
 ///
-/// Example of how to use `DMButtonAction` with an action closure:
+/// A closure that cannot fail:
 ///
 /// ```swift
-/// let buttonActionWithClosure = DMButtonAction { completion in
-///     // Perform some async task
-///     completion(.success(DMActionResultValue(value: PlaceholderCopyable(),
-///                                             attemptCount: 0)))
-/// }
+/// import DMAction
 ///
-/// buttonActionWithClosure.action { result in
-///     switch result {
-///     case .success(let value):
-///         print("Success with value: \(value)")
-///     case .failure(let error):
-///         print("Failed with error: \(error)")
-///     }
+/// let tap = DMButtonAction {
+///     print("Tapped")
 /// }
+/// tap.simpleAction()
 /// ```
 public struct DMButtonAction: DMAction {
     /// Settings used for the default attempt count.
     private enum Settings {
         static let defaultAttemptCount: UInt = 0
     }
-    
-    /// The current attempt number of the action.
+
+    /// The label of a success of this action: 0 for an action made by a public initializer.
     public let currentAttempt: UInt
-    
-    /// The unique identifier of the action.
+
+    /// An identifier of this value. A copy shares it; every composition gets a new one.
     public let id: UUID = UUID()
-    
-    /// The action to be performed.
+
+    /// Runs the producer once, as a guarded run, and calls the given completion at most once
+    /// with its result. A success is labelled ``currentAttempt``.
     public let action: ActionType
-    
+
+    /// What `action` runs.
+    let plan: ActionPlan
+
     /// Initializes a new instance of `DMButtonAction` with the specified current attempt and action.
     ///
     /// - Parameters:
@@ -66,26 +73,32 @@ public struct DMButtonAction: DMAction {
     ///   - action: The action to be performed.
     internal init(currentAttempt: UInt,
                   action: @escaping ActionType) {
+        let plan = ActionPlan(.produce(action))
         self.currentAttempt = currentAttempt
+        self.plan = plan
         self.action = { completion in
-            action { result in
-                let finalResult = Self.mapResultWithAttempt(result, attempt: currentAttempt)
-                completion(finalResult)
-            }
+            plan.run(base: currentAttempt, completion)
         }
     }
-    
-    /// Initializes a new instance of `DMButtonAction` with the default attempt count and the specified action.
+
+    /// Creates an action from a producer.
     ///
-    /// - Parameter action: The action to be performed.
+    /// A run calls `action` on the thread that starts it or, as a later attempt of a composed
+    /// action, on the thread where the attempt before it completed. The producer calls its
+    /// completion once, before it returns or later, on any thread; a second call is ignored.
+    ///
+    /// - Parameter action: The producer.
     public init(_ action: @escaping ActionType) {
         self.init(currentAttempt: Settings.defaultAttemptCount,
                   action: action)
     }
-    
-    /// Initializes a new instance of `DMButtonAction` with the default attempt count and a simple action.
+
+    /// Creates an action from a closure that cannot fail.
     ///
-    /// - Parameter simpleAction: The simple action to be performed.
+    /// Each run calls `simpleAction` and succeeds with a ``PlaceholderCopyable``, so a retry or
+    /// a fallback of this action never runs.
+    ///
+    /// - Parameter simpleAction: The closure to call on each run.
     public init(_ simpleAction: @escaping () -> Void) {
         self.init({ completion in
             simpleAction()

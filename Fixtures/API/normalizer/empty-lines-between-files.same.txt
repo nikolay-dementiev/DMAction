@@ -1,0 +1,16 @@
+# expect: same
+# The compiler leaves an empty line where a source file ends; the file order moves it.
+--- A ---
+public enum First {
+  case one
+}
+
+public struct Second {
+}
+--- B ---
+public struct Second {
+}
+
+public enum First {
+  case one
+}

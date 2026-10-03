@@ -1,0 +1,12 @@
+# expect: same
+# A conditional declaration and a plain one in another order.
+--- A ---
+#if compiler(>=5.3) && $NonescapableTypes
+public func first()
+#endif
+public func second()
+--- B ---
+public func second()
+#if compiler(>=5.3) && $NonescapableTypes
+public func first()
+#endif

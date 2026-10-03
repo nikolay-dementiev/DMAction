@@ -1,0 +1,14 @@
+# expect: different
+# The same move, with a closing parenthesis alone inside the text of the attribute.
+--- A ---
+@available(*, deprecated, message: "step 1) is gone, use Second")
+public struct First {
+}
+public struct Second {
+}
+--- B ---
+public struct First {
+}
+@available(*, deprecated, message: "step 1) is gone, use Second")
+public struct Second {
+}

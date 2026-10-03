@@ -1,0 +1,12 @@
+# expect: different
+# A public property renamed, next to members that are not public.
+--- A ---
+public struct First {
+  private var count: Swift.Int
+  public var visible: Swift.Int
+}
+--- B ---
+public struct First {
+  private var count: Swift.Int
+  public var shown: Swift.Int
+}

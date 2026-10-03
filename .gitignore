@@ -6,3 +6,10 @@ DerivedData/
 .swiftpm/configuration/registries.json
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .netrc
+Fixtures/Consumer/.build/
+Fixtures/Consumer/.swiftpm/
+Fixtures/Consumer/Package.resolved
+Package.resolved
+Fixtures/Rejected/.build/
+Fixtures/Rejected/.swiftpm/
+Fixtures/Rejected/Package.resolved

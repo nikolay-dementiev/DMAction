@@ -1,0 +1,315 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  # The release workflow runs all of it on a version tag.
+  workflow_call:
+  schedule:
+    # Mondays. A new runner image or OS that breaks the package shows up within a week.
+    - cron: "23 5 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # A new push to a pull request supersedes its older run. Runs on main are never
+  # cancelled: a merge, the weekly run and a manual run each keep their own record.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Lint
+        run: Scripts/lint.sh
+      # The analyzer rules, unused_import among them, read the compiler invocations of a full build.
+      - name: Build the library for the analyzer
+        run: |
+          xcodebuild build \
+            -scheme DMAction \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            > "$RUNNER_TEMP/build.log" 2>&1 \
+            || { tail -50 "$RUNNER_TEMP/build.log"; exit 1; }
+      - name: Run the analyzer rules
+        run: Scripts/lint.sh --analyze "$RUNNER_TEMP/build.log"
+
+  test:
+    name: test (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The newest hosted image, Xcode and iOS runtime.
+          - name: iOS 26.5
+            runner: macos-26
+            xcode: "26.6"
+            destination: platform=iOS Simulator,name=iPhone 17,OS=26.5
+          # The oldest hosted image and the oldest iOS runtime it offers.
+          - name: iOS 18.5
+            runner: macos-15
+            xcode: "16.4"
+            destination: platform=iOS Simulator,name=iPhone 16,OS=18.5
+    env:
+      XCODE: ${{ matrix.xcode }}
+      DESTINATION: ${{ matrix.destination }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
+      # The tests build in Debug. Code that only a Release build compiles is built here.
+      - name: Build the library in Release
+        run: |
+          xcodebuild build \
+            -scheme DMAction \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Release \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme DMAction \
+            -sdk iphonesimulator \
+            -destination "$DESTINATION" \
+            -enableCodeCoverage YES \
+            -resultBundlePath "$RUNNER_TEMP/DMAction.xcresult" \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+      - name: Coverage
+        run: Scripts/coverage-gate.sh "$RUNNER_TEMP/DMAction.xcresult"
+      - name: Upload the result bundle
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xcresult-${{ matrix.runner }}
+          path: ${{ runner.temp }}/DMAction.xcresult
+          retention-days: 7
+
+  example:
+    name: example (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: iOS 26.5
+            runner: macos-26
+            xcode: "26.6"
+            device: iPhone 17
+            os: "26.5"
+            newest: true
+          - name: iOS 18.5
+            runner: macos-15
+            xcode: "16.4"
+            device: iPhone 16
+            os: "18.5"
+            newest: false
+    env:
+      XCODE: ${{ matrix.xcode }}
+      DEVICE: ${{ matrix.device }}
+      OS: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: example-checkout
+    steps:
+      # A folder that is not named after the repository: the example must build from any.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: example-checkout
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
+      # The first launch on a simulator that is still booting can fail to install the test
+      # runner, so the simulator is booted and ready before the tests start.
+      - name: Boot the simulator
+        run: |
+          RUNTIME="com.apple.CoreSimulator.SimRuntime.iOS-${OS//./-}"
+          UDID="$(xcrun simctl list devices available -j \
+            | jq -r --arg runtime "$RUNTIME" --arg name "$DEVICE" '.devices[$runtime][]? | select(.name == $name) | .udid' \
+            | head -1)"
+          if [ -z "$UDID" ]; then
+            echo "No $DEVICE with iOS $OS on this runner." >&2
+            exit 1
+          fi
+          xcrun simctl bootstatus "$UDID" -b
+          echo "SIMULATOR=$UDID" >> "$GITHUB_ENV"
+      - name: Build the example and run its tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Examples/DMActionExample/DMActionExample.xcodeproj \
+            -scheme DMActionExample \
+            -destination "platform=iOS Simulator,id=$SIMULATOR" \
+            -resultBundlePath "$RUNNER_TEMP/example.xcresult" \
+            2>&1 | tee "$RUNNER_TEMP/example.log"
+      # A scheme that lost a test bundle would still build and pass.
+      - name: Check that both test bundles ran
+        run: |
+          for bundle in DMActionExampleTests DMActionExampleUITests; do
+            if ! grep -q "Test Suite '$bundle.xctest' passed" "$RUNNER_TEMP/example.log"; then
+              echo "The test bundle $bundle did not run."
+              exit 1
+            fi
+          done
+      # A bundle whose tests were skipped, or that lost tests, passes too. So every test method of
+      # the example's test files must be in the result bundle, run and passed.
+      - name: Check the test counts
+        run: |
+          EXPECTED="$(git grep -hcE '^[[:space:]]*func test[[:alnum:]_]*\(\)' -- 'Examples/DMActionExample/*Tests/*.swift' \
+            | awk '{ total += $1 } END { print total + 0 }')"
+          xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/example.xcresult" > "$RUNNER_TEMP/summary.json"
+          if ! jq -e --argjson expected "$EXPECTED" \
+              '$expected > 0 and .totalTestCount == $expected and .passedTests == $expected and .failedTests == 0 and .skippedTests == 0' \
+              "$RUNNER_TEMP/summary.json" > /dev/null; then
+            echo "Expected $EXPECTED tests of the example to run and pass:"
+            jq '{totalTestCount, passedTests, failedTests, skippedTests}' "$RUNNER_TEMP/summary.json"
+            exit 1
+          fi
+      # Xcode compiles the package with its warnings suppressed, so warnings as errors cannot
+      # cover the whole build. The library's own warnings fail the test job; this step covers
+      # the sources of the example.
+      - name: Fail on a warning in the example
+        run: |
+          # No warning means something only if the log shows every source of the example compiled.
+          missing=""
+          while IFS= read -r source; do
+            if ! grep -qE "^SwiftCompile .*/$source( |$)" "$RUNNER_TEMP/example.log"; then
+              missing="$missing $source"
+            fi
+          done < <(git ls-files 'Examples/DMActionExample/*.swift')
+          if [ -n "$missing" ]; then
+            echo "The build log does not show these compiled:$missing"
+            exit 1
+          fi
+          warnings="$(grep -E "/Examples/[^:]*:[0-9]+:[0-9]+: warning:" "$RUNNER_TEMP/example.log" | sort -u || true)"
+          if [ -n "$warnings" ]; then
+            echo "$warnings"
+            exit 1
+          fi
+      - name: Find unused imports
+        if: matrix.newest
+        run: Scripts/lint.sh --analyze "$RUNNER_TEMP/example.log"
+      - name: Upload the result bundle
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: example-xcresult-${{ matrix.runner }}
+          path: ${{ runner.temp }}/example.xcresult
+          retention-days: 7
+
+  docs:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      # A broken symbol link is a warning to DocC and an error here.
+      - name: Build the documentation
+        run: |
+          xcodebuild docbuild \
+            -scheme DMAction \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            OTHER_DOCC_FLAGS="--warnings-as-errors"
+
+  snippets:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Compile the Swift examples of the documents and the doc comments
+        run: Scripts/check-snippets.sh
+
+  floor:
+    # The oldest toolchain the manifest promises: swift-tools-version 6.0 is Xcode 16.0 to 16.2.
+    runs-on: macos-15
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+      - name: Build and test with Swift 6.0
+        run: |
+          swift --version
+          swift test
+
+  thread-sanitizer:
+    # A run continues on whichever thread completes an attempt. The suite runs once more
+    # under the Thread Sanitizer, on the host, where it is fastest.
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Test with the Thread Sanitizer
+        run: swift test --sanitize=thread
+
+  consumer:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Manifest, installation by version, consumer fixture, podspec, rejected shapes
+        run: Scripts/check-manifest.sh
+
+  api:
+    # The interface text depends on the compiler: this job and the baseline use Xcode 26.6.
+    runs-on: macos-26
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      - name: Check the normalisation of the interface
+        run: Scripts/check-api.sh --self-test
+      - name: Public interface against the baseline
+        run: Scripts/check-api.sh
+
+  podspec:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      # CocoaPods lints with the newest language mode the podspec lists.
+      - name: Lint the podspec
+        run: pod lib lint DMAction.podspec
+      - name: Lint the podspec in the Swift 5 language mode
+        run: pod lib lint DMAction.podspec --swift-version=5.0

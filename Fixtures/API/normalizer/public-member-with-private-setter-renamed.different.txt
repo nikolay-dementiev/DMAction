@@ -1,0 +1,10 @@
+# expect: different
+# A public property with a private setter is public: renaming it is an API change.
+--- A ---
+public struct First {
+  public private(set) var visible: Swift.Int
+}
+--- B ---
+public struct First {
+  public private(set) var shown: Swift.Int
+}

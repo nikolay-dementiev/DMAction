@@ -1,0 +1,14 @@
+# expect: same
+# A closing brace inside a string of a hidden inlinable body must not end the body
+# early: removing that hidden function is not an API change.
+--- A ---
+public struct First {
+  @inlinable internal func helper() -> Swift.String {
+    return "}"
+  }
+  public func keep()
+}
+--- B ---
+public struct First {
+  public func keep()
+}

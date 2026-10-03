@@ -1,0 +1,20 @@
+# expect: same
+# The same declarations in another order: the compiler follows the order of the files.
+--- A ---
+// swift-interface-format-version: 1.0
+import Swift
+public enum First {
+  case one
+}
+public struct Second {
+  public func run()
+}
+--- B ---
+// swift-interface-format-version: 1.0
+import Swift
+public struct Second {
+  public func run()
+}
+public enum First {
+  case one
+}
