@@ -1,0 +1,21 @@
+# expect: error
+# message: line 3 is a statement of a serialised body: package static func matches(_ pattern: Regex<Substring> = /\{/) -> Swift.Bool
+# A line of a hidden block must have the shape of a declaration, an accessor, a case, an
+# attribute, a compiler directive or a lone brace. A statement of a serialised body stops the
+# check at its line, before any text of the body can leak.
+# Here a default argument holds a bare regex literal, which is no value the check models.
+--- A ---
+public struct First {
+  package enum Hidden {
+    package static func matches(_ pattern: Regex<Substring> = /\{/) -> Swift.Bool
+  }
+  public func removedLater()
+  public func keep()
+}
+--- B ---
+public struct First {
+  package enum Hidden {
+    package static func matches(_ pattern: Regex<Substring> = /\{/) -> Swift.Bool
+  }
+  public func keep()
+}

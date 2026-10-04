@@ -1,0 +1,20 @@
+# expect: error
+# message: line 6 is a statement of a serialised body: package
+# The body of an inlinable declaration keeps the indentation of the source. Local functions
+# opened on one line and closed flat end the drop and close the type, and a statement on a
+# parameter named package then reads as a hidden declaration at column 0 whose drop takes the
+# public members. No declaration keyword follows package: the check stops at that line. The
+# text is what the compiler prints for such a source.
+--- A ---
+public struct First {
+  @inlinable internal func helper(package: Swift.Int) {
+    func a() { func b() {
+  }
+}
+package
+    }
+  public func visible()
+}
+--- B ---
+public struct First {
+}

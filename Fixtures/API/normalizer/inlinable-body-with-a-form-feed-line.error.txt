@@ -1,0 +1,19 @@
+# expect: error
+# message: line 3 holds a line break other than a line feed: U+000C
+# A form feed, U+000C, on a line of its own, as an old page break, is a space for Swift, and
+# the printer copies it into an inlinable body.
+--- A ---
+public struct First {
+  @inlinable internal static func page() -> Swift.Int {
+
+    return 1
+  }
+  public func keep()
+}
+--- B ---
+public struct First {
+  @inlinable internal static func page() -> Swift.Int {
+    return 1
+  }
+  public func keep()
+}

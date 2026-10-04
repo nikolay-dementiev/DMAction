@@ -1,0 +1,16 @@
+# expect: same
+# An access level with an argument, such as private(set), is a modifier like any other.
+--- A ---
+public struct First {
+  package enum Hidden {
+    package private(set) static var count: Swift.Int
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+  package enum Hidden {
+    package private(set) static var total: Swift.Int
+  }
+  public func visible()
+}

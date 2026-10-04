@@ -1,0 +1,17 @@
+# expect: same
+# A compiler directive may stand around a hidden declaration: the declaration goes, the
+# directive stays, and only hidden text changes.
+--- A ---
+public struct First {
+  #if compiler(>=5.3)
+  internal func helper()
+  #endif
+  public func visible()
+}
+--- B ---
+public struct First {
+  #if compiler(>=5.3)
+  internal func assist()
+  #endif
+  public func visible()
+}

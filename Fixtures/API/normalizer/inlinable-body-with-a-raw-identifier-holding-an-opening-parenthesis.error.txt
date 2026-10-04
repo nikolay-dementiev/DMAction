@@ -1,0 +1,19 @@
+# expect: error
+# message: line 3 is a statement of a serialised body: let `brace(` = 1
+# A raw identifier may hold a parenthesis. It must not make the value assigned after it read
+# as a default argument inside a parameter list.
+--- A ---
+public struct First {
+  @inlinable internal func helper() {
+    let `brace(` = 1
+  }
+  public func removedLater()
+  public func keep()
+}
+--- B ---
+public struct First {
+  @inlinable internal func helper() {
+    let `brace(` = 1
+  }
+  public func keep()
+}

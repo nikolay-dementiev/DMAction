@@ -1,0 +1,14 @@
+# expect: error
+# message: line 1 holds a line break other than a line feed: U+2028
+# Comments, imports and empty lines are not API and are dropped, but only after the check: a
+# line break other than a line feed is refused on every line of the interface.
+--- A ---
+// swift-module-flags: -target arm64-apple-ios17.0-simulator -module-name First
+public struct First {
+  public func keep()
+}
+--- B ---
+// swift-module-flags: -target arm64-apple-ios17.0-simulator -module-name First
+public struct First {
+  public func keep()
+}

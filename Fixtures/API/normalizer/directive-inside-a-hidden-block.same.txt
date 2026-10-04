@@ -1,0 +1,20 @@
+# expect: same
+# A compiler directive inside a hidden block goes with the block.
+--- A ---
+public struct First {
+  package enum Hidden {
+    #if compiler(>=5.3) && $NonescapableTypes
+    case first
+    #endif
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+  package enum Hidden {
+    #if compiler(>=5.3) && $NonescapableTypes
+    case second
+    #endif
+  }
+  public func visible()
+}

@@ -1,0 +1,28 @@
+# expect: same
+# A package enum is not API: its cases, an accessor block and a function inside it change,
+# and the public interface around it stays the same.
+--- A ---
+public struct First {
+  package enum Hidden {
+    case first
+    case second(Swift.Int)
+    package var value: Swift.Int {
+      get
+    }
+    package func helper() -> Swift.Int
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+  package enum Hidden {
+    case first
+    case third(Swift.String)
+    package var value: Swift.String {
+      get
+      set
+    }
+    package func assist(_ count: Swift.Int)
+  }
+  public func visible()
+}

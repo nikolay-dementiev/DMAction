@@ -1,0 +1,13 @@
+# expect: error
+# message: line 1 holds a line break other than a line feed: U+2028
+# An import line is not API and is dropped, but only after the check, as a comment line is.
+--- A ---
+import Swift 
+public struct First {
+  public func keep()
+}
+--- B ---
+import Swift
+public struct First {
+  public func keep()
+}

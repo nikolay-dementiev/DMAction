@@ -1,0 +1,19 @@
+# expect: error
+# message: line 2 holds a line break other than a line feed: U+000D
+# The printer copies the carriage returns of a source saved with CRLF line ends into an
+# inlinable body. The check reads line feeds alone, and a carriage return stops it wherever
+# it stands, at the end of a line too.
+--- A ---
+public struct First {
+  @inlinable public func value() -> Swift.Int {
+    return 1
+  }
+  public func keep()
+}
+--- B ---
+public struct First {
+  @inlinable public func value() -> Swift.Int {
+    return 1
+  }
+  public func keep()
+}

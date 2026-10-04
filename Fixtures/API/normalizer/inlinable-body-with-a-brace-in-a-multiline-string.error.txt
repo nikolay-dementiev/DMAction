@@ -1,0 +1,23 @@
+# expect: error
+# message: line 3 is a statement of a serialised body: return """
+# A line of a hidden block must have the shape of a declaration, an accessor, a case, an
+# attribute, a compiler directive or a lone brace. A statement of a serialised body stops the
+# check at its line, before any text of the body can leak.
+# Here a return statement starts a multiline string.
+--- A ---
+public struct First {
+  @inlinable internal func helper() -> Swift.String {
+    return """
+      {
+      """
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+  @inlinable internal func helper() -> Swift.String {
+    return """
+      {
+      """
+  }
+}
