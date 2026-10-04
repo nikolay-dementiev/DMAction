@@ -7,6 +7,10 @@ Compose completion-based actions with retries and fallbacks, and get one result 
 [![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_7%2B-yellowgreen?style=flat-square)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 
+<p align="center">
+  <img src="./Documentation/DMAction-main.svg?raw=true" alt="DMAction: compose actions, retry and fall back, with one result per run. Three panels: Action with a play button, Retry with a circular arrow, and Fallback with a bent arrow." style="max-height: 400px; aspect-ratio: 1536/1024; object-fit: scale-down;">
+</p>
+
 - [What it is](#what-it-is)
 - [Requirements](#requirements)
 - [Installation](#installation)
