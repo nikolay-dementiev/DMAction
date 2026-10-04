@@ -1,0 +1,15 @@
+# expect: different
+# A hidden block whose closing brace is missing drops only the lines indented deeper than its
+# declaration. The public member at the indentation of the type stays, so its removal is an
+# API change.
+--- A ---
+public struct First {
+  package enum Hidden {
+    case first
+  public func visible()
+}
+--- B ---
+public struct First {
+  package enum Hidden {
+    case first
+}

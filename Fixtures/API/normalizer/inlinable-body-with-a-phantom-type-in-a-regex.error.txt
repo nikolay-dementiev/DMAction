@@ -1,0 +1,18 @@
+# expect: error
+# message: line 3 is a statement of a serialised body: let _ = #/
+# A multiline regex can hold a closing brace and a hidden type at column 0, which would close
+# the type and start a drop that swallows its public members. The local declaration that
+# starts the regex is a statement: the check stops at it, before the regex text is read.
+--- A ---
+public struct First {
+  @inlinable internal func helper() {
+    let _ = #/
+}
+internal struct Phantom {
+    /#
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+}

@@ -1,0 +1,15 @@
+# expect: error
+# message: line 2 holds a line break other than a line feed: U+0085
+# The shape of the line separator case, with a next line character, U+0085, in a default
+# argument of a public function, which the printer copies from the source.
+--- A ---
+public struct First {
+  public func join(separator: Swift.String = "x0:}0:internal struct Phantom {0:  get")
+  public func removedLater()
+  public func keep()
+}
+--- B ---
+public struct First {
+  public func join(separator: Swift.String = "x0:}0:internal struct Phantom {0:  get")
+  public func keep()
+}

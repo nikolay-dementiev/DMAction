@@ -1,0 +1,14 @@
+# expect: different
+# A hidden declaration without a body may hold a brace in a raw identifier. The line is dropped
+# without being read, so the public member after it stays and its removal is an API change.
+--- A ---
+public struct First {
+  internal func `brace{`()
+  public func removedLater()
+  public func keep()
+}
+--- B ---
+public struct First {
+  internal func `brace{`()
+  public func keep()
+}

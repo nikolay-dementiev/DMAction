@@ -63,70 +63,26 @@ mkdir -p "$WORK"
 # compiler condition (#if ... #endif) stays one block with what it guards: moving either
 # to another declaration is an API change. A declaration whose own access level is
 # private, fileprivate, internal or package is not API: it is dropped with its attribute
-# lines and its body. A build without library evolution prints such stored properties.
+# lines and its block, by indentation, as stated below. A build without library evolution
+# prints such stored properties.
 normalize() {
-    # grep exits 1 when it selects no line, as for an interface without declarations; any
-    # other failure, such as a file it cannot read, stops the normalisation.
-    { grep -v -E '^(//|import |$)' "$1" || [ $? -eq 1 ]; } | python3 -c '
+    # grep numbers every line in the C locale: in a UTF-8 locale it leaves out a line that holds a
+    # byte that is no UTF-8 sequence, and the reader would never see that line. Exit 1 is a file
+    # without lines; any other failure, such as a file it cannot read, stops the normalisation.
+    { LC_ALL=C grep -n '^' "$1" || [ $? -eq 1 ]; } | python3 -c '
+import re
 import sys
 
-def balance(text, opening, closing, state=None):
-    # Characters inside a string literal, such as a message or a return value, or inside a
-    # comment do not count. Block comments nest, so their depth is counted. A block comment
-    # and a multiline string literal can go on over the next lines: the caller passes `state`
-    # to carry them to the next line.
-    # The normaliser balances braces outside comments and plain string literals; a construct
-    # it does not model inside a hidden body stops the check, it is never assumed balanced.
-    # Such a construct is named in `state`: a raw string, whose delimiters and escapes are its
-    # own, and a string interpolation, which holds code and strings of its own.
+def balance(text, opening, closing):
+    # Counts the brackets of the arguments of an attribute, outside string literals.
     total, in_string, position = 0, False, 0
-    comments = state.get("comment", 0) if state else 0
-    multiline = bool(state.get("multiline")) if state else False
     while position < len(text):
-        if comments:
-            if text.startswith("/*", position):
-                comments += 1
-                position += 2
-            elif text.startswith("*/", position):
-                comments -= 1
-                position += 2
-            else:
-                position += 1
-            continue
-        if multiline:
-            if state is not None and text.startswith("\\(", position):
-                state["unmodelled"] = "a string interpolation"
-                break
-            if text[position] == "\\":
-                position += 2
-            elif text.startswith("\"\"\"", position):
-                multiline = False
-                position += 3
-            else:
-                position += 1
-            continue
         character = text[position]
         if in_string:
-            if state is not None and text.startswith("\\(", position):
-                state["unmodelled"] = "a string interpolation"
-                break
             if character == "\\":
                 position += 1
             elif character == "\"":
                 in_string = False
-        elif text.startswith("//", position):
-            break
-        elif text.startswith("/*", position):
-            comments = 1
-            position += 2
-            continue
-        elif state is not None and character == "#" and text[position:].lstrip("#").startswith("\""):
-            state["unmodelled"] = "a raw string literal"
-            break
-        elif text.startswith("\"\"\"", position):
-            multiline = True
-            position += 3
-            continue
         elif character == "\"":
             in_string = True
         elif character == opening:
@@ -134,9 +90,6 @@ def balance(text, opening, closing, state=None):
         elif character == closing:
             total -= 1
         position += 1
-    if state is not None:
-        state["comment"] = comments
-        state["multiline"] = multiline
     return total
 
 def skip_attributes(line):
@@ -172,38 +125,239 @@ def hidden_declaration(line):
             return False
     return False
 
-def refuse_unmodelled(state, line):
-    construct = state.get("unmodelled")
-    if construct:
-        sys.exit("check-api: " + construct + " in a hidden body is not supported: " + line.strip())
+# Every line read must sit where the interface printer puts it, and a declaration that is not
+# API is dropped by its indentation, never by counting its braces. The printer puts the members
+# of a block two spaces deeper than the line that opens it and the closing brace at the
+# indentation of that line; the body of an inlinable declaration it prints as written in the
+# source, so a line of that body, its closing brace included, may sit at any indentation. A
+# hidden declaration at indentation N goes with every following line indented deeper than N
+# and, when its line ends with {, with the next line at indentation N that is exactly }. Any
+# other line must be at the member level of the innermost open block, or be its closing brace;
+# a compiler directive may sit anywhere. A line out of place stops the check with exit 2 and
+# names its number, and so does a directive still open at the end.
+#
+# Each line from a hidden declaration to the end of its drop is checked for shape, and the
+# shape is used only to refuse. The first line is a declaration; each line after it is a
+# declaration, an accessor, a case, a line of attributes, a compiler directive or a lone { or }.
+# A declaration has a declaration keyword after its attributes and modifiers, access levels
+# among them, no = outside parentheses but the one of a typealias or an associatedtype, which
+# names a type, and only plain single-line strings, numbers, nil, true, false or dotted members
+# with balanced parentheses as default arguments. No checked line holds """, #, /* or */, the
+# delimiters of text that spans lines. Any other line is a statement of a serialised body: the
+# check stops with exit 2 and names its number. The shape decides nothing else: no brace is
+# counted, and the drop still goes by indentation alone.
+#
+# Why this closes the family. A public member is lost only inside the drop of a hidden line
+# that sits shallower, every line between them deeper than that line. Were the hidden line
+# text of a multiline literal, the literal would close after it and before the member, which
+# stands outside every body: on a line inside the drop, whose delimiter stops the check, or on
+# a line no deeper than the hidden one, which ends the drop first. So the hidden line is code,
+# and code of a body never passes as a hidden declaration: a local declaration takes no access
+# level, the compiler nests no type in a body, a default argument or an initial value that the
+# interface prints, and a statement, even one that starts with a variable named package, has no
+# declaration keyword where a declaration has one. A hidden declaration of the printer drops
+# nothing past its own block, because the printer puts the line after that block at its
+# indentation or shallower. A crafted line that the shape accepts changes nothing, because
+# nothing on it is counted.
+DIRECTIVES = ("#if", "#elseif", "#else", "#endif")
+DECLARATIONS = {"var", "let", "func", "init", "deinit", "subscript", "struct", "class", "enum",
+                "protocol", "extension", "typealias", "associatedtype", "actor"}
+ACCESS_LEVELS = {"open", "public", "package", "internal", "fileprivate", "private"}
+MODIFIERS = {"static", "final", "override", "required", "convenience", "dynamic", "lazy",
+             "optional", "mutating", "nonmutating", "indirect", "weak", "unowned", "nonisolated",
+             "isolated", "consuming", "borrowing", "__consuming", "distributed", "prefix",
+             "postfix", "infix"}
+ACCESSORS = {"get", "set", "_read", "_modify", "unsafeAddress", "unsafeMutableAddress"}
+SPANNING = ("\"\"\"", "/*", "*/", "#")
+WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+RAW_IDENTIFIER = re.compile(r"`[^`]*`")
+OPERATOR_CHARACTERS = set("/=-+!*%<>&|^~?.")
+NUMBER = re.compile(r"-?(0[xX][0-9A-Fa-f_]+|0[bB][01_]+|0[oO][0-7_]+|[0-9][0-9_]*(\.[0-9][0-9_]*)?([eE][+-]?[0-9]+)?)$")
+PLAIN_STRING = re.compile(r"\"([^\"\\]|\\[^(])*\"$")
+STRING = re.compile(r"\"([^\"\\]|\\.)*\"")
+MEMBER = re.compile(r"\.?[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*(\(.*\))?$")
+
+def indentation(line):
+    return len(line) - len(line.lstrip())
+
+def leading_keyword(line):
+    """The first word after the attributes and the modifiers of a line, access levels included."""
+    text = skip_attributes(line).lstrip()
+    while True:
+        word = WORD.match(text)
+        if not word:
+            return ""
+        text = text[word.end():]
+        if word.group() not in ACCESS_LEVELS and word.group() not in MODIFIERS:
+            return word.group()
+        if text.startswith("("):
+            text = text[text.find(")") + 1:] if ")" in text else ""
+        text = text.lstrip()
+
+def assignments(text):
+    """Each = that assigns a value, with the depth of the brackets around it."""
+    found, depth, in_string, position = [], 0, False, 0
+    while position < len(text):
+        character = text[position]
+        if in_string:
+            if character == "\\":
+                position += 1
+            elif character == "\"":
+                in_string = False
+        elif text.startswith("//", position):
+            break
+        elif character == "\"":
+            in_string = True
+        elif character in "([":
+            depth += 1
+        elif character in ")]":
+            depth -= 1
+        elif character == "=":
+            before = text[position - 1] if position > 0 else " "
+            after = text[position + 1] if position + 1 < len(text) else " "
+            if before not in OPERATOR_CHARACTERS and after not in OPERATOR_CHARACTERS:
+                found.append((position, depth))
+        position += 1
+    return found
+
+def default_value(text, start):
+    """The default argument that starts at `start`: up to the next comma or closing bracket."""
+    depth, in_string, position = 0, False, start
+    while position < len(text):
+        character = text[position]
+        if in_string:
+            if character == "\\":
+                position += 1
+            elif character == "\"":
+                in_string = False
+        elif character == "\"":
+            in_string = True
+        elif character in "([":
+            depth += 1
+        elif character in ")]":
+            if depth == 0:
+                break
+            depth -= 1
+        elif character == "," and depth == 0:
+            break
+        position += 1
+    return text[start:position].strip()
+
+def modelled_default(value):
+    if value in ("nil", "true", "false") or NUMBER.match(value) or PLAIN_STRING.match(value):
+        return True
+    outside = STRING.sub("\"\"", value)
+    if not MEMBER.match(outside) or "\\(" in value:
+        return False
+    if any(character in outside for character in "`/#{}\\"):
+        return False
+    return balance(outside, "(", ")") == 0
+
+def readable_in_a_hidden_block(line):
+    text = line.strip()
+    directive = text.startswith(DIRECTIVES)
+    if any(delimiter in (text[1:] if directive else text) for delimiter in SPANNING):
+        return False
+    if directive or text in ("{", "}") or attributes_only(line):
+        return True
+    keyword = leading_keyword(line)
+    if keyword in ACCESSORS or keyword == "case":
+        return True
+    if keyword not in DECLARATIONS:
+        return False
+    # A raw identifier may hold a bracket or an =, and it never holds a backquote.
+    code = RAW_IDENTIFIER.sub("x", skip_attributes(line))
+    for position, depth in assignments(code):
+        if depth > 0:
+            if not modelled_default(default_value(code, position + 1)):
+                return False
+        elif keyword not in ("typealias", "associatedtype"):
+            return False
+    return True
+
+def refuse(number, line):
+    sys.exit("check-api: line " + str(number) + " is a statement of a serialised body: " + line.strip())
 
 def public_lines(lines):
-    kept, held, depth, state = [], [], 0, {"comment": 0, "multiline": False}
-    for line in lines:
-        if depth > 0:
-            depth += balance(line, "{", "}", state)
-            refuse_unmodelled(state, line)
+    kept, held, blocks, conditions, position = [], [], [], 0, 0
+    while position < len(lines):
+        number, line = lines[position]
+        position += 1
+        directive = line.lstrip()
+        if directive.startswith(DIRECTIVES):
+            if directive.startswith("#if"):
+                conditions += 1
+            elif directive.startswith("#endif"):
+                conditions -= 1
+            kept.extend(held)
+            held = []
+            kept.append(line)
             continue
+        level = indentation(line)
+        if blocks and level == blocks[-1] and line.strip() == "}":
+            blocks.pop()
+            kept.extend(held)
+            held = []
+            kept.append(line)
+            continue
+        if level != (blocks[-1] + 2 if blocks else 0):
+            sys.exit("check-api: line " + str(number) + " is not where the interface printer puts it: " + line.strip())
         if line.strip() and attributes_only(line):
             held.append(line)
             continue
         if hidden_declaration(line):
+            if leading_keyword(line) not in DECLARATIONS or not readable_in_a_hidden_block(line):
+                refuse(number, line)
             held = []
-            state["comment"] = 0
-            state["multiline"] = False
-            depth = balance(line, "{", "}", state)
-            refuse_unmodelled(state, line)
+            while position < len(lines) and indentation(lines[position][1]) > level:
+                if not readable_in_a_hidden_block(lines[position][1]):
+                    refuse(*lines[position])
+                position += 1
+            if (line.rstrip().endswith("{") and position < len(lines)
+                    and indentation(lines[position][1]) == level and lines[position][1].strip() == "}"):
+                position += 1
             continue
         kept.extend(held)
         held = []
         kept.append(line)
-    # A body still open here would have hidden everything after it.
-    if depth > 0:
-        sys.exit("check-api: a hidden body is still open where the interface ends")
+        if line.rstrip().endswith("{"):
+            blocks.append(level)
+    if conditions != 0:
+        sys.exit("check-api: a compiler directive is still open at the end of the interface")
     return kept + held
 
+# grep numbers every line of the interface, and the text is cut at the line feed alone, so that
+# each piece but the empty one after the last line feed is one numbered line. str.splitlines
+# would cut at more characters, among them the line breaks below, which grep leaves inside a
+# line: text after one of them, in a string of a body, would read as a line of its own under a
+# number the text wrote itself. The check refuses each of them on any line, comments and imports
+# included, and it never uses str.splitlines. The interface is read as bytes and decoded as
+# UTF-8, and written as UTF-8, whatever the locale says: a locale that took its bytes for other
+# characters would let a line separator pass.
+LINE_BREAK = re.compile("[\r\x0b\x0c\x85\N{LINE SEPARATOR}\N{PARAGRAPH SEPARATOR}]")
+try:
+    text = sys.stdin.buffer.read().decode("utf-8")
+except UnicodeDecodeError as error:
+    sys.exit("check-api: the interface is not valid UTF-8: " + str(error))
+sys.stdout.reconfigure(encoding="utf-8")
+
+numbered = []
+records = text.split("\n")
+if records.pop() != "":
+    sys.exit("check-api: the numbered text is not ended by a line feed")
+for record in records:
+    number, colon, line = record.partition(":")
+    if not colon or not (number.isascii() and number.isdigit()):
+        sys.exit("check-api: not a line numbered by grep: " + record[:60])
+    found = LINE_BREAK.search(line)
+    if found:
+        sys.exit("check-api: line " + number + " holds a line break other than a line feed: U+"
+                 + format(ord(found.group()), "04X"))
+    if line and not line.startswith(("//", "import ")):
+        numbered.append((int(number), line))
+
 blocks, current, conditions = [], [], 0
-for line in public_lines(sys.stdin.read().splitlines()):
+for line in public_lines(numbered):
     starts_declaration = bool(line) and not line[0].isspace() and line != "}"
     if starts_declaration and current and conditions == 0 and not all(attributes_only(held) for held in current):
         blocks.append("\n".join(current))
@@ -234,8 +388,9 @@ if [ "${1:-}" = "--self-test" ]; then
             continue
         fi
         EXPECTED="$(sed -n 's/^# expect: //p' "$CASE")"
-        awk '/^--- A ---$/ { part = "A"; next } /^--- B ---$/ { part = "B"; next } part == "A"' "$CASE" > "$WORK/case-a.txt"
-        awk '/^--- B ---$/ { part = "B"; next } part == "B"' "$CASE" > "$WORK/case-b.txt"
+        # awk reads the cases as bytes, so that no locale stops it on a character of a case.
+        LC_ALL=C awk '/^--- A ---$/ { part = "A"; next } /^--- B ---$/ { part = "B"; next } part == "A"' "$CASE" > "$WORK/case-a.txt"
+        LC_ALL=C awk '/^--- B ---$/ { part = "B"; next } part == "B"' "$CASE" > "$WORK/case-b.txt"
         # A case that expects an error passes when the normalisation of its text A fails with
         # the message the case names: a crash, or another error, must not stand in for it.
         if [ "$EXPECTED" = "error" ]; then
@@ -273,6 +428,43 @@ if [ "${1:-}" = "--self-test" ]; then
         FAILED=1
     else
         echo "check-api: ok   unreadable-input"
+    fi
+    # A file the check cannot read exactly stops the normalisation with a message of its own,
+    # whatever the locale of the caller. grep prints a notice in place of the lines of a file with
+    # a NUL byte, and the notice holds no line number; the path of the second file holds a colon,
+    # so its notice has a part before the colon that is no number either.
+    expect_refused() {
+        if (export LC_ALL="${4:-C}"; normalize "$1") > /dev/null 2> "$WORK/$2.error"; then
+            echo "check-api: FAIL $2: the normalisation succeeded" >&2
+            FAILED=1
+        elif ! grep -qF -- "$3" "$WORK/$2.error"; then
+            echo "check-api: FAIL $2: expected '$3', the normalisation said: $(head -c 300 "$WORK/$2.error")" >&2
+            FAILED=1
+        else
+            echo "check-api: ok   $2"
+        fi
+    }
+    printf 'public struct First {\n  public func keep()\n}\n\000' > "$WORK/binary-input.txt"
+    expect_refused "$WORK/binary-input.txt" binary-input "not a line numbered by grep"
+    mkdir -p "$WORK/colon:dir"
+    printf 'public struct First {\n  public func keep()\n}\n\000' > "$WORK/colon:dir/binary-input.txt"
+    expect_refused "$WORK/colon:dir/binary-input.txt" binary-input-with-a-colon "not a line numbered by grep"
+    # The byte 0377 starts no UTF-8 sequence, whatever the locale of the caller.
+    printf 'public struct First {\n  public func keep(s: Swift.String = "\377")\n}\n' > "$WORK/invalid-utf8.txt"
+    expect_refused "$WORK/invalid-utf8.txt" invalid-utf8 "the interface is not valid UTF-8"
+    # In a UTF-8 locale grep leaves out a line that starts with a byte that is no UTF-8 sequence, so
+    # the normalisation must number the lines in the C locale to see that line at all.
+    printf 'public struct First {\n\377  public func keep()\n}\n' > "$WORK/invalid-utf8-first.txt"
+    expect_refused "$WORK/invalid-utf8-first.txt" invalid-utf8-at-a-line-start "the interface is not valid UTF-8" en_US.UTF-8
+    # The text is written as UTF-8 whatever the output stream encodes. PYTHONIOENCODING sets that
+    # stream, and no locale changes it: a character that Latin-1 cannot hold comes out as the same
+    # UTF-8 bytes in both runs.
+    printf 'public struct Price {\n  public func show(symbol: Swift.String = "\342\202\254")\n}\n' > "$WORK/euro-sign.txt"
+    if normalize "$WORK/euro-sign.txt" > "$WORK/euro-sign.expected" && (export PYTHONIOENCODING=latin-1; normalize "$WORK/euro-sign.txt") > "$WORK/euro-sign.latin1" 2> "$WORK/euro-sign.error" && cmp -s "$WORK/euro-sign.expected" "$WORK/euro-sign.latin1"; then
+        echo "check-api: ok   output-encoding"
+    else
+        echo "check-api: FAIL output-encoding: the Latin-1 stream differs or stopped: $(head -c 300 "$WORK/euro-sign.error")" >&2
+        FAILED=1
     fi
     exit "$FAILED"
 fi

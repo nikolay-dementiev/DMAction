@@ -1,19 +1,19 @@
 # expect: error
-# message: line 3 is a statement of a serialised body: package static func helper(_ text: Swift.String = "\("{")")
+# message: line 3 is a statement of a serialised body: package static func matches(_ pattern: Regex<Substring> = #/\{/#) -> Swift.Bool
 # A line of a hidden block must have the shape of a declaration, an accessor, a case, an
 # attribute, a compiler directive or a lone brace. A statement of a serialised body stops the
 # check at its line, before any text of the body can leak.
-# Here a default argument holds an interpolation, which is no value the check models.
+# Here a default argument holds a regex literal, which is no value the check models.
 --- A ---
 public struct First {
   package enum Hidden {
-    package static func helper(_ text: Swift.String = "\("{")")
+    package static func matches(_ pattern: Regex<Substring> = #/\{/#) -> Swift.Bool
   }
   public func visible()
 }
 --- B ---
 public struct First {
   package enum Hidden {
-    package static func helper(_ text: Swift.String = "\("{")")
+    package static func matches(_ pattern: Regex<Substring> = #/\{/#) -> Swift.Bool
   }
 }

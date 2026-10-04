@@ -1,0 +1,14 @@
+# expect: same
+# A hidden initialiser may carry the default arguments the normaliser models: a plain string,
+# a brace in it included, and a dotted member with balanced parentheses. Changing them changes
+# nothing public.
+--- A ---
+public struct First {
+  package init(name: Swift.String = "{", direction: DMVariableBlurView.DMVariableBlurDirection = .blurredCenterClearTopBottom())
+  public func visible()
+}
+--- B ---
+public struct First {
+  package init(name: Swift.String = "}", direction: DMVariableBlurView.DMVariableBlurDirection = .blurredTopClearBottom)
+  public func visible()
+}

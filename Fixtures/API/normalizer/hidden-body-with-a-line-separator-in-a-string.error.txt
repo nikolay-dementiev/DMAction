@@ -1,0 +1,19 @@
+# expect: error
+# message: line 2 holds a line break other than a line feed: U+2028
+# grep numbers the lines of the interface at line feeds alone, and a string of an inlinable
+# body may hold a line separator, U+2028, which the printer copies from the source. A reader
+# that also breaks lines there takes the text after each one for a line of its own, under a
+# number the text writes itself: here a brace that closes the type, then a hidden type whose
+# drop swallows the public members, so that the removal of one would pass. A line break other
+# than a line feed stops the check at the line that holds it.
+--- A ---
+public struct First {
+  @inlinable internal func helper() -> Swift.String { return "x 0:} 0:internal struct Phantom { 0:  get" }
+  public func removedLater()
+  public func keep()
+}
+--- B ---
+public struct First {
+  @inlinable internal func helper() -> Swift.String { return "x 0:} 0:internal struct Phantom { 0:  get" }
+  public func keep()
+}

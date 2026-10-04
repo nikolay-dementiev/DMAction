@@ -1,0 +1,13 @@
+# expect: same
+# The = of a hidden typealias names a type, not a value: the line is a declaration, and
+# changing the type changes nothing public.
+--- A ---
+public struct First {
+  package typealias Body = Swift.Int
+  public func visible()
+}
+--- B ---
+public struct First {
+  package typealias Body = Swift.String
+  public func visible()
+}

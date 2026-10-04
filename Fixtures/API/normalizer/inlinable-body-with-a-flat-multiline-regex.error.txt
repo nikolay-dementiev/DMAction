@@ -1,0 +1,22 @@
+# expect: error
+# message: line 3 is a statement of a serialised body: return "x".contains(#/
+# A multiline regex laid out flat leaks a line of a hidden body at column 0 that reads like a
+# hidden declaration. The type holds no line there, so the check stops at it instead of
+# starting a drop that would swallow the public members after the body.
+--- A ---
+public struct First {
+  @inlinable internal func helper() -> Swift.Bool {
+    return "x".contains(#/
+internal
+    /#)
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+  @inlinable internal func helper() -> Swift.Bool {
+    return "x".contains(#/
+internal
+    /#)
+  }
+}

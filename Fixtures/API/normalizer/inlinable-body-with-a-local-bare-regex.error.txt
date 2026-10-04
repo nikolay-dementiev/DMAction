@@ -1,0 +1,21 @@
+# expect: error
+# message: line 3 is a statement of a serialised body: let _ = /\{/
+# A line of a hidden block must have the shape of a declaration, an accessor, a case, an
+# attribute, a compiler directive or a lone brace. A statement of a serialised body stops the
+# check at its line, before any text of the body can leak.
+# Here a local declaration assigns a bare regex literal.
+--- A ---
+public struct First {
+  @inlinable internal func helper() {
+    let _ = /\{/
+  }
+  public func removedLater()
+  public func keep()
+}
+--- B ---
+public struct First {
+  @inlinable internal func helper() {
+    let _ = /\{/
+  }
+  public func keep()
+}

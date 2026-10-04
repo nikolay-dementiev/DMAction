@@ -1,0 +1,23 @@
+# expect: same
+# A hidden body made of declarations alone, a lone brace among them, has the shape of an
+# interface: it goes with its declaration, and changing it changes nothing public.
+--- A ---
+public struct First {
+  @inlinable internal func helper() {
+    struct Local {}
+    func step()
+    {
+    }
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+  @inlinable internal func helper() {
+    struct Other {}
+    func step()
+    {
+    }
+  }
+  public func visible()
+}

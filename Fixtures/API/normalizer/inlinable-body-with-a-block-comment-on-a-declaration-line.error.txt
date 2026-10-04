@@ -1,0 +1,20 @@
+# expect: error
+# message: line 3 is a statement of a serialised body: func y() /*
+# A line of a hidden block may not hold the delimiter of text that spans lines. Here a comment
+# opened after a local function would close the type and start a hidden type at column 0
+# whose drop takes the public members, and the line that closes the comment has the shape of a
+# declaration. The printer leaves comments out of the bodies it prints; the rule does not rely
+# on that.
+--- A ---
+public struct First {
+  @inlinable internal func helper() {
+    func y() /*
+}
+internal struct Phantom {
+    func x() */ {}
+  }
+  public func visible()
+}
+--- B ---
+public struct First {
+}

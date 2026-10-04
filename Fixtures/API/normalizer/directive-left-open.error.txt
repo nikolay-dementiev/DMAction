@@ -1,0 +1,13 @@
+# expect: error
+# message: a compiler directive is still open
+# A compiler directive without its #endif is not text the printer writes: the check stops
+# instead of comparing it.
+--- A ---
+public struct First {
+  #if compiler(>=5.3)
+  public func visible()
+}
+--- B ---
+public struct First {
+  public func visible()
+}
