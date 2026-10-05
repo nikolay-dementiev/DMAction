@@ -9,6 +9,7 @@ Compose completion-based actions with retries and fallbacks, and get one result 
 [![Commit activity](https://img.shields.io/github/commit-activity/y/nikolay-dementiev/DMAction)](https://github.com/nikolay-dementiev/DMAction/graphs/commit-activity)
 [![Last commit](https://img.shields.io/github/last-commit/nikolay-dementiev/DMAction)](https://github.com/nikolay-dementiev/DMAction/commits/main/)
 [![DeepSource](https://app.deepsource.com/gh/nikolay-dementiev/DMAction.svg/?label=active+issues&show_trend=true)](https://app.deepsource.com/gh/nikolay-dementiev/DMAction/)
+[![Codecov](https://codecov.io/gh/nikolay-dementiev/DMAction/branch/main/graph/badge.svg)](https://codecov.io/gh/nikolay-dementiev/DMAction)
 
 <p align="center">
   <img src="./Documentation/DMAction-main.svg?raw=true" alt="DMAction: compose actions, retry and fall back, with one result per run. Three panels: Action with a play button, Retry with a circular arrow, and Fallback with a bent arrow." style="max-height: 400px; aspect-ratio: 1536/1024; object-fit: scale-down;">
@@ -334,5 +335,14 @@ DMAction is one of three packages that share their conventions:
 - DMAction is available under the MIT License. See [LICENSE](LICENSE).
 - [The Challenges of Retry Logic and Fallback Mechanisms in App Development](Documentation/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md),
   an article about the ideas behind the package.
+
+<sub><strong>Codecov Snapshot</strong></sub><br/>
+<a href="https://codecov.io/gh/nikolay-dementiev/DMAction">
+  <img
+    src="https://codecov.io/gh/nikolay-dementiev/DMAction/graphs/icicle.svg"
+    height="80"
+    alt="Code coverage snapshot by file and module (Codecov tree graph)"
+  />
+</a>
 
 ![Visitors](https://api.visitorbadge.io/api/visitors?path=https%3A%2F%2Fgithub.com%2Fnikolay-dementiev%2FDMAction)
