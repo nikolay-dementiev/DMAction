@@ -1,0 +1,6 @@
+# The existing coverage-gate.sh remains the coverage requirement for CI.
+coverage:
+  status:
+    project: false
+    patch: false
+comment: false

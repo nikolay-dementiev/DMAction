@@ -49,6 +49,9 @@ jobs:
     name: test (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -92,6 +95,22 @@ jobs:
             SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
       - name: Coverage
         run: Scripts/coverage-gate.sh "$RUNNER_TEMP/DMAction.xcresult"
+      - name: Check the coverage exporter
+        run: python3 -B Scripts/test-export-coverage.py
+      - name: Export library coverage
+        run: python3 Scripts/export-coverage.py "$RUNNER_TEMP/DMAction.xcresult" DMAction "$RUNNER_TEMP/coverage.lcov"
+      - name: Upload coverage to Codecov
+        # Forks and Dependabot cannot request the OIDC credentials used for this upload.
+        if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          files: ${{ runner.temp }}/coverage.lcov
+          disable_search: true
+          plugins: noop
+          disable_file_fixes: true
+          fail_ci_if_error: true
+          name: library-${{ matrix.name }}
       - name: Upload the result bundle
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
