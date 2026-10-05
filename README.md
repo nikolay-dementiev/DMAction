@@ -6,6 +6,7 @@ Compose completion-based actions with retries and fallbacks, and get one result 
 [![Swift 6.0+](https://img.shields.io/badge/Swift-6.0%2B-orange?style=flat-square)](#requirements)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_7%2B-yellowgreen?style=flat-square)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction?ref=badge_shield)
 [![Commit activity](https://img.shields.io/github/commit-activity/y/nikolay-dementiev/DMAction)](https://github.com/nikolay-dementiev/DMAction/graphs/commit-activity)
 [![Last commit](https://img.shields.io/github/last-commit/nikolay-dementiev/DMAction)](https://github.com/nikolay-dementiev/DMAction/commits/main/)
 [![DeepSource](https://app.deepsource.com/gh/nikolay-dementiev/DMAction.svg/?label=active+issues&show_trend=true)](https://app.deepsource.com/gh/nikolay-dementiev/DMAction/)
@@ -335,6 +336,8 @@ DMAction is one of three packages that share their conventions:
 - DMAction is available under the MIT License. See [LICENSE](LICENSE).
 - [The Challenges of Retry Logic and Fallback Mechanisms in App Development](Documentation/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md),
   an article about the ideas behind the package.
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction?ref=badge_large)
 
 <sub><strong>Codecov Snapshot</strong></sub><br/>
 <a href="https://codecov.io/gh/nikolay-dementiev/DMAction">
