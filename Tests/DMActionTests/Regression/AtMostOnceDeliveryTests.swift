@@ -163,6 +163,8 @@ final class AtMostOnceDeliveryTests: XCTestCase {
     func test_run_whenTheConsumerWaitsForALateCompletionFromAnotherThread_doesNotHoldItUp() throws {
         let sut = makeSUT(producer: [.hold])
         var lateCompletion: DispatchTimeoutResult?
+        // A passing run returns as soon as the completion returns; only a locked run waits the budget.
+        let lateCompletionBudget: DispatchTimeInterval = .seconds(10)
         // A retry, so that a late failure the run did not ignore would call the producer again.
         sut.producer.action.retry(1).action { result in
             sut.consumer.receive(result)
@@ -170,12 +172,12 @@ final class AtMostOnceDeliveryTests: XCTestCase {
                 return
             }
             let returned = DispatchSemaphore(value: 0)
-            BackgroundCaller {
+            BackgroundCaller(qualityOfService: .userInitiated) {
                 held(.failure(MarkedError()))
                 returned.signal()
             }
             .start()
-            lateCompletion = returned.wait(timeout: .now() + 2)
+            lateCompletion = returned.wait(timeout: .now() + lateCompletionBudget)
         }
         let completion = try XCTUnwrap(sut.producer.heldCompletions.first, "the producer kept its completion")
 
