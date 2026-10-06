@@ -9,6 +9,7 @@ import XCTest
 /// audit reports is not an error: it goes through the audit's issue handler, and that is
 /// no reason to run the audit again. Each timeout that is run again is recorded as an activity
 /// of the test, so a passing run still shows it in the result bundle.
+@MainActor
 struct AccessibilityAuditRetry {
     /// The first run and at most two more, so an audit that times out every time still ends.
     static let attemptLimit = 3

@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 
 final class AccessibilityAuditRetryTests: XCTestCase {
+    @MainActor
     func test_perform_whenTheAuditTimesOutTwiceThenPasses_runsItThreeTimes() throws {
         let sut = makeSUT()
         var runs = 0
@@ -16,6 +17,7 @@ final class AccessibilityAuditRetryTests: XCTestCase {
         XCTAssertEqual(runs, 3, "two timeouts are run again, and the third run passes")
     }
 
+    @MainActor
     func test_perform_whenEveryRunTimesOut_throwsTheLastTimeoutAfterThreeRuns() {
         let sut = makeSUT()
         var runs = 0
@@ -29,6 +31,7 @@ final class AccessibilityAuditRetryTests: XCTestCase {
         XCTAssertEqual(runs, 3, "three runs in all, and then the timeout is thrown")
     }
 
+    @MainActor
     func test_perform_whenTheAuditFailsWithAnotherError_throwsItAfterOneRun() {
         let sut = makeSUT()
         var runs = 0
@@ -42,6 +45,7 @@ final class AccessibilityAuditRetryTests: XCTestCase {
         XCTAssertEqual(runs, 1, "an error that is not a timeout is not run again")
     }
 
+    @MainActor
     func test_perform_whenTheErrorHasTheTimeoutCodeInAnotherDomain_throwsItAfterOneRun() {
         let sut = makeSUT()
         var runs = 0
@@ -55,6 +59,7 @@ final class AccessibilityAuditRetryTests: XCTestCase {
         XCTAssertEqual(runs, 1, "the domain is part of the check: an error of another domain is not run again")
     }
 
+    @MainActor
     func test_perform_whenTheAuditDomainHasAnotherCode_throwsItAfterOneRun() {
         let sut = makeSUT()
         var runs = 0
@@ -68,6 +73,7 @@ final class AccessibilityAuditRetryTests: XCTestCase {
         XCTAssertEqual(runs, 1, "the code is part of the check: an audit error with another code is not run again")
     }
 
+    @MainActor
     func test_perform_whenTheAuditReturns_runsItOnce() throws {
         let sut = makeSUT()
         var runs = 0
@@ -81,6 +87,7 @@ final class AccessibilityAuditRetryTests: XCTestCase {
 
     // MARK: - Helpers
 
+    @MainActor
     private func makeSUT() -> AccessibilityAuditRetry {
         AccessibilityAuditRetry()
     }
