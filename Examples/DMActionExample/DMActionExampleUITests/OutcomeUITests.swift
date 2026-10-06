@@ -5,7 +5,7 @@ final class OutcomeUITests: XCTestCase {
     func test_launch_passesEveryAccessibilityAudit() throws {
         let app = makeSUT()
 
-        try app.performAccessibilityAudit()
+        try audit(app)
     }
 
     @MainActor
@@ -19,7 +19,7 @@ final class OutcomeUITests: XCTestCase {
         // At the largest text sizes the longer outcome pushes the footer out of view, and the audit
         // reports a text it cannot see as not scaling, whatever its font. Dynamic Type is audited
         // at launch instead, where every text stays in view.
-        try app.performAccessibilityAudit(for: .all.subtracting(.dynamicType))
+        try audit(app, for: .all.subtracting(.dynamicType))
     }
 
     // MARK: - Helpers
@@ -30,5 +30,13 @@ final class OutcomeUITests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
         return app
+    }
+
+    /// Both tests audit through here, so a timeout of the audit is run again the same way in each.
+    @MainActor
+    private func audit(_ app: XCUIApplication, for auditTypes: XCUIAccessibilityAuditType = .all) throws {
+        try AccessibilityAuditRetry().perform {
+            try app.performAccessibilityAudit(for: auditTypes)
+        }
     }
 }
