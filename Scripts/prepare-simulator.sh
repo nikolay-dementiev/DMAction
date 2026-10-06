@@ -30,7 +30,16 @@ fail() {
     exit 1
 }
 
-if [ "$#" -ne 2 ] || [ -z "$1" ] || ! [[ "$2" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+# A version is digits and dots: it starts and ends with a digit and has no doubled dot. A case
+# pattern, because a regular-expression match is undefined in POSIX sh.
+valid_version() {
+    case "$1" in
+        '' | .* | *. | *..* | *[!0123456789.]*) return 1 ;;
+    esac
+    return 0
+}
+
+if [ "$#" -ne 2 ] || [ -z "$1" ] || ! valid_version "$2"; then
     echo "usage: Scripts/prepare-simulator.sh <device type name> <iOS version>, such as \"iPhone 17\" 26.5" >&2
     exit 2
 fi
