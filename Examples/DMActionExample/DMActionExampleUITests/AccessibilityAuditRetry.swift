@@ -12,14 +12,15 @@ struct AccessibilityAuditRetry {
     static let attemptLimit = 3
 
     func perform(_ audit: () throws -> Void) throws {
-        for attempt in 1...Self.attemptLimit {
+        for _ in 1..<Self.attemptLimit {
             do {
                 try audit()
                 return
-            } catch let error as NSError where Self.isAuditTimeout(error) && attempt < Self.attemptLimit {
+            } catch let error as NSError where Self.isAuditTimeout(error) {
                 continue
             }
         }
+        try audit()
     }
 
     private static func isAuditTimeout(_ error: NSError) -> Bool {
