@@ -60,21 +60,31 @@ jobs:
           - name: iOS 26.5
             runner: macos-26
             xcode: "26.6"
-            destination: platform=iOS Simulator,name=iPhone 17,OS=26.5
+            device: iPhone 17
+            os: "26.5"
           # The oldest hosted image and the oldest iOS runtime it offers.
           - name: iOS 18.5
             runner: macos-15
             xcode: "16.4"
-            destination: platform=iOS Simulator,name=iPhone 16,OS=18.5
+            device: iPhone 16
+            os: "18.5"
     env:
       XCODE: ${{ matrix.xcode }}
-      DESTINATION: ${{ matrix.destination }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Select Xcode
         run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
+      # The udid names the device, not a name and an OS: a hosted image can list a runtime with
+      # no device in it, and the script creates the device then.
+      - name: Prepare the simulator
+        env:
+          DEVICE: ${{ matrix.device }}
+          OS: ${{ matrix.os }}
+        run: |
+          udid="$(Scripts/prepare-simulator.sh "$DEVICE" "$OS")"
+          echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
       # The tests build in Debug. Code that only a Release build compiles is built here.
       - name: Build the library in Release
         run: |
@@ -89,7 +99,7 @@ jobs:
           xcodebuild test \
             -scheme DMAction \
             -sdk iphonesimulator \
-            -destination "$DESTINATION" \
+            -destination "platform=iOS Simulator,id=$SIMULATOR" \
             -enableCodeCoverage YES \
             -resultBundlePath "$RUNNER_TEMP/DMAction.xcresult" \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
@@ -143,8 +153,6 @@ jobs:
             newest: false
     env:
       XCODE: ${{ matrix.xcode }}
-      DEVICE: ${{ matrix.device }}
-      OS: ${{ matrix.os }}
     defaults:
       run:
         working-directory: example-checkout
@@ -158,18 +166,13 @@ jobs:
         run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
       # The first launch on a simulator that is still booting can fail to install the test
       # runner, so the simulator is booted and ready before the tests start.
-      - name: Boot the simulator
+      - name: Prepare the simulator
+        env:
+          DEVICE: ${{ matrix.device }}
+          OS: ${{ matrix.os }}
         run: |
-          RUNTIME="com.apple.CoreSimulator.SimRuntime.iOS-${OS//./-}"
-          UDID="$(xcrun simctl list devices available -j \
-            | jq -r --arg runtime "$RUNTIME" --arg name "$DEVICE" '.devices[$runtime][]? | select(.name == $name) | .udid' \
-            | head -1)"
-          if [ -z "$UDID" ]; then
-            echo "No $DEVICE with iOS $OS on this runner." >&2
-            exit 1
-          fi
-          xcrun simctl bootstatus "$UDID" -b
-          echo "SIMULATOR=$UDID" >> "$GITHUB_ENV"
+          udid="$(Scripts/prepare-simulator.sh "$DEVICE" "$OS")"
+          echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
       - name: Build the example and run its tests
         run: |
           set -o pipefail
