@@ -23,8 +23,8 @@ final class AccessibilityAuditRetryTests: XCTestCase {
         XCTAssertThrowsError(try sut.perform {
             runs += 1
             throw auditTimeout(run: runs)
-        }) { error in
-            XCTAssertEqual((error as NSError).userInfo["run"] as? Int, 3, "the timeout of the third run is the one thrown")
+        }, "three runs time out, and the call throws") { error in
+            XCTAssertEqual((error as NSError).userInfo["run"] as? Int, 3, "the error thrown is the one of the third run")
         }
         XCTAssertEqual(runs, 3, "three runs in all, and then the timeout is thrown")
     }
@@ -36,10 +36,36 @@ final class AccessibilityAuditRetryTests: XCTestCase {
         XCTAssertThrowsError(try sut.perform {
             runs += 1
             throw OtherAuditFailure()
-        }) { error in
+        }, "an error that is not a timeout is thrown") { error in
             XCTAssertEqual(error as? OtherAuditFailure, OtherAuditFailure(), "the error is thrown as it is")
         }
         XCTAssertEqual(runs, 1, "an error that is not a timeout is not run again")
+    }
+
+    func test_perform_whenTheErrorHasTheTimeoutCodeInAnotherDomain_throwsItAfterOneRun() {
+        let sut = makeSUT()
+        var runs = 0
+
+        XCTAssertThrowsError(try sut.perform {
+            runs += 1
+            throw NSError(domain: "DMActionExampleUITests.Other", code: -56)
+        }, "a code of -56 in another domain is thrown at once") { error in
+            XCTAssertEqual((error as NSError).domain, "DMActionExampleUITests.Other", "the error is thrown as it is")
+        }
+        XCTAssertEqual(runs, 1, "the domain is part of the check: an error of another domain is not run again")
+    }
+
+    func test_perform_whenTheAuditDomainHasAnotherCode_throwsItAfterOneRun() {
+        let sut = makeSUT()
+        var runs = 0
+
+        XCTAssertThrowsError(try sut.perform {
+            runs += 1
+            throw NSError(domain: "com.apple.xcode.xctest.accessibilityAudit", code: -57)
+        }, "an audit error with another code is thrown at once") { error in
+            XCTAssertEqual((error as NSError).code, -57, "the error is thrown as it is")
+        }
+        XCTAssertEqual(runs, 1, "the code is part of the check: an audit error with another code is not run again")
     }
 
     func test_perform_whenTheAuditReturns_runsItOnce() throws {
@@ -50,7 +76,7 @@ final class AccessibilityAuditRetryTests: XCTestCase {
             runs += 1
         }
 
-        XCTAssertEqual(runs, 1, "an audit that returns, with or without the issues it reported, is not run again")
+        XCTAssertEqual(runs, 1, "an audit that returns is not run again")
     }
 
     // MARK: - Helpers
