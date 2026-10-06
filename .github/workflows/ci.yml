@@ -102,6 +102,8 @@ jobs:
       - name: Upload coverage to Codecov
         # Forks and Dependabot cannot request the OIDC credentials used for this upload.
         if: github.actor != 'dependabot[bot]' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        # Codecov is a report, not a gate: an outage or a failed token request must not fail the job.
+        continue-on-error: true
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           use_oidc: true
@@ -109,7 +111,7 @@ jobs:
           disable_search: true
           plugins: noop
           disable_file_fixes: true
-          fail_ci_if_error: true
+          fail_ci_if_error: false
           name: library-${{ matrix.name }}
       - name: Upload the result bundle
         if: failure()
