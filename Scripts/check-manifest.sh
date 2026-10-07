@@ -48,7 +48,7 @@ REJECTED_BUILD=""
 # has returned, so a removal is tried three times. A folder that stays is reported; it does
 # not change the result of the checks.
 # shellcheck disable=SC2329  # invoked by the trap below
-cleanup() {
+cleanup() {  # The EXIT trap below calls it. skipcq: SH-2329
     local folder
     for folder in "$PROBE" "$DERIVED" "$REJECTED_BUILD"; do
         [ -n "$folder" ] || continue

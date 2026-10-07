@@ -22,7 +22,19 @@ if [ "${1:-}" = "--notes" ]; then
     shift
 fi
 VERSION="${1:-}"
-if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+
+# The checks of this script are case patterns, because a regular-expression match is undefined
+# in POSIX sh. A version is three groups of digits joined by dots, such as 1.1.0: nothing but
+# digits and dots, no leading, trailing or doubled dot, and exactly two dots.
+valid_version() {
+    case "$1" in
+        '' | .* | *. | *..* | *[!0123456789.]* | *.*.*.*) return 1 ;;
+        *.*.*) return 0 ;;
+    esac
+    return 1
+}
+
+if ! valid_version "$VERSION"; then
     echo "usage: Scripts/check-release.sh [--notes] <version>, a version such as 1.1.0" >&2
     exit 2
 fi
@@ -63,13 +75,25 @@ if [ "$PODSPEC_VERSION" != "$VERSION" ]; then
     PROBLEMS+=("the podspec names version '$PODSPEC_VERSION', not $VERSION")
 fi
 
+# A release date is four digits, a dash, two digits, a dash and two digits, such as 2026-10-03.
+# Whether that day exists is asked of python3 below.
+valid_date_form() {
+    case "$1" in
+        [0123456789][0123456789][0123456789][0123456789]-[0123456789][0123456789]-[0123456789][0123456789]) return 0 ;;
+    esac
+    return 1
+}
+
+# The version and the date of the newest release heading, '## [version] - date'. sed prints them
+# only when the whole heading has that form, and it reads the heading as bytes, so that no locale
+# stops it on a character of the heading. A heading with an empty version does not have the form.
 NEWEST="$(grep -m 1 -E '^## \[' "$CHANGELOG" || true)"
-if [[ "$NEWEST" =~ ^##\ \[([^]]+)\]\ -\ (.*)$ ]]; then
-    HEADING_VERSION="${BASH_REMATCH[1]}"
-    HEADING_DATE="${BASH_REMATCH[2]}"
+HEADING_VERSION="$(printf '%s\n' "$NEWEST" | LC_ALL=C sed -n 's/^## \[\([^]]*\)\] - \(.*\)$/\1/p')"
+HEADING_DATE="$(printf '%s\n' "$NEWEST" | LC_ALL=C sed -n 's/^## \[\([^]]*\)\] - \(.*\)$/\2/p')"
+if [ -n "$HEADING_VERSION" ]; then
     if [ "$HEADING_VERSION" != "$VERSION" ]; then
         PROBLEMS+=("the newest changelog heading is for $HEADING_VERSION, not $VERSION")
-    elif ! [[ "$HEADING_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    elif ! valid_date_form "$HEADING_DATE"; then
         PROBLEMS+=("the changelog heading of $VERSION has '$HEADING_DATE' where the release date belongs")
     elif ! python3 -c 'import datetime, sys; datetime.date.fromisoformat(sys.argv[1])' "$HEADING_DATE" 2> /dev/null; then
         PROBLEMS+=("the changelog heading of $VERSION has '$HEADING_DATE', which is not a day of the calendar")
