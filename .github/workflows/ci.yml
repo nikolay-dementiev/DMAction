@@ -32,6 +32,9 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - name: Lint
         run: Scripts/lint.sh
+      # A rule that never matches reports nothing, so the fixtures prove that each one fires.
+      - name: Check that the lint rules fire
+        run: Scripts/check-lint-contract.sh
       # The analyzer rules, unused_import among them, read the compiler invocations of a full build.
       - name: Build the library for the analyzer
         run: |
