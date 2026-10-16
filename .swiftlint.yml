@@ -51,7 +51,7 @@ custom_rules:
   no_process_termination:
     name: "No process termination"
     included: "Sources/.*\\.swift"
-    regex: '\b(fatalError|preconditionFailure|assertionFailure|precondition|assert|abort|exit)\s*\('
+    regex: '\b(fatalError|preconditionFailure|assertionFailure|precondition|assert|dispatchPrecondition|abort|exit)\s*\('
     match_kinds:
       - identifier
     message: "A library never terminates its host. Report the failure to the caller."
