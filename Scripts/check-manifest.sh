@@ -134,8 +134,8 @@ url, version = requirements[0]
 spec = open(podspec, encoding="utf-8").read()
 spec_url = re.search(r":git\s*=>\s*'([^']+)'", spec)
 # The pod is frozen, so the podspec no longer follows the releases. The version is that of the
-# newest heading that has the form scripts/check-release.sh reads; a heading without a date,
-# such as Unreleased, is passed over.
+# newest dated release heading, '## [x.y.z] - YYYY-MM-DD'. A heading without a date, such as
+# Unreleased, is passed over: it is a normal state between two releases.
 release = re.search(r"^## \[([0-9]+\.[0-9]+\.[0-9]+)\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$",
                     open(changelog, encoding="utf-8").read(), re.M)
 problems = []
