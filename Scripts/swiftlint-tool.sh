@@ -49,10 +49,10 @@ swiftlint_fetch() {
             --output "$archive.part" || return $?
         mv "$archive.part" "$archive" || return $?
     fi
-    actual="$(shasum -a 256 "$archive" | cut -d ' ' -f 1)"
+    actual="$(shasum -a 256 "$archive" | cut -d ' ' -f 1)" || return $?
     if [ "$actual" != "$SWIFTLINT_CHECKSUM" ]; then
         # A wrong archive must not block every later run: the next one fetches it again.
-        rm -f "$archive"
+        rm -f "$archive" || return $?
         echo "$caller: the SwiftLint $version archive had checksum $actual, expected $SWIFTLINT_CHECKSUM. It was removed." >&2
         return 2
     fi
