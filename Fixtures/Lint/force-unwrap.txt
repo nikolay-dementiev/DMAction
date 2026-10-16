@@ -1,0 +1,6 @@
+let literalURL = URL(string: "https://example.com")! // expect: force_unwrapping
+let literalNSURL = NSURL(string: "https://example.com")! // expect: force_unwrapping
+let literalData = Data(hexString: "00")! // expect: force_unwrapping
+let plain = optionalValue! // expect: force_unwrapping
+let notForced = URL(string: "https://example.com")
+let defaulted = optionalValue ?? 0

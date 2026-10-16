@@ -22,28 +22,9 @@ case "${1:-}" in
 esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="$(sed -n 's/^swiftlint_version: *//p' "$ROOT/.swiftlint.yml")"
-# SHA-256 of portable_swiftlint.zip of that release. It changes together with the version.
-CHECKSUM="c1e429b0599cf1b516f369a2d9ec04eaf0e436f3c12b637df8851fa52ff694d0"
-TOOLS="$ROOT/.build/tools/swiftlint-$VERSION"
-SWIFTLINT="$TOOLS/swiftlint"
-
-# The check is a case pattern, because a regular-expression match is undefined in POSIX sh. A
-# version is three groups of digits joined by dots, such as 0.65.1: nothing but digits and dots,
-# no leading, trailing or doubled dot, and exactly two dots.
-valid_version() {
-    case "$1" in
-        '' | .* | *. | *..* | *[!0123456789.]* | *.*.*.*) return 1 ;;
-        *.*.*) return 0 ;;
-    esac
-    return 1
-}
-
-# The version goes into a path and a URL, so it must be a version and nothing else.
-if ! valid_version "$VERSION"; then
-    echo "lint: .swiftlint.yml must pin swiftlint_version to a version such as 0.65.1, not '$VERSION'" >&2
-    exit 2
-fi
+# shellcheck source=SCRIPTDIR/swiftlint-tool.sh
+. "$ROOT/Scripts/swiftlint-tool.sh"
+VERSION="$(swiftlint_version "$ROOT" lint)"
 
 # A folder of `included` that does not exist drops out of the lint without a word.
 while IFS= read -r FOLDER; do
@@ -54,25 +35,7 @@ while IFS= read -r FOLDER; do
 done < <(awk '/^included:/ { inside = 1; next } inside && /^  - / { sub(/^  - /, ""); print; next } inside { exit }' \
     "$ROOT/.swiftlint.yml")
 
-# The archive is checked on every run and the tool is taken out of it again, so a binary that
-# was put in its place is never run.
-mkdir -p "$TOOLS"
-ARCHIVE="$TOOLS/portable_swiftlint.zip"
-if [ ! -f "$ARCHIVE" ]; then
-    # Fetched under another name, so an interrupted transfer never passes for the archive.
-    curl --fail --silent --show-error --location --retry 3 --proto '=https' --proto-redir '=https' \
-        "https://github.com/realm/SwiftLint/releases/download/$VERSION/portable_swiftlint.zip" \
-        --output "$ARCHIVE.part"
-    mv "$ARCHIVE.part" "$ARCHIVE"
-fi
-ACTUAL="$(shasum -a 256 "$ARCHIVE" | cut -d ' ' -f 1)"
-if [ "$ACTUAL" != "$CHECKSUM" ]; then
-    # A wrong archive must not block every later run: the next one fetches it again.
-    rm -f "$ARCHIVE"
-    echo "lint: the SwiftLint $VERSION archive had checksum $ACTUAL, expected $CHECKSUM. It was removed." >&2
-    exit 2
-fi
-unzip -q -o "$ARCHIVE" swiftlint -d "$TOOLS"
+SWIFTLINT="$(swiftlint_fetch "$ROOT" "$VERSION" lint)"
 
 cd "$ROOT"
 # Not --quiet: the summary names how many files were linted.
