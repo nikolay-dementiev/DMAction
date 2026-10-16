@@ -355,6 +355,42 @@ jobs:
               exit "$status"
               ;;
           esac
+      - name: Check the mapping of the digester result
+        run: Scripts/check-api-digester.sh --self-test
+      # What swift-api-digester finds against the last release, for the reviewer. It blocks at the
+      # release (Scripts/check-release.sh), not here: a break is information on a pull request, and
+      # this step fails only when it cannot compare. The baseline is the newest dated heading of the
+      # changelog that has a tag on origin, because a release pull request has its heading before
+      # its tag. The text is indented as a code block: a line of a fork's source could close a fence.
+      - name: Write what the digester finds against the last release to the job summary
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: |
+          baseline=""
+          while IFS= read -r version; do
+            if git ls-remote --exit-code --tags origin "refs/tags/$version" > /dev/null 2>&1; then
+              baseline="$version"
+              break
+            fi
+          done < <(grep -E '^## \[[0-9]+\.[0-9]+\.[0-9]+\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$' CHANGELOG.md | sed 's/^## \[\([^]]*\)\].*$/\1/')
+          if [ -z "$baseline" ]; then
+            echo "No dated heading of CHANGELOG.md has a tag on origin, so there is no release to compare with." >&2
+            exit 2
+          fi
+          git fetch --no-tags --depth=1 origin "refs/tags/$baseline:refs/tags/$baseline"
+          status=0
+          Scripts/check-api-digester.sh "$baseline" > "$RUNNER_TEMP/digest.txt" 2>&1 || status=$?
+          {
+            echo "### Public API against $baseline, by swift-api-digester"
+            echo
+            sed 's/^/    /' "$RUNNER_TEMP/digest.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+          case "$status" in
+            0 | 1) ;;
+            *)
+              cat "$RUNNER_TEMP/digest.txt" >&2
+              exit "$status"
+              ;;
+          esac
 
   # The pod is frozen at 1.1.0 and nothing goes to the trunk again. The job lints the current
   # sources as a pod; it is also the only watchOS build of the package until a SwiftPM watchOS
