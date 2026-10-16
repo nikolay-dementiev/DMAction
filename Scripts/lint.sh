@@ -22,7 +22,7 @@ case "${1:-}" in
 esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=swiftlint-tool.sh
+# shellcheck source=SCRIPTDIR/swiftlint-tool.sh
 . "$ROOT/Scripts/swiftlint-tool.sh"
 VERSION="$(swiftlint_version "$ROOT" lint)"
 

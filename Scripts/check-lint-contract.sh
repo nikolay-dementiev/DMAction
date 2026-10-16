@@ -38,7 +38,7 @@ FIXTURE_DIR="Fixtures/Lint"
 # ==== End of the settings ===============================================================
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=swiftlint-tool.sh
+# shellcheck source=SCRIPTDIR/swiftlint-tool.sh
 . "$ROOT/Scripts/swiftlint-tool.sh"
 
 fail() {  # <status> <message>
