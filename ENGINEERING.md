@@ -69,7 +69,8 @@ the rules above it would have needed a major version. The rules apply from the r
 ## The package as it is
 
 - **One layer.** The library imports Foundation and, where the module exists, `os`. It has no UI,
-  no third-party dependency and no build plugin.
+  no third-party dependency and no build plugin. `Scripts/lint.sh` enforces the imports: the custom
+  rule `domain_imports` reports any other import in the library folder.
 - **Composition as data.** `fallbackTo` and `retry` build values and run nothing. What an action
   runs is held as data (`ActionPlan`) and one internal type (`ActionRun`) runs it. `retry` stores
   its count and `fallbackTo` joins the steps of its operands into one list, so neither nests a run.
@@ -84,10 +85,16 @@ the rules above it would have needed a major version. The rules apply from the r
 - **Composition root.** The public initializers of the library's actions, `fallbackTo` and `retry`
   create every concrete action. A run creates only its own internal state. There is no global
   configuration and no singleton.
-- **The library never stops its host.** No `fatalError`, `preconditionFailure`, `assert`,
-  `abort` or `exit`, no force unwrap, no `try!` and no `as!`. A failure reaches the caller through
-  the result of the run. `Scripts/lint.sh` enforces this over `Sources`: the custom rule
-  `no_process_termination` and SwiftLint's `force_unwrapping`, `force_try` and `force_cast`.
+- **The library never stops its host.** No `fatalError`, `preconditionFailure`,
+  `assertionFailure`, `precondition`, `assert`, `dispatchPrecondition`, `abort` or `exit`, no force
+  unwrap, no `try!` and no `as!`. A failure reaches the caller through the result of the run.
+  `Scripts/lint.sh` enforces this over `Sources`: the custom rule `no_process_termination` and
+  SwiftLint's `force_unwrapping`, `force_try` and `force_cast`. The force unwrap rule has no
+  exemption for a call with a literal argument, so `URL(string: "...")!` is reported too.
+- **The rules are proved.** A rule that never matches reports nothing, so
+  `Scripts/check-lint-contract.sh` lints the fixtures of `Fixtures/Lint` and proves that
+  `domain_imports`, `force_unwrapping` and `no_process_termination` fire on the lines that expect
+  them and on no other line. CI runs it right after `Scripts/lint.sh`.
 
 ## Toolchain and platforms
 

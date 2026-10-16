@@ -33,6 +33,7 @@ of "Build and test" and of "The example app".
 | Script | What it checks |
 |---|---|
 | `Scripts/lint.sh` | SwiftLint, at the version pinned in `.swiftlint.yml`. The first run fetches that version into `.build/tools` and checks its checksum. `--analyze <xcodebuild log>` also runs the analyzer rules |
+| `Scripts/check-lint-contract.sh` | that the lint rules fire: it lints the fixtures of `Fixtures/Lint` and compares the diagnostics of the import, force unwrap and termination rules with the ones each line expects |
 | `Scripts/check-api.sh` | the public interface against `Fixtures/API/public-interface.txt`. A deliberate change of the public API runs it with `--update` and commits the new baseline in the same commit |
 | `Scripts/check-manifest.sh` | the manifest, the README's installation manifest built by version, the consumer fixture, the podspec and the uses across isolation domains that the compiler must keep rejecting |
 | `Scripts/coverage-gate.sh <result bundle>` | the line coverage of the library |
