@@ -47,17 +47,23 @@ release and its own line in the changelog. A raise that does any of these is bre
 
 The package has no dependency today.
 
-Who checks. The `api` job of CI runs `Scripts/check-api.sh` on every pull request and fails it
-when the public interface differs from the baseline; it also writes the delta against the base of
-the pull request to the job summary. `Scripts/check-release.sh` runs on the version tag, and before
-it by whoever releases: it refuses a version that keeps the major version of the previous release
-when the baseline lost or changed a line since that release, or when the notes of the version have
-a `### Breaking changes` subsection. The pull request template asks for the class, the changes of
-observable behaviour and the release the change needs. The reviewer applies the rest: that the
-baseline changes in the same commit as the declaration; whether an added line adds a requirement
-to a protocol or an overload that makes an existing call ambiguous, which neither script can see;
-and every change of observable behaviour that the notes do not declare, which a test catches only
-where a test pins the behaviour.
+Who checks. The `api` job of CI runs `Scripts/check-api.sh` on every pull request and fails it when
+the public interface differs from the baseline; it also writes to the job summary the delta against
+the base of the pull request and what swift-api-digester finds against the last release.
+`Scripts/check-release.sh` runs on the version tag, and before it by whoever releases: it refuses a
+version that keeps the major version of the previous release when the baseline lost or changed a
+line since that release, when the digester reports a break since that release, or when the notes of
+the version have a `### Breaking changes` subsection. The digester gives a verdict on what the lines
+show only as an added one: a protocol requirement added without a default, a method that an
+extension declares and that becomes a requirement, a narrowed generic requirement. It does not see a
+changed default value, an added associated type with a default or the resolution of an overload,
+which stay with `Scripts/check-api.sh` and review, and it builds for the host only, so an API behind
+`#if os(iOS)` would not be compared (the package has none). A green digester is evidence, not proof.
+The pull request template asks for the class, the changes of observable behaviour and the release
+the change needs. The reviewer applies the rest: that the baseline changes in the same commit as the
+declaration; whether an added line adds an overload that makes an existing call ambiguous, which no
+script sees; and every change of observable behaviour that the notes do not declare, which a test
+catches only where a test pins the behaviour.
 
 ## Deprecation
 
