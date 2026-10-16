@@ -47,9 +47,27 @@ cleanup() {  # The EXIT trap below calls it. skipcq: SH-2329
 }
 trap cleanup EXIT
 
-# The mapping of the result is not written yet: every comparison is a failure.
+# Reads the status and the text of the digester together and exits 0, 1 or 2.
 map_result() {  # <ref> <status>
-    echo "check-api-digester: the mapping of the result is not implemented" >&2
+    local ref="$1" status="$2" pass_line break_line
+    pass_line="$(grep -E '^No breaking changes detected in ' "$WORK/out" | head -1 || true)"
+    break_line="$(grep -E '^[0-9]+ breaking changes? detected in ' "$WORK/out" | head -1 || true)"
+    if [ "$status" -eq 0 ] && [ -n "$pass_line" ] && [ -z "$break_line" ]; then
+        echo "check-api-digester: no break since $ref: $pass_line"
+        exit 0
+    fi
+    if [ "$status" -eq 1 ] && [ -n "$break_line" ] && [ -z "$pass_line" ]; then
+        echo "check-api-digester: ${break_line%:} since $ref"
+        { grep -v -F "$break_line" "$WORK/out" | grep -v -E '^[[:space:]]*$' | sed 's/^/  /'; } || true
+        exit 1
+    fi
+    echo "check-api-digester: could not compare with $ref (status $status):" >&2
+    # The progress of the build and the SwiftPM warning about the docc catalog of the baseline
+    # checkout (two lines) are not the reason.
+    {
+        grep -v -E '^\[[0-9]+/[0-9]+\]|^Building for |^Build complete|^Write |found [0-9]+ file\(s\) which are unhandled|/apidiff/[0-9a-f]+-checkout/' "$WORK/err" || true
+        head -5 "$WORK/out"
+    } | head -20 | sed 's/^/  /' >&2
     exit 2
 }
 
