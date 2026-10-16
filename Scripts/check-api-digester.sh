@@ -224,6 +224,10 @@ case "$SHIM_MODE" in
     break-status-0) echo "1 breaking change detected in Probe:"; echo "  API breakage: x"; exit 0 ;;
     empty-status-0) exit 0 ;;
     empty-status-1) exit 1 ;;
+    both-status-0) echo "No breaking changes detected in Probe"; echo "1 breaking change detected in Probe:"; exit 0 ;;
+    both-status-1) echo "No breaking changes detected in Probe"; echo "1 breaking change detected in Probe:"; exit 1 ;;
+    indented-pass-status-0) echo "  No breaking changes detected in Probe"; exit 0 ;;
+    indented-break-status-1) echo "  1 breaking change detected in Probe:"; exit 1 ;;
 esac
 SHIM
     chmod 755 "$shims/swift"
@@ -233,6 +237,10 @@ SHIM
     check "status 0 with the break header is a failure" 2 "could not compare with v1" env PATH="$shims:$PATH" SHIM_MODE=break-status-0 "$wrapper" v1
     check "status 0 with no text is a failure" 2 "could not compare with v1" env PATH="$shims:$PATH" SHIM_MODE=empty-status-0 "$wrapper" v1
     check "status 1 with no text is a failure" 2 "could not compare with v1" env PATH="$shims:$PATH" SHIM_MODE=empty-status-1 "$wrapper" v1
+    check "both texts at status 0 is a failure" 2 "could not compare with v1" env PATH="$shims:$PATH" SHIM_MODE=both-status-0 "$wrapper" v1
+    check "both texts at status 1 is a failure" 2 "could not compare with v1" env PATH="$shims:$PATH" SHIM_MODE=both-status-1 "$wrapper" v1
+    check "an indented pass line is not a pass" 2 "could not compare with v1" env PATH="$shims:$PATH" SHIM_MODE=indented-pass-status-0 "$wrapper" v1
+    check "an indented break header is not a break" 2 "could not compare with v1" env PATH="$shims:$PATH" SHIM_MODE=indented-break-status-1 "$wrapper" v1
 
     if [ "$failures" -gt 0 ]; then
         echo "check-api-digester: $failures of $total self-test cases failed" >&2
