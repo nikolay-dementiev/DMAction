@@ -23,9 +23,9 @@
 set -euo pipefail
 
 # ==== Settings of this repository =======================================================
-# The packages DMAction, DMVariableBlurView and DMUnLoader share this script. Only this
-# block differs between them. Everything below the end marker is identical in the three:
-# a change there is made in the copy of DMAction and synced to the other two.
+# This block is the only part of the script that is specific to this repository. The body
+# below the end marker names nothing of it, so a repository with another layout changes only
+# these settings.
 
 # The folder of the package layout that the include patterns of the rules name, relative to the
 # repository root. The fixtures are linted as files of this folder.
