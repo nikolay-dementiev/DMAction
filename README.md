@@ -309,7 +309,9 @@ doc comments, compiles as written. `CONTRIBUTING.md` lists the commands.
 
 ## Versions and migration
 
-DMAction follows semantic versioning. `CHANGELOG.md` records every release.
+DMAction follows semantic versioning. `CHANGELOG.md` records every release. From the release after
+1.1.0 on, every change that is not purely additive, in the declarations or in observable
+behaviour, needs a major version; [ENGINEERING.md](ENGINEERING.md) has the rules.
 
 Coming from 1.0.x: no declaration changed, but some behaviour did, and `CHANGELOG.md` lists each
 change with a table. The ones most likely to matter:
@@ -332,6 +334,7 @@ DMAction is one of three packages that share their conventions:
 ## Contributing, security, licence
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to build, test and propose a change.
+- [ENGINEERING.md](ENGINEERING.md): the architecture, and the compatibility and release policy.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability. Not in a public issue.
 - DMAction is available under the MIT License. See [LICENSE](LICENSE).
 - [The Challenges of Retry Logic and Fallback Mechanisms in App Development](Documentation/Article_sdk_for_handling_actions_in_swift_using_retry_and_fallback_feature.md),
