@@ -323,6 +323,9 @@ jobs:
       - name: Public interface against the baseline
         run: Scripts/check-api.sh
 
+  # The pod is frozen at 1.1.0 and nothing goes to the trunk again. The job lints the current
+  # sources as a pod; it is also the only watchOS build of the package until a SwiftPM watchOS
+  # job exists.
   podspec:
     runs-on: macos-26
     timeout-minutes: 20

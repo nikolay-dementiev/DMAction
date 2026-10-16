@@ -81,15 +81,19 @@ check is yours to run before you commit a change to the example's project.
 A release starts from a tag that is the version itself, such as `1.1.0`, on a commit of `main`:
 merge first, then tag. Before the tag is pushed:
 
-1. The podspec names that version, and the newest heading of `CHANGELOG.md` is `## [1.1.0] -` with
-   the release date and the notes under it. `Scripts/check-release.sh 1.1.0` checks them.
+1. The newest heading of `CHANGELOG.md` is `## [<version>] -` with the release date and the notes
+   under it. `Scripts/check-release.sh <version>` checks it. The README's installation manifest
+   asks for the version being released, `from: "<version>"`, and `Scripts/check-manifest.sh`
+   checks it against that heading, so the release pull request updates both together. The podspec
+   stays at 1.1.0, because the pod is frozen.
 2. The library's tests pass on an iOS 17 simulator, the oldest version the package supports. CI's
    oldest runtime is iOS 18.5, so this run is local:
    `xcodebuild test -scheme DMAction -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5'`.
 
 On the tag, the release workflow runs the check, makes sure the tagged commit is on `main`, runs the
 whole CI workflow, makes sure the tag still points at the commit CI tested, and drafts a GitHub
-release from the changelog section. Publishing the release, and the pod, stays a manual step.
+release from the changelog section. Publishing the release stays a manual step, and nothing goes
+to the CocoaPods trunk.
 
 ## Security
 

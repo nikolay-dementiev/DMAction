@@ -10,11 +10,12 @@
 #    with an unstable dependency or an unsafe flag as a dependency by version, a build
 #    plugin of a dependency runs in every consumer's build, and a manifest that reads the
 #    environment describes more than one package.
-# 2. The installation manifest of README.md works. Its URL and version are the podspec's,
-#    and no platform it declares is below the package's. With only its URL pointed at a
-#    throw-away tagged copy of the tracked manifest and sources, it resolves and builds: a
-#    consumer that depends on the checkout by path cannot show a failure of a version
-#    requirement, and only a build shows a wrong product or package name.
+# 2. The installation manifest of README.md works. Its URL is the podspec's, its version is
+#    that of the newest dated release heading of CHANGELOG.md, and no platform it declares is
+#    below the package's. With only its URL pointed at a throw-away tagged copy of the
+#    tracked manifest and sources, it resolves and builds: a consumer that depends on the
+#    checkout by path cannot show a failure of a version requirement, and only a build shows
+#    a wrong product or package name.
 # 3. Fixtures/Consumer builds without a warning. It uses the released public declarations
 #    with their exact types and the shapes the downstream package relies on, so if it
 #    stops building, a consumer's code stops building.
@@ -116,12 +117,12 @@ probe_git() {
 }
 # Writes the consumer's manifest and prints the version the README asks for and the name of
 # the copy.
-if ! ANSWER="$(python3 - "$ROOT/README.md" "$ROOT/$MODULE.podspec" "$PROBE" "$WORK/manifest.json" <<'PY'
+if ! ANSWER="$(python3 - "$ROOT/README.md" "$ROOT/$MODULE.podspec" "$ROOT/CHANGELOG.md" "$PROBE" "$WORK/manifest.json" <<'PY'
 import json
 import re
 import sys
 
-readme, podspec, probe, package_manifest = sys.argv[1:5]
+readme, podspec, changelog, probe, package_manifest = sys.argv[1:6]
 blocks = re.findall(r"^```swift\n(.*?)^```$", open(readme, encoding="utf-8").read(), re.S | re.M)
 manifests = [block for block in blocks if "Package(" in block]
 if len(manifests) != 1:
@@ -132,12 +133,18 @@ if len(requirements) != 1:
 url, version = requirements[0]
 spec = open(podspec, encoding="utf-8").read()
 spec_url = re.search(r":git\s*=>\s*'([^']+)'", spec)
-spec_version = re.search(r"\.version\s*=\s*'([^']+)'", spec)
+# The pod is frozen, so the podspec no longer follows the releases. The version is that of the
+# newest dated release heading, '## [x.y.z] - YYYY-MM-DD'. A heading without a date, such as
+# Unreleased, is passed over: it is a normal state between two releases.
+release = re.search(r"^## \[([0-9]+\.[0-9]+\.[0-9]+)\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$",
+                    open(changelog, encoding="utf-8").read(), re.M)
 problems = []
 if not spec_url or url != spec_url.group(1):
     problems.append(f"README.md installs from {url}, the podspec's source is {spec_url and spec_url.group(1)}")
-if not spec_version or version != spec_version.group(1):
-    problems.append(f"README.md asks for version {version}, the podspec is {spec_version and spec_version.group(1)}")
+if not release:
+    problems.append("CHANGELOG.md has no release heading of the form '## [version] - date'")
+elif version != release.group(1):
+    problems.append(f"README.md asks for version {version}, the newest release heading of CHANGELOG.md is {release.group(1)}")
 # The build below runs for this Mac, so it cannot see an iOS or watchOS floor: compare them here.
 def version_tuple(text):
     return tuple(int(part) for part in text.split("."))
@@ -199,7 +206,7 @@ else
             echo "import $MODULE" > "$PROBE/consumer/Sources/$TARGET/$TARGET.swift"
         done <<< "$TARGETS"
         if swift build --package-path "$PROBE/consumer" > "$WORK/version-build.log" 2>&1; then
-            echo "check-manifest: the manifest of README.md asks for the podspec's URL and version $VERSION, and resolves and builds by version."
+            echo "check-manifest: the manifest of README.md asks for the podspec's URL and the changelog's newest version $VERSION, and resolves and builds by version."
         else
             echo "check-manifest: the manifest of README.md does not resolve or build by version:" >&2
             ERRORS="$(grep -E "error:|cannot be used|unstable|unsafe" "$WORK/version-build.log" | cut -c1-300 | head -5 || true)"
@@ -281,6 +288,7 @@ else
 fi
 
 # 5. The podspec. `pod ipc spec` prints it as JSON.
+#    It compares the manifest with the frozen 1.1.0 pod.
 if ! command -v pod > /dev/null; then
     if [ -n "${CI:-}" ]; then
         echo "check-manifest: CocoaPods is not installed on this runner; the podspec cannot be checked." >&2
