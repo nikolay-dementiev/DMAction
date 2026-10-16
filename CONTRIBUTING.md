@@ -1,7 +1,8 @@
 # Contributing to DMAction
 
 Thank you for helping. This guide says how to build and test the package, what a test must do, and
-how to propose a change.
+how to propose a change. [ENGINEERING.md](ENGINEERING.md) has the architecture and the
+compatibility and release policy.
 
 ## Build and test
 
