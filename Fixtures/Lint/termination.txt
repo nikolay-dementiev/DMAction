@@ -1,0 +1,18 @@
+func terminate() {
+    fatalError("x") // expect: no_process_termination
+    preconditionFailure("x") // expect: no_process_termination
+    assertionFailure("x") // expect: no_process_termination
+    precondition(false) // expect: no_process_termination
+    assert(false) // expect: no_process_termination
+    dispatchPrecondition(condition: .onQueue(.main)) // expect: no_process_termination
+    abort() // expect: no_process_termination
+    exit(1) // expect: no_process_termination
+    // fatalError("x")
+    let quoted = "fatalError(\"x\")"
+    let multiline = """
+    exit(1)
+    """
+    assertValid()
+}
+
+func assertValid() {}

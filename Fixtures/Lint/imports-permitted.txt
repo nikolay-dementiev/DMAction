@@ -1,0 +1,16 @@
+import Foundation
+public import Foundation
+#if canImport(os)
+import os
+#endif
+import os.log
+import Foundation.NSURL
+// import UIKit
+/// import UIKit
+/*
+import UIKit
+*/
+let quoted = "import UIKit"
+let multiline = """
+import UIKit
+"""
