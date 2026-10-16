@@ -82,8 +82,10 @@ A release starts from a tag that is the version itself, such as `1.1.0`, on a co
 merge first, then tag. Before the tag is pushed:
 
 1. The newest heading of `CHANGELOG.md` is `## [<version>] -` with the release date and the notes
-   under it. `Scripts/check-release.sh <version>` checks it. The podspec stays at 1.1.0, because
-   the pod is frozen.
+   under it. `Scripts/check-release.sh <version>` checks it. The README's installation manifest
+   asks for the version being released, `from: "<version>"`, and `Scripts/check-manifest.sh`
+   checks it against that heading, so the release pull request updates both together. The podspec
+   stays at 1.1.0, because the pod is frozen.
 2. The library's tests pass on an iOS 17 simulator, the oldest version the package supports. CI's
    oldest runtime is iOS 18.5, so this run is local:
    `xcodebuild test -scheme DMAction -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5'`.
