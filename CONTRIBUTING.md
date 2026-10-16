@@ -34,7 +34,8 @@ of "Build and test" and of "The example app".
 |---|---|
 | `Scripts/lint.sh` | SwiftLint, at the version pinned in `.swiftlint.yml`. The first run fetches that version into `.build/tools` and checks its checksum. `--analyze <xcodebuild log>` also runs the analyzer rules |
 | `Scripts/check-lint-contract.sh` | that the lint rules fire: it lints the fixtures of `Fixtures/Lint` and compares the diagnostics of the import, force unwrap and termination rules with the ones each line expects |
-| `Scripts/check-api.sh` | the public interface against `Fixtures/API/public-interface.txt`. A deliberate change of the public API runs it with `--update` and commits the new baseline in the same commit |
+| `Scripts/check-api.sh` | the public interface against `Fixtures/API/public-interface.txt`; `--self-test` runs the cases of its normalisation; `--since <ref>` prints, without a compiler, the lines the baseline lost, changed or gained since a git ref such as a release tag. A deliberate change of the public API runs it with `--update` and commits the new baseline in the same commit |
+| `Scripts/check-release.sh <version>` | that the newest heading of `CHANGELOG.md` is that version, with a release date that is a day of the calendar and notes under it, and that the podspec still names 1.1.0, the version the pod is frozen at; it also compares the release with the one below it in the changelog and refuses a version that keeps its major version after a removed or changed line of the interface, or after a `### Breaking changes` subsection |
 | `Scripts/check-manifest.sh` | the manifest, the README's installation manifest built by version, the consumer fixture, the podspec and the uses across isolation domains that the compiler must keep rejecting |
 | `Scripts/coverage-gate.sh <result bundle>` | the line coverage of the library |
 | `Scripts/check-snippets.sh` | every Swift block of a tracked Markdown file and of a doc comment in `Sources`, each compiled on its own against the checkout, as written: a manifest, a block for iOS, or a command-line tool for the Mac. A warning fails it too |
@@ -88,7 +89,21 @@ merge first, then tag. Before the tag is pushed:
    asks for the version being released, `from: "<version>"`, and `Scripts/check-manifest.sh`
    checks it against that heading, so the release pull request updates both together. The podspec
    stays at 1.1.0, because the pod is frozen.
-2. The library's tests pass on an iOS 17 simulator, the oldest version the package supports. CI's
+2. Every breaking change, as ENGINEERING.md defines it, needs a new major version, with no
+   exception for a small one. A removed or changed line of the interface is one:
+   `Scripts/check-api.sh --since <previous version>` lists them. A change of behaviour is another,
+   and the notes of the release declare it in a `### Breaking changes` subsection, in any letter
+   case, because no script can see behaviour: a change listed under `### Changed` alone does not
+   count.
+   `Scripts/check-release.sh` refuses a version that keeps the major version of the previous one
+   when it finds either. Lines that were only added pass the script, and they are additive only
+   after a review that none adds a requirement to a protocol or an overload that makes an
+   existing call ambiguous: the script cannot see either, nor the order of the cases of an enum
+   or of the statements in the body of an inlinable function.
+   It cannot tell a line that a new compiler reworded from a line that the code changed, so both
+   count. Run `Scripts/check-api.sh` first, since the baseline is the interface of the library
+   only while that check passes.
+3. The library's tests pass on an iOS 17 simulator, the oldest version the package supports. CI's
    oldest runtime is iOS 18.5, so this run is local:
    `xcodebuild test -scheme DMAction -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5'`.
 

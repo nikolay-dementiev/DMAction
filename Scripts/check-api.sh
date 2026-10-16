@@ -4,17 +4,29 @@
 #
 #   Scripts/check-api.sh               compare, exit 1 on any difference
 #   Scripts/check-api.sh --update      rewrite the baseline from the current sources
+#   Scripts/check-api.sh --since <ref> print the lines the baseline lost, changed or gained since
+#                                      a git ref, such as a release tag, without a compiler
 #   Scripts/check-api.sh --self-test   run the normalisation on the cases in
 #                                      Fixtures/API/normalizer, no compiler needed
 #
-# Any difference fails. A removed or changed line is a break of the public contract.
-# An added line is new public API: run with --update and commit the baseline together
-# with the change, so the whole API delta is readable in the diff of one file.
+# Any difference fails. A removed or changed line breaks the public contract: it needs a new major
+# version. The check cannot tell a line that a new compiler reworded from a line that the code
+# changed, so both count. An added line is additive only after a review that it adds no
+# requirement to a protocol (every type that conforms to it stops compiling) and no overload that
+# makes an existing call ambiguous; this check cannot see either. Nor does --since see the order
+# of the members of a type, so the order of the cases of an enum, which decides allCases and the
+# raw values that are not written out, is invisible to it. So are the order and the repetition of
+# the statements in the body of an inlinable function, which no baseline of these packages holds
+# today. Run with --update and commit the baseline together with the change, so the whole API
+# delta is readable in the diff of one file.
 #
 # The interface text depends on the compiler and the SDK. CI runs this check on one
 # pinned Xcode; after a toolchain change the baseline may need --update with no API change.
 #
 # Exit codes: 0 the same interface, 1 a different interface, 2 the check could not run.
+# With --since: 0 the same, 1 a line was removed or changed, 2 the comparison could not run (no
+# such ref, no baseline in the working tree), 3 lines were only added, 4 the ref holds no
+# baseline: its interface was not recorded.
 
 set -euo pipefail
 
@@ -375,6 +387,141 @@ print("\n".join(sorted(blocks)))
 '
 }
 
+# Prints what two normalised interface texts do not share: the removed or changed lines, then the
+# added ones. A changed line is both. A line is identified by its text, the attributes that the
+# printer put on lines of their own above it, and the declarations around it, the outermost
+# first. A branch of a compiler condition is one of those declarations, and it holds every
+# condition above it: the else branch of one condition is not the else branch of another. So the
+# member of one type is never matched by the same text in another type, and a member that moves
+# under another attribute or condition is a removal and an addition. Neither the order of the
+# members of a type nor the number of extensions that hold them is a difference: the lines are
+# compared as a set, and a type has one opening line however many extensions hold it. A closing
+# line follows from its opening line and is not compared. A member that moves from a type to an
+# extension of it is reported as removed and added, and so is a conformance that moves from the
+# header of a type.
+# Status 0 the texts are the same, 1 a line was removed or changed, 3 lines were only added, 2 the
+# texts could not be compared. The heading of the added lines says what no line can show: an added
+# line may still break a conformer of a protocol or make an existing call ambiguous.
+delta() {
+    python3 -c '
+import sys
+
+def read(path):
+    with open(path, encoding="utf-8") as handle:
+        return [line for line in handle.read().split("\n") if line.strip()]
+
+def skip_attributes(text):
+    """The text after its leading attributes, their arguments included."""
+    position, end = 0, len(text)
+    while True:
+        while position < end and text[position].isspace():
+            position += 1
+        if position >= end or text[position] != "@":
+            return text[position:]
+        position += 1
+        while position < end and (text[position].isalnum() or text[position] in "_."):
+            position += 1
+        if position < end and text[position] == "(":
+            depth, in_string = 0, False
+            while position < end:
+                character = text[position]
+                position += 1
+                if in_string:
+                    if character == "\\":
+                        position += 1
+                    elif character == "\"":
+                        in_string = False
+                elif character == "\"":
+                    in_string = True
+                elif character == "(":
+                    depth += 1
+                elif character == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+
+def entries(lines):
+    """Each line to compare: the declarations around it and the line itself, with the attributes
+    that the printer put on lines of their own above it."""
+    stack, held, found = [], [], []
+    for line in lines:
+        text = line.strip()
+        if text.startswith("@") and not skip_attributes(text).strip():
+            held.append(line)
+            continue
+        directive = text.startswith(("#if", "#else", "#endif"))
+        if held and (directive or text == "}"):
+            found.extend((tuple(stack), attribute) for attribute in held)
+            held = []
+        context = tuple(stack)
+        if text.startswith("#if"):
+            found.append((context, line))
+            stack.append(("#", line))
+        elif text.startswith("#else"):
+            if not stack or stack[-1][0] != "#":
+                raise ValueError("a branch of a condition is not inside that condition: " + text)
+            condition = stack.pop()[1] + "\n" + line
+            found.append((tuple(stack), condition))
+            stack.append(("#", condition))
+        elif text.startswith("#endif"):
+            if stack and stack[-1][0] == "#":
+                stack.pop()
+        elif text == "}":
+            if not stack:
+                raise ValueError("a block ends where none began")
+            if stack[-1][0] == "{":
+                stack.pop()
+        else:
+            declaration = "\n".join(held + [line])
+            held = []
+            found.append((context, declaration))
+            if line.rstrip().endswith("{"):
+                stack.append(("{", declaration))
+    # An end that met the wrong frame was skipped above and left that frame open, which stops here.
+    if stack:
+        raise ValueError("a block or a condition is still open at the end of the interface")
+    found.extend((tuple(stack), attribute) for attribute in held)
+    return found
+
+def difference(first, second):
+    """The entries of the first that the second lacks, in the order of the first."""
+    present, seen, lacking = set(second), set(), []
+    for key in first:
+        if key not in present and key not in seen:
+            seen.add(key)
+            lacking.append(key)
+    return lacking
+
+def show(sign, keys):
+    for context, text in keys:
+        homes = [line.split("\n")[-1] for kind, line in context if kind == "{"]
+        note = "   (in " + skip_attributes(homes[-1]).strip()[:100] + ")" if homes else ""
+        parts = text.split("\n")
+        for part in parts[:-1]:
+            print(sign + " " + part)
+        print(sign + " " + parts[-1] + note)
+
+def main():
+    old, new = entries(read(sys.argv[1])), entries(read(sys.argv[2]))
+    removed, added = difference(old, new), difference(new, old)
+    sys.stdout.reconfigure(encoding="utf-8")
+    if removed:
+        print("Removed or changed (breaking: a new major version):")
+        show("-", removed)
+    if added:
+        print("Added (additive only after a review: no protocol requirement, no overload that makes a call ambiguous):")
+        show("+", added)
+    return 1 if removed else 3 if added else 0
+
+try:
+    status = main()
+except Exception as error:
+    print("check-api: the two interfaces could not be compared: " + str(error), file=sys.stderr)
+    sys.exit(2)
+sys.exit(status)
+' "$1" "$2"
+}
+
 # Each case holds two interface texts and says whether they must normalise to the same
 # text. A change to normalize() that hides an API change, or reports one that is not
 # there, fails one of them.
@@ -467,7 +614,165 @@ if [ "${1:-}" = "--self-test" ]; then
         echo "check-api: FAIL output-encoding: the Latin-1 stream differs or stopped: $(head -c 300 "$WORK/euro-sign.error")" >&2
         FAILED=1
     fi
+    # The delta that --since prints: each case is two interface texts, the status that delta must
+    # return for them, and the sections it must print. A run that prints a section the case does
+    # not name, or leaves one out, fails the case.
+    expect_delta() {
+        local name="$1" expected_status="$2" expected_sections="$3" status=0 sections=""
+        printf '%b' "$4" > "$WORK/delta-old.txt"
+        printf '%b' "$5" > "$WORK/delta-new.txt"
+        if ! normalize "$WORK/delta-old.txt" > "$WORK/delta-old.normalized" || ! normalize "$WORK/delta-new.txt" > "$WORK/delta-new.normalized"; then
+            echo "check-api: FAIL $name: the normalisation stopped with an error" >&2
+            FAILED=1
+            return
+        fi
+        delta "$WORK/delta-old.normalized" "$WORK/delta-new.normalized" > "$WORK/$name.out" 2> "$WORK/$name.error" || status=$?
+        if grep -q '^Removed or changed' "$WORK/$name.out"; then
+            sections="removed"
+        fi
+        if grep -q '^Added' "$WORK/$name.out"; then
+            sections="${sections:+$sections }added"
+        fi
+        if [ "$status" = "$expected_status" ] && [ "${sections:-none}" = "$expected_sections" ]; then
+            echo "check-api: ok   $name"
+        else
+            echo "check-api: FAIL $name: expected status $expected_status and sections '$expected_sections', got status $status and '${sections:-none}': $(head -c 300 "$WORK/$name.error")" >&2
+            FAILED=1
+        fi
+    }
+    FIRST='public struct First {\n  public func keep()\n}\n'
+    SECOND='public struct Second {\n  public func keep()\n}\n'
+    expect_delta delta-reordered-declarations 0 none "$FIRST$SECOND" "$SECOND$FIRST"
+    expect_delta delta-member-added 3 added "$FIRST" 'public struct First {\n  public func keep()\n  public func more()\n}\n'
+    expect_delta delta-type-added 3 added "$FIRST" "$FIRST$SECOND"
+    expect_delta delta-protocol-requirement-added 3 added 'public protocol Source {\n  func read() -> Swift.Int\n}\n' 'public protocol Source {\n  func read() -> Swift.Int\n  func write()\n}\n'
+    expect_delta delta-member-removed 1 removed 'public struct First {\n  public func keep()\n  public func drop()\n}\n' "$FIRST"
+    expect_delta delta-signature-changed 1 "removed added" "$FIRST" 'public struct First {\n  public func keep(flag: Swift.Bool = true)\n}\n'
+    expect_delta delta-type-replaced 1 "removed added" "$FIRST" "$SECOND"
+    # A line is the same line only inside the same declaration. A removed line whose text is found
+    # again further on, in a block that sorts later, is still a removal.
+    expect_delta delta-removal-hidden-by-a-later-block 1 "removed added" 'public enum Direction {\n  case up\n  case down\n}\n' 'public enum Direction {\n  case up\n}\npublic enum Edge {\n  case down\n}\n'
+    expect_delta delta-accessor-removed-and-property-added 1 "removed added" 'public struct Box {\n  public var first: Swift.Int {\n    get\n    set\n  }\n}\n' 'public struct Box {\n  public var first: Swift.Int {\n    get\n  }\n  public var second: Swift.Int {\n    get\n    set\n  }\n}\n'
+    expect_delta delta-member-moved-to-another-type 1 "removed added" 'public struct First {\n  public func keep()\n}\npublic struct Second {\n  public func other()\n}\n' 'public struct First {\n}\npublic struct Second {\n  public func other()\n  public func keep()\n}\n'
+    expect_delta delta-attribute-removed-from-one-declaration 1 "removed added" 'public struct First {\n  @available(iOS 17.0, *)\n  public func one()\n  @available(iOS 17.0, *)\n  public func two()\n}\n' 'public struct First {\n  public func one()\n  @available(iOS 17.0, *)\n  public func two()\n}\n'
+    # The order of the members of a type, and the number of extensions that hold them, are no API.
+    expect_delta delta-members-reordered-in-a-type 0 none 'public struct First {\n  public func one()\n  public func two()\n}\n' 'public struct First {\n  public func two()\n  public func one()\n}\n'
+    expect_delta delta-extensions-merged 0 none 'extension First {\n  public func one()\n}\nextension First {\n  public func two()\n}\n' 'extension First {\n  public func one()\n  public func two()\n}\n'
+    # An attribute belongs to the declaration below it, and a branch of a condition to the conditions
+    # above it: moving a member under another attribute or another condition narrows its availability.
+    expect_delta delta-member-moved-under-an-attribute 1 "removed added" '@available(iOS 18.0, *)\nextension First {\n  public func one()\n}\nextension First {\n  public func two()\n}\n' '@available(iOS 18.0, *)\nextension First {\n  public func one()\n  public func two()\n}\n'
+    expect_delta delta-attribute-swapped-between-members 1 "removed added" 'public struct First {\n  @available(*, unavailable)\n  public func legacy()\n  public func current()\n}\n' 'public struct First {\n  public func legacy()\n  @available(*, unavailable)\n  public func current()\n}\n'
+    expect_delta delta-member-moved-to-the-else-of-another-condition 1 "removed added" '#if os(iOS)\npublic func one()\n#else\npublic func two()\n#endif\n#if os(macOS)\npublic func three()\n#else\npublic func four()\n#endif\n' '#if os(iOS)\npublic func one()\n#else\n#endif\n#if os(macOS)\npublic func three()\n#else\npublic func four()\npublic func two()\n#endif\n'
+    # A condition that straddles a block cannot come from the compiler. The delta stops with status 2
+    # instead of comparing the lines against a nesting that the text does not have.
+    expect_delta delta-condition-straddling-a-block 2 none '#if os(iOS)\npublic struct S : P {\n  public func f()\n#else\n  public func g()\n#endif\n}\n' '#if os(iOS)\npublic struct S : P {\n  public func f()\n  public func g()\n#else\n#endif\n}\n'
+    expect_delta delta-block-ending-inside-a-condition 2 none 'public struct S {\n#if os(iOS)\n  public func f()\n}\n#endif\n' 'public struct S {\n#if os(iOS)\n  public func f()\n  public func g()\n}\n#endif\n'
+    expect_delta delta-condition-ending-inside-a-block 2 none '#if os(iOS)\npublic struct S {\n  public func f()\n#endif\n}\n' '#if os(iOS)\npublic struct S {\n  public func f()\n  public func g()\n#endif\n}\n'
+    expect_delta delta-block-left-open 2 none 'public struct S {\n  public func f()\n' 'public struct S {\n  public func f()\n  public func g()\n'
+    expect_delta delta-block-ending-where-none-began 2 none 'public struct S {\n  public func f()\n}\n}\n' 'public struct S {\n  public func f()\n  public func g()\n}\n}\n'
+    expect_delta delta-branch-outside-a-condition 2 none 'public func one()\n#else\npublic func two()\n' 'public func one()\n#else\npublic func two()\npublic func three()\n'
+    # --since reads the baselines of the repository its script sits in, so these cases run a copy of
+    # the script in a scratch repository with two commits: one without a baseline and one with it.
+    # A status alone would also match a crash, so each case names a text of its output as well. The
+    # scratch repository is kept apart from the environment of the caller: GIT_DIR and the other
+    # variables that git lists with rev-parse --local-env-vars would point git at the repository or
+    # the object store of the caller, and a global setting of hooks, signing or ignored files would
+    # stop the scratch commits.
+    GIT_LOCAL_VARIABLES=()
+    for VARIABLE in $(git rev-parse --local-env-vars); do
+        GIT_LOCAL_VARIABLES+=(-u "$VARIABLE")
+    done
+    expect_since() {
+        local name="$1" expected_status="$2" expected_text="$3" status=0
+        shift 3
+        env ${GIT_LOCAL_VARIABLES[@]+"${GIT_LOCAL_VARIABLES[@]}"} "$SCRATCH/Scripts/check-api.sh" --since "$@" > "$WORK/$name.out" 2> "$WORK/$name.error" || status=$?
+        if [ "$status" = "$expected_status" ] && grep -q -F -- "$expected_text" "$WORK/$name.out" "$WORK/$name.error"; then
+            echo "check-api: ok   $name"
+        else
+            echo "check-api: FAIL $name: expected status $expected_status and '$expected_text', got $status: $(head -c 300 "$WORK/$name.out" "$WORK/$name.error")" >&2
+            FAILED=1
+        fi
+    }
+    scratch_git() {
+        env ${GIT_LOCAL_VARIABLES[@]+"${GIT_LOCAL_VARIABLES[@]}"} GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+            git -C "$SCRATCH" -c init.defaultBranch=main -c user.name=check-api -c user.email=check-api@example.invalid \
+            -c commit.gpgsign=false -c tag.gpgSign=false -c core.hooksPath=/dev/null "$@"
+    }
+    SCRATCH="$WORK/since-repository"
+    rm -rf "$SCRATCH"
+    mkdir -p "$SCRATCH/Scripts" "$SCRATCH/Fixtures/API"
+    cp "${BASH_SOURCE[0]}" "$SCRATCH/Scripts/check-api.sh"
+    scratch_git init -q
+    printf 'a repository without a baseline\n' > "$SCRATCH/README"
+    scratch_git add -f README
+    scratch_git commit -q -m "no baseline"
+    scratch_git tag no-baseline
+    SCRATCH_BASELINE="$SCRATCH/Fixtures/API/public-interface.txt"
+    printf 'public struct First {\n  public func keep()\n}\n' > "$SCRATCH_BASELINE"
+    scratch_git add -f Fixtures
+    scratch_git commit -q -m "baseline"
+    scratch_git tag recorded
+    expect_since since-same 0 "the same declarations" recorded
+    printf 'public struct First {\n  public func keep()\n  public func more()\n}\n' > "$SCRATCH_BASELINE"
+    expect_since since-added 3 "Added" recorded
+    printf 'public struct First {\n}\n' > "$SCRATCH_BASELINE"
+    expect_since since-removed 1 "Removed or changed" recorded
+    printf 'public struct First {\n  public func keep()\n}\n' > "$SCRATCH_BASELINE"
+    expect_since since-unknown-ref 2 "is not a commit" no-such-ref
+    expect_since since-ref-that-looks-like-an-option 2 "usage" -x
+    expect_since since-ref-without-a-baseline 4 "holds no baseline" no-baseline
+    rm "$SCRATCH_BASELINE"
+    expect_since since-no-baseline-in-the-working-tree 2 "no baseline at" recorded
+    expect_since since-no-baseline-anywhere 2 "no baseline at" no-baseline
     exit "$FAILED"
+fi
+
+# The baseline at an earlier ref against the baseline of the working tree, without a compiler.
+# The baseline of the working tree is the interface of the library only while the comparison
+# below passes, which CI runs on every commit.
+if [ "${1:-}" = "--since" ]; then
+    REF="${2:-}"
+    case "$REF" in
+        '' | -*)
+            echo "usage: Scripts/check-api.sh --since <git ref>" >&2
+            exit 2
+            ;;
+    esac
+    BASELINE_PATH="${BASELINE#"$ROOT"/}"
+    if ! git -C "$ROOT" rev-parse --verify --quiet "$REF^{commit}" > /dev/null; then
+        echo "check-api: $REF is not a commit of this repository. If it is a tag, fetch it: git fetch --tags." >&2
+        exit 2
+    fi
+    if [ ! -f "$BASELINE" ]; then
+        echo "check-api: no baseline at $BASELINE_PATH. Run with --update." >&2
+        exit 2
+    fi
+    if ! LISTING="$(git -C "$ROOT" ls-tree --name-only "$REF" -- "$BASELINE_PATH")"; then
+        echo "check-api: could not list the files of $REF." >&2
+        exit 2
+    fi
+    if [ -z "$LISTING" ]; then
+        echo "check-api: $REF holds no baseline at $BASELINE_PATH: its interface was not recorded."
+        exit 4
+    fi
+    if ! git -C "$ROOT" show "$REF:$BASELINE_PATH" > "$WORK/since-baseline.txt"; then
+        echo "check-api: could not read $BASELINE_PATH at $REF." >&2
+        exit 2
+    fi
+    if ! normalize "$WORK/since-baseline.txt" > "$WORK/since-old.txt" || ! normalize "$BASELINE" > "$WORK/since-new.txt"; then
+        echo "check-api: a baseline could not be normalised." >&2
+        exit 2
+    fi
+    STATUS=0
+    delta "$WORK/since-old.txt" "$WORK/since-new.txt" > "$WORK/since.delta" || STATUS=$?
+    case "$STATUS" in
+        0) echo "check-api: the baseline at $REF and the baseline of the working tree have the same declarations." ;;
+        1 | 3)
+            echo "check-api: the baseline of the working tree differs from the baseline at $REF."
+            cat "$WORK/since.delta"
+            ;;
+    esac
+    exit "$STATUS"
 fi
 
 # The files of a module are passed in one fixed order. A plain sort follows the locale
@@ -592,7 +897,8 @@ if diff -u --label "$(basename "$BASELINE")" --label "current interface" "$WORK/
 fi
 
 echo "check-api: the public interface differs from the baseline." >&2
-echo "  '-' lines were removed or changed: that breaks the public contract." >&2
-echo "  '+' lines are new public API: run Scripts/check-api.sh --update and commit the baseline." >&2
+echo "  A '-' line was removed or changed: that breaks the public contract and needs a new major version." >&2
+echo "  A '+' line is new public API. It is additive only if it adds no protocol requirement and no overload" >&2
+echo "  that makes an existing call ambiguous. When it is additive, run Scripts/check-api.sh --update and commit the baseline." >&2
 cat "$WORK/api.diff" >&2
 exit 1

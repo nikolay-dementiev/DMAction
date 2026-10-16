@@ -2,7 +2,7 @@
 #
 # Checks a release version against the changelog, and that the podspec names the frozen version.
 #
-#   Scripts/check-release.sh <version>           check; exit 1 on any mismatch
+#   Scripts/check-release.sh <version>           check; exit 1 if not ready, 2 if it cannot compare
 #   Scripts/check-release.sh --notes <version>   print the changelog section of that version
 #
 # A release starts from a tag that is the version itself, such as 1.1.0. The newest heading of
@@ -10,6 +10,18 @@
 # are the section under that heading. The pod is frozen: the podspec stays at the last version
 # published to the trunk, FROZEN_POD_VERSION below, whatever the release version is. The release
 # workflow runs this script on the tag; run it before you push one.
+#
+# The release is also compared with the one before it, the heading below the newest. It must raise
+# the major version when the baseline lost or changed a line since the tag of that release
+# (Scripts/check-api.sh --since), or when its notes have a `### Breaking changes` subsection, where
+# a change of behaviour is declared because no script can see one. Lines that were only added pass
+# with a reminder to review them. The first release has none before it and is not compared, and
+# neither is a release that holds no baseline; the script says so. A tag that is not in the
+# repository, or a comparison that cannot run, is exit 2, never a pass. Run Scripts/check-api.sh
+# first: the baseline is the interface of the library only while that check passes. The heading of
+# the subsection is matched in any letter case.
+#
+# Exit codes: 0 ready, 1 not ready, 2 wrong usage or the comparison could not run.
 
 set -euo pipefail
 
@@ -106,9 +118,71 @@ else
     PROBLEMS+=("CHANGELOG.md has no heading of the form '## [version] - date'")
 fi
 
+# The release before this one is the version of the second release heading. It has no meaning when
+# the newest heading is for another version, which is a problem already.
+COULD_NOT_COMPARE=0
+if [ "$HEADING_VERSION" = "$VERSION" ]; then
+    PREVIOUS_HEADING="$(LC_ALL=C awk '/^## \[/ { count++ } count == 2 { print; exit }' "$CHANGELOG")"
+    if [ -z "$PREVIOUS_HEADING" ]; then
+        echo "check-release: CHANGELOG.md has no release below $VERSION, so the interface was not compared."
+    else
+        PREVIOUS="$(printf '%s\n' "$PREVIOUS_HEADING" | LC_ALL=C sed -n 's/^## \[\([^]]*\)\].*$/\1/p')"
+        if ! valid_version "$PREVIOUS"; then
+            PROBLEMS+=("the changelog heading below $VERSION is not a release version: '$PREVIOUS_HEADING'")
+        else
+            RAISES_MAJOR=0
+            if [ "${VERSION%%.*}" -gt "${PREVIOUS%%.*}" ]; then
+                RAISES_MAJOR=1
+            fi
+            BREAKING="$(notes | grep -c -i -E '^### Breaking changes[[:space:]]*$' || true)"
+            if [ "$BREAKING" -gt 0 ] && [ "$RAISES_MAJOR" -eq 0 ]; then
+                PROBLEMS+=("the notes of $VERSION have a '### Breaking changes' subsection: that needs a new major version, and $VERSION does not raise the major version of $PREVIOUS")
+            fi
+            if ! git -C "$ROOT" rev-parse --verify --quiet "refs/tags/$PREVIOUS^{commit}" > /dev/null; then
+                PROBLEMS+=("the tag $PREVIOUS of the release below $VERSION is not in this repository, so the interface cannot be compared: git fetch --tags")
+                COULD_NOT_COMPARE=1
+            else
+                DELTA_STATUS=0
+                DELTA="$("$ROOT/Scripts/check-api.sh" --since "$PREVIOUS" 2>&1)" || DELTA_STATUS=$?
+                case "$DELTA_STATUS" in
+                    0) ;;
+                    1)
+                        # A script that stops on an error exits with 1 as well, so the exit code
+                        # counts only with the heading of the lines that were removed or changed.
+                        case "$DELTA" in
+                            *"Removed or changed"*)
+                                if [ "$RAISES_MAJOR" -eq 0 ]; then
+                                    PROBLEMS+=("the interface lost or changed lines since $PREVIOUS (Scripts/check-api.sh --since $PREVIOUS lists them): that needs a new major version, and $VERSION does not raise the major version of $PREVIOUS")
+                                fi
+                                ;;
+                            *)
+                                PROBLEMS+=("the interface could not be compared with $PREVIOUS: $(printf '%s\n' "$DELTA" | sed -n '1p')")
+                                COULD_NOT_COMPARE=1
+                                ;;
+                        esac
+                        ;;
+                    3)
+                        echo "check-release: lines were added to the interface since $PREVIOUS. Review that none adds a protocol requirement or an overload that makes a call ambiguous: either needs a new major version."
+                        ;;
+                    4)
+                        echo "check-release: the interface was not compared with $PREVIOUS: that release holds no baseline."
+                        ;;
+                    *)
+                        PROBLEMS+=("the interface could not be compared with $PREVIOUS: $(printf '%s\n' "$DELTA" | sed -n '1p')")
+                        COULD_NOT_COMPARE=1
+                        ;;
+                esac
+            fi
+        fi
+    fi
+fi
+
 if [ "${#PROBLEMS[@]}" -gt 0 ]; then
     echo "check-release: $VERSION is not ready to release:" >&2
     printf '  - %s\n' "${PROBLEMS[@]}" >&2
+    if [ "$COULD_NOT_COMPARE" -eq 1 ]; then
+        exit 2
+    fi
     exit 1
 fi
 echo "check-release: the changelog agrees on $VERSION, released $HEADING_DATE; the pod stays at $FROZEN_POD_VERSION."
