@@ -40,7 +40,7 @@ stop() {  # <message>: the comparison could not be made
     exit 2
 }
 
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-api-digester.XXXXXX")"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-api-digester.XXXXXX")" || stop "no scratch folder could be made"
 # shellcheck disable=SC2329  # invoked by the trap below
 cleanup() {  # The EXIT trap below calls it. skipcq: SH-2329
     rm -rf "$WORK"
@@ -63,11 +63,12 @@ map_result() {  # <ref> <status>
     fi
     echo "check-api-digester: could not compare with $ref (status $status):" >&2
     # The progress of the build and the SwiftPM warning about the docc catalog of the baseline
-    # checkout (two lines) are not the reason.
+    # checkout (two lines) are not the reason. The sed that cuts the output to 20 lines reads all of
+    # it: a head that stopped early would end the pipeline with SIGPIPE before the exit below.
     {
-        grep -v -E '^\[[0-9]+/[0-9]+\]|^Building for |^Build complete|^Write |found [0-9]+ file\(s\) which are unhandled|/apidiff/[0-9a-f]+-checkout/' "$WORK/err" || true
+        grep -v -E '^\[[0-9]+/[0-9]+\]|^Building for |^Build complete|^Write |found [0-9]+ file\(s\) which are unhandled|^[[:space:]]+/.*/apidiff/[0-9a-f]+-checkout/.*\.docc$' "$WORK/err" || true
         head -5 "$WORK/out"
-    } | head -20 | sed 's/^/  /' >&2
+    } | sed -n '1,20p' | sed 's/^/  /' >&2
     exit 2
 }
 
@@ -146,17 +147,25 @@ SWIFT
 # Runs the mapping on a scratch package with tagged commits, with no network. Each case changes
 # the working tree, runs a copy of this script and compares the status and one line of its output.
 self_test() {
-    local scratch="$WORK/probe" shims="$WORK/shims" failures=0 total=0 wrapper
+    local scratch="$WORK/probe" shims="$WORK/shims" failures=0 total=0 wrapper variable
     wrapper="$scratch/Scripts/check-api-digester.sh"
+    # GIT_DIR and the other variables that git lists with rev-parse --local-env-vars would point git
+    # at the repository or the object store of the caller, which a git hook or filter-branch sets,
+    # and a global setting of hooks or signing would stop the scratch commits.
+    GIT_LOCAL_VARIABLES=()
+    for variable in $(git rev-parse --local-env-vars); do
+        GIT_LOCAL_VARIABLES+=(-u "$variable")
+    done
     probe_git() {
-        git -C "$scratch" -c user.name=probe -c user.email=probe@example.invalid \
+        env ${GIT_LOCAL_VARIABLES[@]+"${GIT_LOCAL_VARIABLES[@]}"} GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null \
+            git -C "$scratch" -c init.defaultBranch=main -c user.name=probe -c user.email=probe@example.invalid \
             -c commit.gpgsign=false -c tag.gpgSign=false -c core.hooksPath=/dev/null "$@"
     }
     check() {  # <name> <expected status> <expected text> <command...>
         local name="$1" want="$2" text="$3" got=0 output
         shift 3
         total=$((total + 1))
-        output="$("$@" 2>&1)" || got=$?
+        output="$(env ${GIT_LOCAL_VARIABLES[@]+"${GIT_LOCAL_VARIABLES[@]}"} "$@" 2>&1)" || got=$?
         if [ "$got" -eq "$want" ] && printf '%s\n' "$output" | grep -q -F -- "$text"; then
             echo "check-api-digester: ok   $name"
         else
