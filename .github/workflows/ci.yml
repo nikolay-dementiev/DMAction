@@ -326,6 +326,35 @@ jobs:
         run: Scripts/check-api.sh --self-test
       - name: Public interface against the baseline
         run: Scripts/check-api.sh
+      # What the pull request removes, changes or adds in the baseline, for the reviewer. The
+      # comparison above is the one that fails; this step fails only when it cannot compare. The
+      # text is indented as a code block: a line of a fork's baseline could close a fence.
+      - name: Write the interface delta against the base to the job summary
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          status=0
+          Scripts/check-api.sh --since "$BASE_SHA" > "$RUNNER_TEMP/delta.txt" 2>&1 || status=$?
+          {
+            echo "### Public interface against the base of the pull request"
+            echo
+            sed 's/^/    /' "$RUNNER_TEMP/delta.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+          case "$status" in
+            0 | 3 | 4) ;;
+            1)
+              if ! grep -q '^Removed or changed' "$RUNNER_TEMP/delta.txt"; then
+                cat "$RUNNER_TEMP/delta.txt" >&2
+                exit 1
+              fi
+              ;;
+            *)
+              cat "$RUNNER_TEMP/delta.txt" >&2
+              exit "$status"
+              ;;
+          esac
 
   # The pod is frozen at 1.1.0 and nothing goes to the trunk again. The job lints the current
   # sources as a pod; it is also the only watchOS build of the package until a SwiftPM watchOS
