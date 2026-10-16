@@ -12,8 +12,8 @@ declaration and every observable behaviour. Each change belongs to one of three 
 
 - **none**: no declaration and no observable behaviour changes.
 - **additive**: new declarations only, with `Fixtures/API/public-interface.txt` updated in the same
-  commit, and nothing a consumer must do. Raising the minimum version of a dependency within the
-  same major version is additive too (see the table).
+  commit, and nothing a consumer must do. A raised minimum version of a dependency can be additive
+  under the conditions below the table.
 - **breaking**: anything else.
 
 The rule is strict and has no carve-out: every change of observable behaviour is breaking. That
@@ -27,9 +27,9 @@ version.
 | A new case in a public enum that a consumer can switch over (the package declares none today) | breaking | major |
 | A new protocol requirement without a default implementation | breaking | major |
 | A new protocol requirement with a default implementation | additive or breaking, see below | minor or major |
-| An added overload | additive, or breaking if an existing call now resolves to it | minor or major |
+| An added overload | additive, or breaking if an existing call now resolves to it or becomes ambiguous | minor or major |
 | Depending on a new major version of a dependency | breaking | major |
-| Raising the minimum version of a dependency within the same major | additive | minor, with its own line in the changelog |
+| Raising the minimum version of a dependency within the same major | additive or breaking, see below | minor or major |
 | A CI or tool pin, such as a runner image or the SwiftLint version | none | patch, or no release |
 | A pure refactor | none | patch, or no release |
 | A crash that stops happening | breaking | major |
@@ -41,20 +41,24 @@ dispatched: the extension method was called statically and the requirement is ca
 so a conformer's own member of that name starts to be called. That is a change of behaviour, so it
 is breaking.
 
+Raising the minimum version of a dependency within the same major version is additive only when it
+moves no platform floor, changes no behaviour and asks nothing of a consumer. It then needs a minor
+release and its own line in the changelog. A raise that does any of these is breaking.
+
 The package has no dependency today.
 
-Who checks. `Scripts/check-api.sh` fails on any difference between the public interface and the
-baseline, so a change of a declaration cannot merge without the baseline in the same commit. The
-pull request template asks for the class, the changes of observable behaviour and the release the
-change needs. The reviewer applies the rest, in particular the classification of a change of
-observable behaviour: a test fails only for a behaviour that a test pins.
+Who checks. The `api` job of CI runs `Scripts/check-api.sh` on every pull request and fails it
+when the public interface differs from the baseline. The pull request template asks for the class,
+the changes of observable behaviour and the release the change needs. The reviewer applies the
+rest: that the baseline changes in the same commit as the declaration, and the classification of a
+change of observable behaviour, which a test catches only where a test pins the behaviour.
 
 ## Deprecation
 
-No compiler deprecation attribute ships in a 1.x release. Its warning fails every consumer that
-builds with warnings as errors, so it would turn a notice into a breaking change. A symbol is
-retired in the documentation instead: the replacement and a migration example say what to use. The
-next major version removes it.
+No compiler deprecation attribute ships in a 1.x release. Its warning appears at every use of the
+symbol and fails a consumer that builds with warnings as errors, so it would turn a notice into a
+breaking change. A symbol is retired in the documentation instead: the replacement and a
+migration example say what to use. The next major version removes it.
 
 ## History
 
@@ -78,7 +82,8 @@ the rules above it would have needed a major version. The rules apply from the r
   "Behaviour your app must know". This file points to them and does not restate them. A change of
   one of those limits is a change of behaviour.
 - **Composition root.** The public initializers of the library's actions, `fallbackTo` and `retry`
-  create every concrete value. There is no global configuration and no singleton.
+  create every concrete action. A run creates only its own internal state. There is no global
+  configuration and no singleton.
 - **The library never stops its host.** No `fatalError`, `preconditionFailure`, `assert`,
   `abort` or `exit`, no force unwrap, no `try!` and no `as!`. A failure reaches the caller through
   the result of the run. `Scripts/lint.sh` enforces this over `Sources`: the custom rule
@@ -88,11 +93,12 @@ the rules above it would have needed a major version. The rules apply from the r
 
 - The manifest declares `swift-tools-version: 6.0` and the Swift 6 language mode, so the package
   needs Xcode 16.0 or later. `ExistentialAny` is on in every target.
-- The declared platforms are iOS 17.0 and watchOS 7.0. Raising either floor is a breaking change.
+- The declared platforms are iOS 17.0 and watchOS 7.0. Raising either platform floor, or the
+  `swift-tools-version`, is a breaking change.
 - `.github/workflows/ci.yml` is the place that says what CI runs; this file does not restate it.
   The policy needs four facts. The oldest iOS runtime that CI runs is iOS 18.5. iOS 17.5 runs
-  locally before a release (CONTRIBUTING.md, "Releases"). The `floor` job runs the oldest
-  compiler the manifest allows, Swift 6.0. watchOS is built by the `podspec` job, and no test runs
+  locally before a release (CONTRIBUTING.md, "Releases"). The `floor` job runs Swift 6.0, the
+  oldest compiler line the manifest allows. watchOS is built by the `podspec` job, and no test runs
   there.
 - "Oldest tested runtime" and "oldest supported version" are different statements. The supported
   version is a promise: the platforms the manifest declares. The tested runtime is evidence: the
