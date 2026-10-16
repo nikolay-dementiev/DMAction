@@ -70,7 +70,8 @@ the rules above it would have needed a major version. The rules apply from the r
 
 - **One layer.** The library imports Foundation and, where the module exists, `os`. It has no UI,
   no third-party dependency and no build plugin. `Scripts/lint.sh` enforces the imports: the custom
-  rule `domain_imports` reports any other import in the library folder.
+  rule `domain_imports` reports any other import in the library folder, except one that follows a
+  block comment on the same line.
 - **Composition as data.** `fallbackTo` and `retry` build values and run nothing. What an action
   runs is held as data (`ActionPlan`) and one internal type (`ActionRun`) runs it. `retry` stores
   its count and `fallbackTo` joins the steps of its operands into one list, so neither nests a run.

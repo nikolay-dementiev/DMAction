@@ -59,10 +59,12 @@ custom_rules:
   domain_imports:
     name: "Domain imports"
     # The library folder only: a path that merely contains Sources, such as the source folders of
-    # the fixtures, is not the library.
+    # the fixtures, is not the library. The pattern is matched against the absolute path, so a
+    # checkout inside a folder that is itself named Sources/DMAction would apply it to everything.
     included: ".*/Sources/DMAction/.*\\.swift"
     # Any attribute, access level and import kind; a second import after a semicolon; a submodule
-    # of Foundation or os is allowed. Comments and strings never match.
+    # of Foundation or os is allowed. Comments and strings never match. An import that follows a
+    # block comment on the same line is not seen.
     regex: '(?:^|;)\s*(@\w+(\([^)]*\))?\s+)*((public|package|internal|fileprivate|private)\s+)?import\s+(?:(?:struct|class|enum|protocol|typealias|func|var|let)\s+)?+(?!(?:Foundation|os)\b)\w+'
     match_kinds: [keyword, identifier, attribute.builtin, attribute.id]
     message: "The library imports Foundation and os only: no UI and no platform framework."

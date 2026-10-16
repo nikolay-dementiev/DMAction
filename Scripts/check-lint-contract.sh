@@ -12,10 +12,13 @@
 # diagnostics of the rules in RULES with the ones the fixture expects. A line that must give a
 # diagnostic ends with `// expect: <rule>`, with the rule repeated once for each diagnostic. A
 # line without that comment must give none of the rules. Diagnostics of other rules are not part
-# of the contract and are ignored. Nothing is written into the working tree.
+# of the contract and are ignored. Nothing is written into the tracked files: the pinned tool is
+# unpacked into .build/tools, and the fixtures are linted in a scratch folder that is removed at
+# the end.
 #
 # Exit codes: 0 every rule fires where expected and nowhere else, 1 a line differs, 2 the check
-# could not be made.
+# could not be made. A tool that fails by itself, such as the fetch of SwiftLint or python3, can
+# end the script with its own status.
 
 set -euo pipefail
 
