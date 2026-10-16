@@ -3,7 +3,8 @@
 # Compares the public API of the library with a git ref using swift-api-digester, which loads the
 # compiled modules. It classifies what the text comparison of Scripts/check-api.sh shows only as an
 # added line: a protocol requirement added without a default, a method that an extension declares
-# and that becomes a requirement, a narrowed generic requirement.
+# and that becomes a requirement. It names a narrowed generic requirement too, which the lines show
+# as a changed one.
 #
 #   Scripts/check-api-digester.sh <ref>          compare the working tree with the git ref
 #   Scripts/check-api-digester.sh --self-test    run the mapping below on a scratch package
@@ -18,8 +19,9 @@
 #
 # It builds the ref and the working tree for the host, so a declaration behind #if os(iOS) is not
 # compared. It does not see a changed default value, an added associated type with a default, or
-# the resolution of an overload. A green result is evidence, not proof. Apart from .build, the only
-# thing it writes is a scratch folder that it removes at the end.
+# the resolution of an overload. A green result is evidence, not proof. Apart from .build, it writes
+# a scratch folder that it removes at the end; SwiftPM leaves small lock files in the temporary
+# folder, which it does not remove.
 
 set -euo pipefail
 
