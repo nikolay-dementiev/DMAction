@@ -277,10 +277,11 @@ jobs:
           persist-credentials: false
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_16.2.app
+      # The package has no dependency, so the flag reaches only its own library and test targets.
       - name: Build and test with Swift 6.0
         run: |
           swift --version
-          swift test
+          swift test -Xswiftc -warnings-as-errors
 
   thread-sanitizer:
     # A run continues on whichever thread completes an attempt. The suite runs once more
