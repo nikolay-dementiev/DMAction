@@ -1,8 +1,8 @@
 name: Release
 
-# A version tag, such as 1.1.0, starts it. It checks the tag against the podspec and the
-# changelog, runs the whole CI workflow on the tag, and then drafts a GitHub release from the
-# changelog. It never creates or moves a tag and never publishes: the draft waits for a person.
+# A version tag, such as 1.1.0, starts it. It checks the tag against the changelog, runs the
+# whole CI workflow on the tag, and then drafts a GitHub release from the changelog. It never
+# creates or moves a tag and never publishes: the draft waits for a person.
 on:
   push:
     tags:
@@ -20,7 +20,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Check that the tag, the podspec and the changelog agree
+      - name: Check that the tag and the changelog agree
         run: Scripts/check-release.sh "$GITHUB_REF_NAME"
       # A version tag on a branch that was never merged would release unreviewed code.
       - name: Check that the tagged commit is on main
