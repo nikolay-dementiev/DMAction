@@ -1,14 +1,14 @@
 #!/bin/bash
 #
-# Checks that a release version and the changelog agree.
+# Checks a release version against the changelog, and that the podspec names the frozen version.
 #
 #   Scripts/check-release.sh <version>           check; exit 1 on any mismatch
 #   Scripts/check-release.sh --notes <version>   print the changelog section of that version
 #
 # A release starts from a tag that is the version itself, such as 1.1.0. The newest heading of
-# CHANGELOG.md must be `## [1.1.0] - YYYY-MM-DD`, with the date of the release. The release
-# notes are the section under that heading. The podspec is not compared with the release: the
-# pod is frozen, and the podspec must keep naming the version it was frozen at. The release
+# CHANGELOG.md must be `## [1.1.0] - YYYY-MM-DD`, with the date of the release. The release notes
+# are the section under that heading. The pod is frozen: the podspec stays at the last version
+# published to the trunk, FROZEN_POD_VERSION below, whatever the release version is. The release
 # workflow runs this script on the tag; run it before you push one.
 
 set -euo pipefail
@@ -17,7 +17,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CHANGELOG="$ROOT/CHANGELOG.md"
 PODSPEC="$ROOT/DMAction.podspec"
 # The CocoaPods channel ended with 1.1.0 (README, "CocoaPods"). The podspec stays at that
-# version; a release is checked against the changelog alone.
+# version; the release version is checked against the changelog alone.
 FROZEN_POD_VERSION="1.1.0"
 
 NOTES=0
