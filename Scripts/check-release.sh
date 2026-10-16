@@ -18,7 +18,8 @@
 # with a reminder to review them. The first release has none before it and is not compared, and
 # neither is a release that holds no baseline; the script says so. A tag that is not in the
 # repository, or a comparison that cannot run, is exit 2, never a pass. Run Scripts/check-api.sh
-# first: the baseline is the interface of the library only while that check passes.
+# first: the baseline is the interface of the library only while that check passes. The heading of
+# the subsection is matched in any letter case.
 #
 # Exit codes: 0 ready, 1 not ready, 2 wrong usage or the comparison could not run.
 
@@ -133,7 +134,7 @@ if [ "$HEADING_VERSION" = "$VERSION" ]; then
             if [ "${VERSION%%.*}" -gt "${PREVIOUS%%.*}" ]; then
                 RAISES_MAJOR=1
             fi
-            BREAKING="$(notes | grep -c -E '^### Breaking changes[[:space:]]*$' || true)"
+            BREAKING="$(notes | grep -c -i -E '^### Breaking changes[[:space:]]*$' || true)"
             if [ "$BREAKING" -gt 0 ] && [ "$RAISES_MAJOR" -eq 0 ]; then
                 PROBLEMS+=("the notes of $VERSION have a '### Breaking changes' subsection: that needs a new major version, and $VERSION does not raise the major version of $PREVIOUS")
             fi
