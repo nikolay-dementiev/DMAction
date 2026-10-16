@@ -43,6 +43,12 @@ fail() {  # <status> <message>
     exit "$1"
 }
 
+# The include patterns of the rules name this folder. Without it they lint nothing real, while the
+# fixtures, which the script puts there itself, would still pass.
+if [ ! -d "$ROOT/$LIBRARY_DIR" ]; then
+    fail 2 "$LIBRARY_DIR does not exist, and the include patterns of the rules name it"
+fi
+
 VERSION="$(swiftlint_version "$ROOT" check-lint-contract)"
 SWIFTLINT="$(swiftlint_fetch "$ROOT" "$VERSION" check-lint-contract)"
 
