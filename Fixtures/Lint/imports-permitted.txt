@@ -5,6 +5,10 @@ import os
 #endif
 import os.log
 import Foundation.NSURL
+import struct Foundation.URL
+import func os.os_log
+internal import Foundation
+@_exported import Foundation
 // import UIKit
 /// import UIKit
 /*
