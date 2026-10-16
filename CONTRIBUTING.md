@@ -92,8 +92,9 @@ merge first, then tag. Before the tag is pushed:
 2. Every breaking change, as ENGINEERING.md defines it, needs a new major version, with no
    exception for a small one. A removed or changed line of the interface is one:
    `Scripts/check-api.sh --since <previous version>` lists them. A change of behaviour is another,
-   and the notes of the release declare it in a `### Breaking changes` subsection, because no
-   script can see behaviour: a change listed under `### Changed` alone does not count.
+   and the notes of the release declare it in a `### Breaking changes` subsection, in any letter
+   case, because no script can see behaviour: a change listed under `### Changed` alone does not
+   count.
    `Scripts/check-release.sh` refuses a version that keeps the major version of the previous one
    when it finds either. Lines that were only added pass the script, and they are additive only
    after a review that none adds a requirement to a protocol or an overload that makes an
