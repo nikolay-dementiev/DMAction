@@ -30,9 +30,7 @@ package final class DefaultOutcomeViewModel: OutcomeViewModel {
         self.actions = actions
     }
 
-    /// Asks the factory for the action of one load and runs it. The default factory fetches a
-    /// quote, retries a failed fetch twice, and shows the cached quote when all three attempts
-    /// have failed.
+    /// Asks the factory for the action of one load and runs it.
     package func load() {
         // One run at a time: a second one would deliver into the same state. The view disables
         // its button while loading, but the view model does not rely on that.

@@ -3,7 +3,8 @@ import DMAction
 /// Builds the action that one load of the outcome screen runs.
 @MainActor
 package protocol OutcomeActionFactory {
-    /// The action for one load. `failures` is how many fetches fail before one succeeds.
+    /// The action for one load, a new one for every request: the default one counts its fetches
+    /// inside it. `failures` is how many fetches fail before one succeeds.
     func makeAction(failingFetches failures: Int) -> any DMAction
 }
 
