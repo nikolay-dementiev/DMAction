@@ -21,6 +21,11 @@
 # first: the baseline is the interface of the library only while that check passes. The heading of
 # the subsection is matched in any letter case.
 #
+# Where Scripts/check-api-digester.sh exists, a release that keeps its major version is also
+# compared with the previous one by swift-api-digester, which classifies what lines cannot, such as
+# a protocol requirement added without a default: a break it reports needs a new major version too.
+# In a repository without that script this does nothing.
+#
 # Exit codes: 0 ready, 1 not ready, 2 wrong usage or the comparison could not run.
 
 set -euo pipefail
@@ -172,6 +177,26 @@ if [ "$HEADING_VERSION" = "$VERSION" ]; then
                         COULD_NOT_COMPARE=1
                         ;;
                 esac
+                if [ -x "$ROOT/Scripts/check-api-digester.sh" ]; then
+                    if [ "$DELTA_STATUS" -eq 4 ]; then
+                        echo "check-release: the digester was not run against $PREVIOUS: that release holds no baseline."
+                    elif [ "$RAISES_MAJOR" -eq 0 ] && [ "$COULD_NOT_COMPARE" -eq 0 ]; then
+                        DIGEST_STATUS=0
+                        DIGEST="$("$ROOT/Scripts/check-api-digester.sh" "$PREVIOUS" 2>&1)" || DIGEST_STATUS=$?
+                        case "$DIGEST_STATUS" in
+                            0)
+                                echo "check-release: the digester finds no break since $PREVIOUS."
+                                ;;
+                            1)
+                                PROBLEMS+=("the digester reports a break since $PREVIOUS (Scripts/check-api-digester.sh $PREVIOUS lists it): that needs a new major version, and $VERSION does not raise the major version of $PREVIOUS")
+                                ;;
+                            *)
+                                PROBLEMS+=("the digester could not compare with $PREVIOUS: $(printf '%s\n' "$DIGEST" | sed -n '1,2p' | tr '\n' ' ')")
+                                COULD_NOT_COMPARE=1
+                                ;;
+                        esac
+                    fi
+                fi
             fi
         fi
     fi
