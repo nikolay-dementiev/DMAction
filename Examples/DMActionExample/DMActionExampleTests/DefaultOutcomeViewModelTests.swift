@@ -13,7 +13,7 @@ final class DefaultOutcomeViewModelTests: XCTestCase {
     /// The UI test expects the label of one failed attempt, so it relies on this default.
     @MainActor
     func test_failuresBeforeSuccess_byDefault_isOne() {
-        let viewModel = DefaultOutcomeViewModel(source: QuoteSourceSpy())
+        let viewModel = DefaultOutcomeViewModel(actions: DefaultOutcomeActionFactory(source: QuoteSourceSpy()))
 
         XCTAssertEqual(viewModel.failuresBeforeSuccess, 1)
     }
@@ -127,7 +127,7 @@ final class DefaultOutcomeViewModelTests: XCTestCase {
     @MainActor
     private func makeSUT(failuresBeforeSuccess: Int = 1) -> (viewModel: DefaultOutcomeViewModel, source: QuoteSourceSpy) {
         let source = QuoteSourceSpy()
-        let viewModel = DefaultOutcomeViewModel(source: source)
+        let viewModel = DefaultOutcomeViewModel(actions: DefaultOutcomeActionFactory(source: source))
         viewModel.failuresBeforeSuccess = failuresBeforeSuccess
         return (viewModel, source)
     }

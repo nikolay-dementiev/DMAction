@@ -19,6 +19,7 @@
 		906D01CA1AFC2EA25576F3FC /* OutcomeActionFactorySpy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3140E1C2474995BC1535695B /* OutcomeActionFactorySpy.swift */; };
 		988283B2D4FFBDE2F132980B /* DMAction in Frameworks */ = {isa = PBXBuildFile; productRef = 10638BB354B3C810EAA7463B /* DMAction */; };
 		A0A534E88F9E376040D8E718 /* QuoteSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D40703D007D667CDAC7201E /* QuoteSource.swift */; };
+		C4B78235EF491A2526D92B5A /* OutcomeActionFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DC3EA5EEFE89F0D4C5B258 /* OutcomeActionFactory.swift */; };
 		D173AC59E8D4613D66B82306 /* OutcomeViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA26692D1B4C0DC12AF70AD1 /* OutcomeViewModel.swift */; };
 		D81E3C0469C11B720F1C8915 /* AccessibilityAuditRetry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B74D34A5BB7FB9522D3F4F6C /* AccessibilityAuditRetry.swift */; };
 /* End PBXBuildFile section */
@@ -46,6 +47,7 @@
 		34B63AF5F0CBF4E9008C59A9 /* DefaultOutcomeViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultOutcomeViewModelTests.swift; sourceTree = "<group>"; };
 		491C0B5630E7C8A500A2165C /* DMActionExample.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = DMActionExample.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		51707AD59910091C17E33A30 /* OutcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutcomeView.swift; sourceTree = "<group>"; };
+		54DC3EA5EEFE89F0D4C5B258 /* OutcomeActionFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutcomeActionFactory.swift; sourceTree = "<group>"; };
 		690B8E572A91BCB36B7B1E00 /* OutcomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutcomeUITests.swift; sourceTree = "<group>"; };
 		6D99328680FB945C7ED2A451 /* DMActionExampleApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DMActionExampleApp.swift; sourceTree = "<group>"; };
 		86E90C4E4D1122E592341B27 /* DMAction */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DMAction; path = ../..; sourceTree = SOURCE_ROOT; };
@@ -82,6 +84,7 @@
 		3C07BEE39A29FC147BD7A504 /* Outcome */ = {
 			isa = PBXGroup;
 			children = (
+				54DC3EA5EEFE89F0D4C5B258 /* OutcomeActionFactory.swift */,
 				51707AD59910091C17E33A30 /* OutcomeView.swift */,
 				BA26692D1B4C0DC12AF70AD1 /* OutcomeViewModel.swift */,
 				8D40703D007D667CDAC7201E /* QuoteSource.swift */,
@@ -286,6 +289,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5351FAA2F733D5149AFCDE9E /* DMActionExampleApp.swift in Sources */,
+				C4B78235EF491A2526D92B5A /* OutcomeActionFactory.swift in Sources */,
 				3F5AD17D57A5340B15DDC319 /* OutcomeView.swift in Sources */,
 				D173AC59E8D4613D66B82306 /* OutcomeViewModel.swift in Sources */,
 				A0A534E88F9E376040D8E718 /* QuoteSource.swift in Sources */,
