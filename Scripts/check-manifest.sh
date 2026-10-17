@@ -46,7 +46,8 @@
 # extra pin, no pin, the copy twice, a format other than 2 and 3, and input that is not a
 # resolution at all. A reader that was changed to pass one of these fails the self-test.
 #
-# Exit codes: 0 every check passed, 1 a check failed, 2 wrong usage or the self-test could not run.
+# Exit codes: 0 every check passed, 1 a check failed, 2 wrong usage, or python3 is missing, or the
+# python block of item 2 is not where the self-test expects it.
 
 set -euo pipefail
 
@@ -56,10 +57,25 @@ MODULE="DMAction"
 # Runs the reader of Package.resolved (the block of step 2) on built-in texts, and exits.
 SELF_TEST_WORK=""
 self_test() {
-    local script total=0 failures=0 dm
+    local script total=0 failures=0 dm found
     script="${BASH_SOURCE[0]}"
+    if ! command -v python3 > /dev/null; then
+        echo "check-manifest: self-test: python3 is not installed" >&2
+        exit 2
+    fi
     SELF_TEST_WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-manifest-self-test.XXXXXX")" || exit 2
     trap 'rm -rf "$SELF_TEST_WORK"' EXIT
+    # Step 2 runs the text from its heredoc to the line PY. The self-test must take that same text:
+    # one marker, directly under the line that opens the heredoc, so that a line added above the
+    # marker or a second marker cannot make the two differ.
+    found="$(awk '/^# resolved-inventory$/ { count++; opener = prev } { prev = $0 } END { print count + 0 ":" opener }' "$script")"
+    case "$found" in
+        "1:"*"<<'PY'") ;;
+        *)
+            echo "check-manifest: self-test: the marker resolved-inventory must appear once, under the line that opens the heredoc of step 2 (found '$found')" >&2
+            exit 2
+            ;;
+    esac
     awk '/^# resolved-inventory$/ { found = 1 } found && /^PY$/ { exit } found' "$script" > "$SELF_TEST_WORK/reader.py"
     if [ ! -s "$SELF_TEST_WORK/reader.py" ]; then
         echo "check-manifest: self-test: the python block marked resolved-inventory is not in $script" >&2
@@ -107,17 +123,13 @@ self_test() {
     exit 0
 }
 
-case "${1:-}" in
-    '') ;;
-    --self-test)
-        [ "$#" -eq 1 ] || { echo "usage: Scripts/check-manifest.sh [--self-test]" >&2; exit 2; }
+if [ "$#" -gt 0 ]; then
+    if [ "$1" = "--self-test" ] && [ "$#" -eq 1 ]; then
         self_test
-        ;;
-    *)
-        echo "usage: Scripts/check-manifest.sh [--self-test]" >&2
-        exit 2
-        ;;
-esac
+    fi
+    echo "usage: Scripts/check-manifest.sh [--self-test]" >&2
+    exit 2
+fi
 
 WORK="$ROOT/.build/check-manifest"
 FAILED=0
