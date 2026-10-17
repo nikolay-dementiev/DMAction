@@ -115,6 +115,11 @@ whole CI workflow, makes sure the tag still points at the commit CI tested, and 
 release from the changelog section. Publishing the release stays a manual step, and nothing goes
 to the CocoaPods trunk.
 
+After the tag, open the package's page on the Swift Package Index,
+https://swiftpackageindex.com/nikolay-dementiev/DMAction, and check that the new version and its
+documentation are listed. `.spi.yml` configures the documentation build; no script or CI job
+checks the index.
+
 ## Security
 
 Do not report a vulnerability in a public issue. See `SECURITY.md`.
