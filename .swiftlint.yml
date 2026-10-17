@@ -56,6 +56,7 @@ custom_rules:
       - identifier
     message: "A library never terminates its host. Report the failure to the caller."
     severity: error
+  # The name is older than the Domain folder: this rule covers the whole library.
   domain_imports:
     name: "Domain imports"
     # The library folder only: a path that merely contains Sources, such as the source folders of
@@ -74,8 +75,9 @@ custom_rules:
     # The Domain folder holds the plan as data, the layer under the facade. A path is matched as
     # domain_imports matches it, against the absolute path.
     included: ".*/Sources/DMAction/Domain/.*\\.swift"
-    # Every public type of the library, by its own name; a name that merely contains one is not
-    # that type. Comments and strings never match.
+    # The public types of the library, by their own names; a name that merely contains one is not
+    # that type. Comments and strings never match. The list is kept by hand: a public type that is
+    # added goes into it in the same change.
     regex: '\b(DMAction|DMButtonAction|DMActionWithFallback|DMActionResultValue|DMActionResultValueProtocol|PlaceholderCopyable)\b'
     match_kinds: [identifier, typeidentifier]
     message: "The Domain folder names no type of the facade: it is the layer under it. Use the aliases of ActionTypes.swift."
@@ -87,5 +89,5 @@ custom_rules:
     # to the Adapters folder, where the executor writes to the unified log.
     regex: '(?:^|;)\s*(@\w+(\([^)]*\))?\s+)*((public|package|internal|fileprivate|private)\s+)?import\s+(?:(?:struct|class|enum|protocol|typealias|func|var|let)\s+)?+(?!Foundation\b)\w+'
     match_kinds: [keyword, identifier, attribute.builtin, attribute.id]
-    message: "The Domain folder imports Foundation at most: the unified log, threads and locks belong to the Adapters folder."
+    message: "The Domain folder imports Foundation at most: the unified log and every other module belong to the Adapters folder or the facade."
     severity: error
