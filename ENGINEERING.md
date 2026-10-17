@@ -92,16 +92,17 @@ the rules above it would have needed a major version. The rules apply from the r
 - **Composition as data.** `fallbackTo` and `retry` build values and run nothing. What an action
   runs is held as data (`ActionPlan`) and one internal type (`ActionRun`) runs it. `retry` stores
   its count and `fallbackTo` joins the steps of its operands into one list, so neither nests a run.
-- **Two folders under the facade.** `Sources/DMAction` holds the facade: the protocol and the two
-  structs, which read a conformer into a plan and start a run. `Domain/` holds the plan as data
-  (`ActionPlan`, `Cursor`) and the aliases of its function types (`Producer`, `ProducerResult`, the
-  same types as the public `ActionType` and `ResultType`). It imports Foundation at most and names
-  no type of the facade. `Adapters/` holds the executor (`ActionRun`: threads, a lock, the unified
-  log). `Scripts/lint.sh` enforces the Domain half with two rules scoped to the folder:
-  `domain_no_facade_types` reports the name of any public type of the library, and
-  `domain_foundation_only` any import but Foundation. `ActionRun` still calls
-  `DMActionResultValue.labelling`, a helper of the facade that labels a success; no rule keeps the
-  Adapters folder from naming the facade.
+- **Two folders under the facade.** `Sources/DMAction` holds the facade: the public protocols and
+  structs, and the two members that read a conformer into a plan and start a run. `Domain/` holds
+  the plan as data (`ActionPlan`, `Cursor`) and the aliases of the producer and its result
+  (`Producer`, `ProducerResult`, the same types as the public `ActionType` and `ResultType`).
+  `Adapters/` holds the executor (`ActionRun`: threads, a lock, the unified log).
+  `Scripts/lint.sh` enforces the Domain half with two rules scoped to its folder:
+  `domain_no_facade_types` reports the name of a public type of the library, from a list that is
+  kept by hand, and `domain_foundation_only` any import but Foundation, except one that follows a
+  block comment on the same line. No rule keeps the Domain folder from naming `ActionRun`, and none
+  keeps the Adapters folder from naming the facade: `ActionRun` still calls
+  `DMActionResultValue.labelling`, a helper of the facade that labels a success.
 - **One delivery.** A run of the library's actions delivers at most one result. A later completion
   of the same run is ignored.
 - **No `Sendable`.** Nothing public is `Sendable` and no closure type is `@Sendable`. An action is
@@ -125,8 +126,10 @@ the rules above it would have needed a major version. The rules apply from the r
   `force_unwrapping` and `no_process_termination` fire on the lines that expect them and on no
   other line. The fixtures cannot show that the two Domain rules reach that folder only; the real
   tree does, because the facade names those types and the executor imports `os`, so
-  `Scripts/lint.sh` fails when either rule is widened. CI runs the contract right after
-  `Scripts/lint.sh`.
+  `Scripts/lint.sh` fails when either rule is widened. They cannot show either that `domain_imports`
+  and `no_process_termination` reach the rest of the library and not only the Domain folder, and
+  nothing else shows it: that needs a contract that lints fixtures in more than one folder. CI runs
+  the contract right after `Scripts/lint.sh`.
 
 ## Toolchain and platforms
 
