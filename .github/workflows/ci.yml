@@ -201,9 +201,7 @@ jobs:
       # files must be in the result bundle, run and passed.
       - name: Check the test count
         run: |
-          # git grep exits 1 when nothing matches. Without the || true, pipefail would end the step
-          # before the check below could say that it expected no test.
-          EXPECTED="$({ git grep -hcE '^[[:space:]]*func test[[:alnum:]_]*\(\)' -- 'Tests/DMActionTests/*.swift' || true; } \
+          EXPECTED="$(git grep -hcE '^[[:space:]]*func test[[:alnum:]_]*\(\)' -- 'Tests/DMActionTests/*.swift' \
             | awk '{ total += $1 } END { print total + 0 }')"
           xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/DMAction-watchOS.xcresult" > "$RUNNER_TEMP/summary.json"
           if ! jq -e --argjson expected "$EXPECTED" \
