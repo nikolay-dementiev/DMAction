@@ -59,7 +59,8 @@ What each platform is verified with:
 | iOS 26.5 (Xcode 26.6), iOS 18.5 (Xcode 16.4) | the tests run on simulators in CI, for the library and the example app |
 | iOS 17.5 | the library's tests run on a simulator before a release |
 | macOS, the host | the tests run in CI with Swift 6.0.3, and again under the Thread Sanitizer. macOS is not a declared platform |
-| watchOS | CI builds the library for watchOS with `pod lib lint`. No test runs on watchOS |
+| watchOS 26.5 (Xcode 26.6), watchOS 11.5 (Xcode 16.4) | the library's tests run on simulators in CI, and CI builds the library for the watchOS device SDK |
+| watchOS 7 | declared, not run: the oldest watchOS runtime a test has run on is 11.5 |
 
 ## Installation
 
