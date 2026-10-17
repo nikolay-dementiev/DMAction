@@ -85,13 +85,24 @@ the rules above it would have needed a major version. The rules apply from the r
 
 ## The package as it is
 
-- **One layer.** The library imports Foundation and, where the module exists, `os`. It has no UI,
+- **Imports.** The library imports Foundation and, where the module exists, `os`. It has no UI,
   no third-party dependency and no build plugin. `Scripts/lint.sh` enforces the imports: the custom
   rule `domain_imports` reports any other import in the library folder, except one that follows a
   block comment on the same line.
 - **Composition as data.** `fallbackTo` and `retry` build values and run nothing. What an action
   runs is held as data (`ActionPlan`) and one internal type (`ActionRun`) runs it. `retry` stores
   its count and `fallbackTo` joins the steps of its operands into one list, so neither nests a run.
+- **Two folders under the facade.** `Sources/DMAction` holds the facade: the public protocols and
+  structs, and the two members that read a conformer into a plan and start a run. `Domain/` holds
+  the plan as data (`ActionPlan`, `Cursor`) and the aliases of the producer and its result
+  (`Producer`, `ProducerResult`, the same types as the public `ActionType` and `ResultType`).
+  `Adapters/` holds the executor (`ActionRun`: threads, a lock, the unified log).
+  `Scripts/lint.sh` enforces the Domain half with two rules scoped to its folder:
+  `domain_no_facade_types` reports the name of a public type of the library, from a list that is
+  kept by hand, and `domain_foundation_only` any import but Foundation, except one that follows a
+  block comment on the same line. No rule keeps the Domain folder from naming `ActionRun`, and none
+  keeps the Adapters folder from naming the facade: `ActionRun` still calls
+  `DMActionResultValue.labelling`, a helper of the facade that labels a success.
 - **One delivery.** A run of the library's actions delivers at most one result. A later completion
   of the same run is ignored.
 - **No `Sendable`.** Nothing public is `Sendable` and no closure type is `@Sendable`. An action is
@@ -110,9 +121,15 @@ the rules above it would have needed a major version. The rules apply from the r
   SwiftLint's `force_unwrapping`, `force_try` and `force_cast`. The force unwrap rule has no
   exemption for a call with a literal argument, so `URL(string: "...")!` is reported too.
 - **The rules are proved.** A rule that never matches reports nothing, so
-  `Scripts/check-lint-contract.sh` lints the fixtures of `Fixtures/Lint` and proves that
-  `domain_imports`, `force_unwrapping` and `no_process_termination` fire on the lines that expect
-  them and on no other line. CI runs it right after `Scripts/lint.sh`.
+  `Scripts/check-lint-contract.sh` lints the fixtures of `Fixtures/Lint` as files of the Domain
+  folder and proves that `domain_imports`, `domain_no_facade_types`, `domain_foundation_only`,
+  `force_unwrapping` and `no_process_termination` fire on the lines that expect them and on no
+  other line. The fixtures cannot show that the two Domain rules reach that folder only; the real
+  tree does, because the facade names those types and the executor imports `os`, so
+  `Scripts/lint.sh` fails when either rule is widened. They cannot show either that `domain_imports`
+  and `no_process_termination` reach the rest of the library and not only the Domain folder, and
+  nothing else shows it: that needs a contract that lints fixtures in more than one folder. CI runs
+  the contract right after `Scripts/lint.sh`.
 
 ## Toolchain and platforms
 

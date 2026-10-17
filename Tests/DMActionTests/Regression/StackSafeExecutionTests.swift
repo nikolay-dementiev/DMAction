@@ -10,7 +10,8 @@ final class StackSafeExecutionTests: XCTestCase {
 
     func test_retry_withTenThousandRetriesOnASmallStack_callsTheProducerTenThousandAndOneTimes() {
         let errors = (0...Self.depth).map { _ in MarkedError() }
-        let (producer, consumer) = makeSUT(script: errors.map { .failure($0) })
+        let (spies, consumer) = makeSUT(script: errors.map { .failure($0) })
+        let producer = spies[0]
 
         runOnASmallStack {
             producer.action.retry(UInt(Self.depth)).action(consumer.receive)
@@ -114,7 +115,8 @@ final class StackSafeExecutionTests: XCTestCase {
             let action: any DMAction
             init(_ action: any DMAction) { self.action = action }
         }
-        let (producer, consumer) = makeSUT(script: [.success("value")])
+        let (spies, consumer) = makeSUT(script: [.success("value")])
+        let producer = spies[0]
 
         runOnASmallStack {
             var action: any DMAction = producer.action.fallbackTo(DMButtonAction { $0(.success("fallback")) })
@@ -139,7 +141,8 @@ final class StackSafeExecutionTests: XCTestCase {
     /// release build. CI also runs this test with Swift 6.0 and 6.1.
     func test_retry_appliedAThousandTimesToACompositeOnASmallStack_runsAndIsDestroyed() {
         final class Probe {}
-        let (producer, consumer) = makeSUT(script: [.success("value")])
+        let (spies, consumer) = makeSUT(script: [.success("value")])
+        let producer = spies[0]
         weak var weakProbe: Probe?
 
         runOnASmallStack {
@@ -166,12 +169,13 @@ final class StackSafeExecutionTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeSUT(script: [ProducerSpy.Outcome]) -> (producer: ProducerSpy, consumer: ConsumerSpy) {
-        (ProducerSpy(script: script), ConsumerSpy())
-    }
-
-    /// Every producer fails except the last one, which succeeds with "last".
-    private func makeSUT() -> (spies: [ProducerSpy], consumer: ConsumerSpy) {
+    /// A consumer and the producers of one test. With a script, one producer plays it. Without one,
+    /// a chain of `depth + 1` producers: every producer fails except the last one, which succeeds
+    /// with "last".
+    private func makeSUT(script: [ProducerSpy.Outcome]? = nil) -> (spies: [ProducerSpy], consumer: ConsumerSpy) {
+        if let script {
+            return ([ProducerSpy(script: script)], ConsumerSpy())
+        }
         let spies = (0...Self.depth).map { index in
             index == Self.depth ? ProducerSpy(script: [.success("last")]) : ProducerSpy.alwaysFailing()
         }

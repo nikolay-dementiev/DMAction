@@ -1,0 +1,10 @@
+// Linted as a file of Sources/DMAction/Domain. domain_imports permits os for the library, so it
+// reports none of these lines; the Domain folder permits Foundation only, so domain_foundation_only
+// reports every one.
+#if canImport(os)
+import os // expect: domain_foundation_only
+#endif
+import os.log // expect: domain_foundation_only
+import func os.os_log // expect: domain_foundation_only
+public import os // expect: domain_foundation_only
+@preconcurrency import os // expect: domain_foundation_only
