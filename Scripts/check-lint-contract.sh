@@ -22,9 +22,11 @@
 # linted in the same subfolder of LIBRARY_DIR, so that a rule meant for one folder, such as Domain,
 # is proved there, and a fixture in the root proves that the rule does not reach the root. A file
 # under Outside is linted at the same path counted from the root of the scratch copy, outside the
-# library: no rule of the contract applies there, so such a fixture expects nothing, and a
+# library, where the rules that have an include do not apply. Such a fixture expects nothing, and a
 # diagnostic in it fails the check. That is how a rule that is too wide is caught, one that reaches
-# a fixture package or a second module.
+# a fixture package or a second module. A rule without an include, such as force_unwrapping,
+# applies there too, so an Outside fixture holds none of what it reports. The first folder of an
+# Outside path must be one that .swiftlint.yml includes, or SwiftLint does not lint the file.
 #
 # Exit codes: 0 every rule fires where expected and nowhere else, 1 a line differs, 2 the check
 # could not be made. A tool that fails by itself, such as the fetch of SwiftLint or python3, can
@@ -47,6 +49,10 @@ FIXTURE_DIR="Fixtures/Lint"
 
 # ==== End of the settings ===============================================================
 
+# A trailing slash would break the path guards below.
+LIBRARY_DIR="${LIBRARY_DIR%/}"
+FIXTURE_DIR="${FIXTURE_DIR%/}"
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=SCRIPTDIR/swiftlint-tool.sh
 . "$ROOT/Scripts/swiftlint-tool.sh"
@@ -68,7 +74,7 @@ SWIFTLINT="$(swiftlint_fetch "$ROOT" "$VERSION" check-lint-contract)"
 FIXTURES=()
 while IFS= read -r FIXTURE; do
     FIXTURES+=("$FIXTURE")
-done < <(find "$ROOT/$FIXTURE_DIR" -type f -name '*.txt' 2> /dev/null | LC_ALL=C sort)
+done < <(find -L "$ROOT/$FIXTURE_DIR" -type f -name '*.txt' | LC_ALL=C sort)
 if [ "${#FIXTURES[@]}" -eq 0 ]; then
     fail 2 "no fixture found in $FIXTURE_DIR"
 fi
@@ -87,6 +93,11 @@ cp "$ROOT/.swiftlint.yml" "$WORK/.swiftlint.yml"
 : > "$WORK/fixtures.tsv"
 for FIXTURE in "${FIXTURES[@]}"; do
     RELATIVE="${FIXTURE#"$ROOT/$FIXTURE_DIR/"}"
+    case "$RELATIVE" in
+        *[!A-Za-z0-9._/\ -]*)
+            fail 2 "$FIXTURE_DIR/$RELATIVE has a character in its name that the contract cannot carry: use letters, digits and . _ - / and spaces"
+            ;;
+    esac
     case "$RELATIVE" in
         Outside/*)
             KIND="outside"
@@ -139,7 +150,8 @@ def stop(message):
     sys.exit(2)
 
 
-# (path in the fixture folder, path of the fixture, real path of its scratch copy, outside the library)
+# (path in the fixture folder, path of the fixture, real path of its scratch copy, whether it lies
+# outside the library)
 fixtures = []
 for row in open(map_path, encoding="utf-8").read().splitlines():
     relative, copy, kind = row.split("\t")
@@ -169,7 +181,8 @@ try:
 except ValueError as error:
     stop(f"the report of SwiftLint is not JSON: {error}")
 
-# The scratch folder lies under /var on macOS, which is a link to /private/var: real paths on both sides.
+# The scratch folder lies under /var on macOS, which is a link to /private/var: real paths on both
+# sides.
 copies = {copy: relative for relative, _, copy, _ in fixtures}
 actual = collections.defaultdict(list)
 for violation in report:
