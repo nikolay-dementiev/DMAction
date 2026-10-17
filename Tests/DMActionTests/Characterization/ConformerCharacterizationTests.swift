@@ -29,6 +29,24 @@ final class ConformerCharacterizationTests: XCTestCase {
         }
     }
 
+    /// A conformer whose getters append to a log that other conformers share, so that the order of
+    /// reads across two of them can be pinned.
+    private struct LoggedAction: DMAction {
+        let name: String
+        let log: EventLog
+        let id = UUID()
+
+        var currentAttempt: UInt {
+            log.add("\(name).currentAttempt")
+            return 0
+        }
+
+        var action: ActionType {
+            log.add("\(name).action")
+            return { $0(.success("value")) }
+        }
+    }
+
     /// A conformer that supplies its own `simpleAction`.
     private struct SilentAction: DMAction {
         let currentAttempt: UInt = 0
@@ -141,6 +159,20 @@ final class ConformerCharacterizationTests: XCTestCase {
         XCTAssertEqual(receiver.actionReads, 1, "the receiver's action")
         XCTAssertEqual(fallback.actionReads, 1, "the fallback's action")
         XCTAssertEqual(fallback.attemptReads, 0, "the fallback's attempt is not used")
+    }
+
+    func test_fallbackTo_withEffectfulGetters_readsReceiverAttemptThenReceiverActionThenFallbackAction() {
+        let log = EventLog()
+        let receiver = LoggedAction(name: "receiver", log: log)
+        let fallback = LoggedAction(name: "fallback", log: log)
+
+        _ = receiver.fallbackTo(fallback)
+
+        XCTAssertEqual(
+            log.events,
+            ["receiver.currentAttempt", "receiver.action", "fallback.action"],
+            "the receiver's attempt, then its action, then the fallback's action, each read once"
+        )
     }
 
     func test_retry_onCustomConformer_readsItsActionOnceAtComposition() {
