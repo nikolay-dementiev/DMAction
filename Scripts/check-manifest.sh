@@ -3,7 +3,8 @@
 # Checks what a consumer of the package gets, and what the repository's own tooling does
 # on the machine of whoever runs it.
 #
-#   Scripts/check-manifest.sh
+#   Scripts/check-manifest.sh              run the checks below
+#   Scripts/check-manifest.sh --self-test  run the reader of Package.resolved of item 2 on built-in texts
 #
 # 1. The manifest declares no dependency, uses no plugin on any target, passes no unsafe
 #    flag and does not read the environment. A dependency needs the maintainer's approval and
@@ -38,11 +39,86 @@
 # 6. The uses across isolation domains that the Swift 6 compiler rejects today are still
 #    rejected, each with the error it names. Each one is a target of Fixtures/Rejected.
 #    One that starts to compile means the concurrency limits of the library have changed.
+#
+# --self-test needs no network, no build and no swift. A reader that never fails looks the same
+# as a clean tree, so it takes the python block of item 2 out of this very file, the text that the
+# check runs, and runs it on Package.resolved texts that it carries: a pin of the copy alone, an
+# extra pin, no pin, the copy twice, a format other than 2 and 3, and input that is not a
+# resolution at all. A reader that was changed to pass one of these fails the self-test.
+#
+# Exit codes: 0 every check passed, 1 a check failed, 2 wrong usage or the self-test could not run.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODULE="DMAction"
+
+# Runs the reader of Package.resolved (the block of step 2) on built-in texts, and exits.
+SELF_TEST_WORK=""
+self_test() {
+    local script total=0 failures=0 dm
+    script="${BASH_SOURCE[0]}"
+    SELF_TEST_WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-manifest-self-test.XXXXXX")" || exit 2
+    trap 'rm -rf "$SELF_TEST_WORK"' EXIT
+    awk '/^# resolved-inventory$/ { found = 1 } found && /^PY$/ { exit } found' "$script" > "$SELF_TEST_WORK/reader.py"
+    if [ ! -s "$SELF_TEST_WORK/reader.py" ]; then
+        echo "check-manifest: self-test: the python block marked resolved-inventory is not in $script" >&2
+        exit 2
+    fi
+    pin() {  # <identity> <version>
+        printf '{"identity":"%s","kind":"localSourceControl","location":"/x/%s","state":{"revision":"abc","version":"%s"}}' "$1" "$1" "$2"
+    }
+    expect() {  # <name> <expected status> <expected text>: the reader on Package.resolved as it is
+        local got=0 output
+        total=$((total + 1))
+        output="$(python3 "$SELF_TEST_WORK/reader.py" "$SELF_TEST_WORK/Package.resolved" "$MODULE" 2>&1)" || got=$?
+        if [ "$got" -eq "$2" ] && printf '%s\n' "$output" | grep -q -F -- "$3"; then
+            echo "check-manifest: self-test ok   $1"
+        else
+            failures=$((failures + 1))
+            echo "check-manifest: self-test FAIL $1: expected status $2 and '$3', got status $got:" >&2
+            printf '%s\n' "$output" | head -5 | sed 's/^/    /' >&2
+        fi
+    }
+    check() {  # <name> <expected status> <expected text> <text of Package.resolved>
+        printf '%s\n' "$4" > "$SELF_TEST_WORK/Package.resolved"
+        expect "$1" "$2" "$3"
+    }
+    dm="$(pin dmaction 1.1.0)"
+    check "the copy alone, format 3" 0 "" "{\"version\":3,\"pins\":[$dm]}"
+    check "the copy alone, format 2" 0 "" "{\"version\":2,\"pins\":[$dm]}"
+    check "an extra pin is named" 1 "second (localSourceControl, 1.0.0, /x/second)" "{\"version\":3,\"pins\":[$(pin second 1.0.0),$dm]}"
+    check "another pin only" 1 "dmaction, the tagged copy, is not among the resolved packages" "{\"version\":3,\"pins\":[$(pin second 1.0.0)]}"
+    check "no pin at all" 1 "is not among the resolved packages" '{"version":3,"pins":[]}'
+    check "format 1" 1 "not of format version 2 or 3" '{"object":{"pins":[{"package":"DMAction"}]},"version":1}'
+    check "format 4" 1 "not of format version 2 or 3" "{\"version\":4,\"pins\":[$dm]}"
+    check "no list of pins" 1 "not of format version 2 or 3" '{"version":3}'
+    check "not JSON" 1 "cannot be read" 'not json'
+    check "the copy twice" 1 "pinned 2 times" "{\"version\":3,\"pins\":[$dm,$(pin dmaction 1.2.0)]}"
+    check "a pin that is not an object" 1 "not of format version 2 or 3" "{\"version\":3,\"pins\":[$dm,\"text\"]}"
+    check "a null state" 1 "second (registry, None, None)" "{\"version\":3,\"pins\":[$dm,{\"identity\":\"second\",\"kind\":\"registry\",\"state\":null}]}"
+    rm -f "$SELF_TEST_WORK/Package.resolved"
+    expect "a file that is not there" 1 "cannot be read"
+    if [ "$failures" -gt 0 ]; then
+        echo "check-manifest: self-test: $failures of $total checks failed" >&2
+        exit 1
+    fi
+    echo "check-manifest: self-test: $total checks of the reader of Package.resolved, all ok."
+    exit 0
+}
+
+case "${1:-}" in
+    '') ;;
+    --self-test)
+        [ "$#" -eq 1 ] || { echo "usage: Scripts/check-manifest.sh [--self-test]" >&2; exit 2; }
+        self_test
+        ;;
+    *)
+        echo "usage: Scripts/check-manifest.sh [--self-test]" >&2
+        exit 2
+        ;;
+esac
+
 WORK="$ROOT/.build/check-manifest"
 FAILED=0
 SKIPPED=""
