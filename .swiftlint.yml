@@ -69,3 +69,23 @@ custom_rules:
     match_kinds: [keyword, identifier, attribute.builtin, attribute.id]
     message: "The library imports Foundation and os only: no UI and no platform framework."
     severity: error
+  domain_no_facade_types:
+    name: "Domain names no facade type"
+    # The Domain folder holds the plan as data, the layer under the facade. A path is matched as
+    # domain_imports matches it, against the absolute path.
+    included: ".*/Sources/DMAction/Domain/.*\\.swift"
+    # Every public type of the library, by its own name; a name that merely contains one is not
+    # that type. Comments and strings never match.
+    regex: '\b(DMAction|DMButtonAction|DMActionWithFallback|DMActionResultValue|DMActionResultValueProtocol|PlaceholderCopyable)\b'
+    match_kinds: [identifier, typeidentifier]
+    message: "The Domain folder names no type of the facade: it is the layer under it. Use the aliases of ActionTypes.swift."
+    severity: error
+  domain_foundation_only:
+    name: "Domain imports Foundation only"
+    included: ".*/Sources/DMAction/Domain/.*\\.swift"
+    # The pattern of domain_imports, with Foundation as the only module that is allowed: os belongs
+    # to the Adapters folder, where the executor writes to the unified log.
+    regex: '(?:^|;)\s*(@\w+(\([^)]*\))?\s+)*((public|package|internal|fileprivate|private)\s+)?import\s+(?:(?:struct|class|enum|protocol|typealias|func|var|let)\s+)?+(?!Foundation\b)\w+'
+    match_kinds: [keyword, identifier, attribute.builtin, attribute.id]
+    message: "The Domain folder imports Foundation at most: the unified log, threads and locks belong to the Adapters folder."
+    severity: error
