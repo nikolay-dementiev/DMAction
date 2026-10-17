@@ -1,0 +1,9 @@
+// Linted as a file of the Adapters folder: the rules of the whole library reach it, and the Domain
+// rules do not, so os and the names of the facade are fine here.
+import Foundation
+import os
+import UIKit // expect: domain_imports
+let button = DMButtonAction()
+func terminate() {
+    fatalError("x") // expect: no_process_termination
+}
