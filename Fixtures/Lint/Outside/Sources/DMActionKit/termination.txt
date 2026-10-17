@@ -1,0 +1,16 @@
+// Linted outside the library, in a module whose name starts like the library's. The rules that have
+// an include do not apply there. The force_unwrapping rule has none, so no line here forces an
+// unwrap. No line expects a diagnostic.
+func terminate() {
+    fatalError("x")
+    preconditionFailure("x")
+    assertionFailure("x")
+    precondition(false)
+    assert(false)
+    dispatchPrecondition(condition: .onQueue(.main))
+    abort()
+    exit(1)
+}
+import UIKit
+import os
+let button = DMButtonAction()

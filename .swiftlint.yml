@@ -50,7 +50,9 @@ missing_docs:
 custom_rules:
   no_process_termination:
     name: "No process termination"
-    included: "Sources/.*\\.swift"
+    # The library module, by name, like the other rules: a path that merely holds a Sources folder,
+    # such as a fixture package or a second module, is not the library.
+    included: ".*/Sources/DMAction/.*\\.swift"
     regex: '\b(fatalError|preconditionFailure|assertionFailure|precondition|assert|dispatchPrecondition|abort|exit)\s*\('
     match_kinds:
       - identifier
@@ -64,9 +66,10 @@ custom_rules:
     # checkout inside a folder that is itself named Sources/DMAction would apply it to everything.
     included: ".*/Sources/DMAction/.*\\.swift"
     # Any attribute, access level and import kind; a second import after a semicolon; a submodule
-    # of Foundation or os is allowed. Comments and strings never match. An import that follows a
-    # block comment on the same line is not seen.
-    regex: '(?:^|;)\s*(@\w+(\([^)]*\))?\s+)*((public|package|internal|fileprivate|private)\s+)?import\s+(?:(?:struct|class|enum|protocol|typealias|func|var|let)\s+)?+(?!(?:Foundation|os)\b)\w+'
+    # of Foundation or os is allowed. Comments and strings never match. Only spaces and tabs may
+    # come before the import, so that a blank line is not swallowed and the diagnostic lands on
+    # the line of the import. An import that follows a block comment on the same line is not seen.
+    regex: '(?:^|;)[ \t]*(@\w+(\([^)]*\))?\s+)*((public|package|internal|fileprivate|private)\s+)?import\s+(?:(?:struct|class|enum|protocol|typealias|func|var|let)\s+)?+(?!(?:Foundation|os)\b)\w+'
     match_kinds: [keyword, identifier, attribute.builtin, attribute.id]
     message: "The library imports Foundation and os only: no UI and no platform framework."
     severity: error
@@ -87,7 +90,7 @@ custom_rules:
     included: ".*/Sources/DMAction/Domain/.*\\.swift"
     # The pattern of domain_imports, with Foundation as the only module that is allowed: os belongs
     # to the Adapters folder, where the executor writes to the unified log.
-    regex: '(?:^|;)\s*(@\w+(\([^)]*\))?\s+)*((public|package|internal|fileprivate|private)\s+)?import\s+(?:(?:struct|class|enum|protocol|typealias|func|var|let)\s+)?+(?!Foundation\b)\w+'
+    regex: '(?:^|;)[ \t]*(@\w+(\([^)]*\))?\s+)*((public|package|internal|fileprivate|private)\s+)?import\s+(?:(?:struct|class|enum|protocol|typealias|func|var|let)\s+)?+(?!Foundation\b)\w+'
     match_kinds: [keyword, identifier, attribute.builtin, attribute.id]
     message: "The Domain folder imports Foundation at most: the unified log and every other module belong to the Adapters folder or the facade."
     severity: error

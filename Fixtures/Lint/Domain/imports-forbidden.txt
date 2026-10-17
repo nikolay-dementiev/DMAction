@@ -1,0 +1,24 @@
+import UIKit // expect: domain_imports domain_foundation_only
+public import UIKit // expect: domain_imports domain_foundation_only
+@preconcurrency import SwiftUI // expect: domain_imports domain_foundation_only
+@_implementationOnly import Combine // expect: domain_imports domain_foundation_only
+import struct SwiftUI.Color // expect: domain_imports domain_foundation_only
+import Foundation; import UIKit // expect: domain_imports domain_foundation_only
+@_spi(Internal) import UIKit // expect: domain_imports domain_foundation_only
+package import UIKit // expect: domain_imports domain_foundation_only
+import UIKit.UIView // expect: domain_imports domain_foundation_only
+import FoundationNetworking // expect: domain_imports domain_foundation_only
+internal import UIKit // expect: domain_imports domain_foundation_only
+fileprivate import UIKit // expect: domain_imports domain_foundation_only
+private import UIKit // expect: domain_imports domain_foundation_only
+@testable import UIKit // expect: domain_imports domain_foundation_only
+@_exported import UIKit // expect: domain_imports domain_foundation_only
+import os_signpost // expect: domain_imports domain_foundation_only
+import osLog // expect: domain_imports domain_foundation_only
+	import UIKit // expect: domain_imports domain_foundation_only
+import  UIKit // expect: domain_imports domain_foundation_only
+import class UIKit.UIView // expect: domain_imports domain_foundation_only
+import func SwiftUI.withAnimation // expect: domain_imports domain_foundation_only
+#if canImport(UIKit)
+import UIKit // expect: domain_imports domain_foundation_only
+#endif

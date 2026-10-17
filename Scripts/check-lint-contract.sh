@@ -16,6 +16,18 @@
 # unpacked into .build/tools, and the fixtures are linted in a scratch folder that is removed at
 # the end.
 #
+# Where a fixture is linted depends on where it lies in Fixtures/Lint. A file directly in that
+# folder is linted as a file of LIBRARY_DIR, so a repository whose fixtures are all in one flat
+# folder works as it did before subfolders were read, without a change. A file in a subfolder is
+# linted in the same subfolder of LIBRARY_DIR, so that a rule meant for one folder, such as Domain,
+# is proved there, and a fixture in the root proves that the rule does not reach the root. A file
+# under Outside is linted at the same path counted from the root of the scratch copy, outside the
+# library, where the rules that have an include do not apply. Such a fixture expects nothing, and a
+# diagnostic in it fails the check. That is how a rule that is too wide is caught, one that reaches
+# a fixture package or a second module. A rule without an include, such as force_unwrapping,
+# applies there too, so an Outside fixture holds none of what it reports. The first folder of an
+# Outside path must be one that .swiftlint.yml includes, or SwiftLint does not lint the file.
+#
 # Exit codes: 0 every rule fires where expected and nowhere else, 1 a line differs, 2 the check
 # could not be made. A tool that fails by itself, such as the fetch of SwiftLint or python3, can
 # end the script with its own status.
@@ -28,18 +40,18 @@ set -euo pipefail
 # these settings.
 
 # The folder of the package layout that the include patterns of the rules name, relative to the
-# repository root. The fixtures are linted as files of this folder. Here it is the Domain folder,
-# the strictest one: the rules of the whole library cover it too, so every rule reaches a fixture.
-# That shows that the library-wide rules reach the Domain folder, not that they reach the rest of
-# the library. A contract that lints fixtures in more than one folder would; that is a change of
-# the body, which the repositories share.
-LIBRARY_DIR="Sources/DMAction/Domain"
+# repository root. The fixtures are linted as files of this folder, or of its subfolders.
+LIBRARY_DIR="Sources/DMAction"
 # The rules of the contract, separated by spaces. Each one needs a fixture that expects it.
 RULES="domain_foundation_only domain_imports domain_no_facade_types force_unwrapping no_process_termination"
 # The folder of the fixtures, relative to the repository root.
 FIXTURE_DIR="Fixtures/Lint"
 
 # ==== End of the settings ===============================================================
+
+# A trailing slash would break the path guards below.
+LIBRARY_DIR="${LIBRARY_DIR%/}"
+FIXTURE_DIR="${FIXTURE_DIR%/}"
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=SCRIPTDIR/swiftlint-tool.sh
@@ -60,11 +72,9 @@ VERSION="$(swiftlint_version "$ROOT" check-lint-contract)"
 SWIFTLINT="$(swiftlint_fetch "$ROOT" "$VERSION" check-lint-contract)"
 
 FIXTURES=()
-for FIXTURE in "$ROOT/$FIXTURE_DIR"/*.txt; do
-    if [ -f "$FIXTURE" ]; then
-        FIXTURES+=("$FIXTURE")
-    fi
-done
+while IFS= read -r FIXTURE; do
+    FIXTURES+=("$FIXTURE")
+done < <(find -L "$ROOT/$FIXTURE_DIR" -type f -name '*.txt' | LC_ALL=C sort)
 if [ "${#FIXTURES[@]}" -eq 0 ]; then
     fail 2 "no fixture found in $FIXTURE_DIR"
 fi
@@ -78,8 +88,35 @@ trap cleanup EXIT
 
 mkdir -p "$WORK/$LIBRARY_DIR"
 cp "$ROOT/.swiftlint.yml" "$WORK/.swiftlint.yml"
+# One row for each fixture: its path in the fixture folder, its copy in the scratch folder, and
+# whether it lies inside the library.
+: > "$WORK/fixtures.tsv"
 for FIXTURE in "${FIXTURES[@]}"; do
-    cp "$FIXTURE" "$WORK/$LIBRARY_DIR/$(basename "$FIXTURE" .txt).swift"
+    RELATIVE="${FIXTURE#"$ROOT/$FIXTURE_DIR/"}"
+    case "$RELATIVE" in
+        *[!A-Za-z0-9._/\ -]*)
+            fail 2 "$FIXTURE_DIR/$RELATIVE has a character in its name that the contract cannot carry: use letters, digits and . _ - / and spaces"
+            ;;
+    esac
+    case "$RELATIVE" in
+        Outside/*)
+            KIND="outside"
+            COPY="$WORK/${RELATIVE#Outside/}"
+            case "$COPY" in
+                "$WORK/$LIBRARY_DIR"/*)
+                    fail 2 "$FIXTURE_DIR/$RELATIVE would be linted inside $LIBRARY_DIR, and a fixture under Outside must lie outside it"
+                    ;;
+            esac
+            ;;
+        *)
+            KIND="library"
+            COPY="$WORK/$LIBRARY_DIR/$RELATIVE"
+            ;;
+    esac
+    COPY="${COPY%.txt}.swift"
+    mkdir -p "$(dirname "$COPY")"
+    cp "$FIXTURE" "$COPY"
+    printf '%s\t%s\t%s\n' "$RELATIVE" "$COPY" "$KIND" >> "$WORK/fixtures.tsv"
 done
 
 # Exit 0 is a clean run and 2 is a run that found serious violations; both have a report. Any
@@ -97,15 +134,14 @@ if [ -z "$LINTED" ] || [ "$LINTED" -ne "${#FIXTURES[@]}" ]; then
     fail 2 "SwiftLint linted ${LINTED:-no} files, and there are ${#FIXTURES[@]} fixtures"
 fi
 
-python3 - "$WORK/report.json" "$RULES" "${FIXTURES[@]}" <<'PY'
+python3 - "$WORK/report.json" "$RULES" "$ROOT/$FIXTURE_DIR" "$WORK/fixtures.tsv" <<'PY'
 import collections
 import json
 import os
 import re
 import sys
 
-report_path, rules_text = sys.argv[1:3]
-fixtures = sys.argv[3:]
+report_path, rules_text, fixture_dir, map_path = sys.argv[1:5]
 rules = rules_text.split()
 
 
@@ -114,19 +150,27 @@ def stop(message):
     sys.exit(2)
 
 
+# (path in the fixture folder, path of the fixture, real path of its scratch copy, whether it lies
+# outside the library)
+fixtures = []
+for row in open(map_path, encoding="utf-8").read().splitlines():
+    relative, copy, kind = row.split("\t")
+    fixtures.append((relative, os.path.join(fixture_dir, relative), os.path.realpath(copy), kind == "outside"))
+
 expected = {}
 expecting = set()
-for path in fixtures:
-    name = os.path.basename(path)
+for relative, path, _, outside in fixtures:
     for number, line in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
         match = re.search(r"//\s*expect:\s*([A-Za-z_][A-Za-z_ ]*?)\s*$", line)
         if not match:
             continue
+        if outside:
+            stop(f"{relative}:{number} expects a diagnostic, and a fixture under Outside expects none: the rules that have an include do not apply outside the library")
         wanted = match.group(1).split()
         for rule in wanted:
             if rule not in rules:
-                stop(f"{name}:{number} expects '{rule}', which is not a rule of the contract ({' '.join(rules)})")
-        expected[(name, number)] = sorted(wanted)
+                stop(f"{relative}:{number} expects '{rule}', which is not a rule of the contract ({' '.join(rules)})")
+        expected[(relative, number)] = sorted(wanted)
         expecting.update(wanted)
 for rule in rules:
     if rule not in expecting:
@@ -137,11 +181,16 @@ try:
 except ValueError as error:
     stop(f"the report of SwiftLint is not JSON: {error}")
 
+# The scratch folder lies under /var on macOS, which is a link to /private/var: real paths on both
+# sides.
+copies = {copy: relative for relative, _, copy, _ in fixtures}
 actual = collections.defaultdict(list)
 for violation in report:
     if violation["rule_id"] in rules:
-        name = os.path.basename(violation["file"])[: -len(".swift")] + ".txt"
-        actual[(name, violation["line"])].append(violation["rule_id"])
+        relative = copies.get(os.path.realpath(violation["file"]))
+        if relative is None:
+            stop(f"SwiftLint reported {violation['rule_id']} in {violation['file']}, which is no fixture")
+        actual[(relative, violation["line"])].append(violation["rule_id"])
 
 problems = []
 for key in sorted(set(expected) | set(actual)):

@@ -1,0 +1,9 @@
+// Linted as a file of the Domain folder: both import rules report the line that holds the import,
+// after a blank line and after a line that ends in a semicolon too.
+import Foundation
+
+import UIKit // expect: domain_foundation_only domain_imports
+let first = 1;
+import UIKit // expect: domain_foundation_only domain_imports
+import Foundation;import UIKit // expect: domain_foundation_only domain_imports
+import UIKit; import SwiftUI // expect: domain_foundation_only domain_foundation_only domain_imports domain_imports

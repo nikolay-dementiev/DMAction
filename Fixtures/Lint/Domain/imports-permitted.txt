@@ -1,0 +1,17 @@
+// Linted as a file of the Domain folder: every form of an import of Foundation is allowed there,
+// and a comment or a string that holds an import is not one.
+import Foundation
+public import Foundation
+import Foundation.NSURL
+import struct Foundation.URL
+internal import Foundation
+@_exported import Foundation
+// import UIKit
+/// import UIKit
+/*
+import UIKit
+*/
+let quoted = "import UIKit"
+let multiline = """
+import UIKit
+"""

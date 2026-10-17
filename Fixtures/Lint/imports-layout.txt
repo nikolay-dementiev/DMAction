@@ -1,0 +1,7 @@
+import Foundation
+
+import UIKit // expect: domain_imports
+let first = 1;
+import UIKit // expect: domain_imports
+import Foundation;import UIKit // expect: domain_imports
+import UIKit; import SwiftUI // expect: domain_imports domain_imports
