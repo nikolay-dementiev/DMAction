@@ -35,6 +35,9 @@ jobs:
       # A rule that never matches reports nothing, so the fixtures prove that each one fires.
       - name: Check that the lint rules fire
         run: Scripts/check-lint-contract.sh
+      # Two runs at once on one checkout must not break each other while the tool is fetched.
+      - name: Check that the lint tool is fetched safely
+        run: Scripts/check-lint-tool.sh
       # The analyzer rules, unused_import among them, read the compiler invocations of a full build.
       - name: Build the library for the analyzer
         run: |
@@ -309,6 +312,10 @@ jobs:
           persist-credentials: false
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      # A reader of Package.resolved that never fails looks like a clean tree, so it is tried first on
+      # texts that it must reject.
+      - name: Self-test of the reader of Package.resolved
+        run: Scripts/check-manifest.sh --self-test
       - name: Manifest, installation by version, consumer fixture, podspec, rejected shapes
         run: Scripts/check-manifest.sh
 
