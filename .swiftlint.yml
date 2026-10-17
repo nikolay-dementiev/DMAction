@@ -50,7 +50,9 @@ missing_docs:
 custom_rules:
   no_process_termination:
     name: "No process termination"
-    included: "Sources/.*\\.swift"
+    # The library module, by name, like the other rules: a path that merely holds a Sources folder,
+    # such as a fixture package or a second module, is not the library.
+    included: ".*/Sources/DMAction/.*\\.swift"
     regex: '\b(fatalError|preconditionFailure|assertionFailure|precondition|assert|dispatchPrecondition|abort|exit)\s*\('
     match_kinds:
       - identifier
