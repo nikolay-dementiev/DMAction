@@ -125,9 +125,11 @@ the rules above it would have needed a major version. The rules apply from the r
   version is a promise: the platforms the manifest declares. The tested runtime is evidence: the
   oldest runtime a test has run on. That is iOS 17.5 against a promise of iOS 17.0, and none for
   watchOS.
-- No third-party dependency without the maintainer's approval. `Scripts/check-manifest.sh` rejects
-  a dependency required by branch or revision, a plugin on any target, an unsafe flag and a
-  manifest that reads the environment. The approval itself is a rule the reviewer applies.
+- No dependency without the maintainer's approval. `Scripts/check-manifest.sh` rejects any
+  dependency in the manifest, named, so a dependency cannot land without a change of that check
+  in the same pull request, where the reviewer sees it. It also rejects a plugin on any target,
+  an unsafe flag and a manifest that reads the environment, and it requires that a consumer of
+  the README's installation manifest resolves this package only.
 - XCTest is the test framework. Another one comes only by the maintainer's decision.
 - The manifest sets no `defaultIsolation`: it would change the inferred isolation of public
   declarations, which is observable behaviour.
