@@ -17,13 +17,14 @@
 # the end.
 #
 # Where a fixture is linted depends on where it lies in Fixtures/Lint. A file directly in that
-# folder is linted as a file of LIBRARY_DIR, which is all that a flat folder of fixtures needs. A
-# file in a subfolder is linted in the same subfolder of LIBRARY_DIR, so that a rule meant for one
-# folder, such as Domain, is proved there, and a fixture in the root proves that the rule does not
-# reach the root. A file under Outside is linted at the same path counted from the root of the
-# scratch copy, outside the library: no rule of the contract applies there, so such a fixture
-# expects nothing, and a diagnostic in it fails the check. That is how a rule that is too wide is
-# caught, one that reaches a fixture package or a second module.
+# folder is linted as a file of LIBRARY_DIR, so a repository whose fixtures are all in one flat
+# folder works as it did before subfolders were read, without a change. A file in a subfolder is
+# linted in the same subfolder of LIBRARY_DIR, so that a rule meant for one folder, such as Domain,
+# is proved there, and a fixture in the root proves that the rule does not reach the root. A file
+# under Outside is linted at the same path counted from the root of the scratch copy, outside the
+# library: no rule of the contract applies there, so such a fixture expects nothing, and a
+# diagnostic in it fails the check. That is how a rule that is too wide is caught, one that reaches
+# a fixture package or a second module.
 #
 # Exit codes: 0 every rule fires where expected and nowhere else, 1 a line differs, 2 the check
 # could not be made. A tool that fails by itself, such as the fetch of SwiftLint or python3, can
