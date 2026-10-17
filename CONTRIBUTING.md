@@ -25,8 +25,8 @@ and once more under the Thread Sanitizer:
 swift test --sanitize=thread
 ```
 
-The `watchos` job of CI runs the suite on a watchOS simulator and builds the library for the
-watchOS device SDK:
+The `watchos` job of CI runs the suite on a watchOS simulator, builds the library for the watchOS
+device SDK, and builds `Fixtures/Consumer` for the watchOS Simulator:
 
 ```bash
 xcodebuild test -scheme DMAction -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm),OS=26.5' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
