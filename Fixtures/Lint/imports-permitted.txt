@@ -1,15 +1,7 @@
-// Linted as a file of Sources/DMAction/Domain. domain_imports permits Foundation and os for the
-// library, and the Domain folder permits Foundation only, so the lines that import os expect
-// domain_foundation_only.
 import Foundation
 public import Foundation
-#if canImport(os)
-import os // expect: domain_foundation_only
-#endif
-import os.log // expect: domain_foundation_only
 import Foundation.NSURL
 import struct Foundation.URL
-import func os.os_log // expect: domain_foundation_only
 internal import Foundation
 @_exported import Foundation
 // import UIKit

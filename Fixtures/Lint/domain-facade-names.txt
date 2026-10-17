@@ -1,6 +1,7 @@
 // Linted as a file of Sources/DMAction/Domain: a type of the public facade is reported by its own
-// name, in any position. A comment, a doc comment and a string that hold a name are not a use, and a
-// name that merely contains one is not that type.
+// name, in any position of ordinary code (the argument of an underscored attribute such as
+// @_specialize is not seen). A comment, a doc comment and a string that hold a name are not a use,
+// and a name that merely contains one is not that type.
 let anyAction: any DMAction = value // expect: domain_no_facade_types
 let button = DMButtonAction() // expect: domain_no_facade_types
 let composed: DMActionWithFallback? = nil // expect: domain_no_facade_types
