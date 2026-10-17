@@ -205,8 +205,44 @@ else
             mkdir -p "$PROBE/consumer/Sources/$TARGET"
             echo "import $MODULE" > "$PROBE/consumer/Sources/$TARGET/$TARGET.swift"
         done <<< "$TARGETS"
-        if swift build --package-path "$PROBE/consumer" > "$WORK/version-build.log" 2>&1; then
-            echo "check-manifest: the manifest of README.md asks for the podspec's URL and the changelog's newest version $VERSION, and resolves and builds by version."
+        # The cache lies in the folder of the probe, so that a package in the cache of whoever runs
+        # this cannot stand in for a fetch.
+        if swift build --package-path "$PROBE/consumer" --cache-path "$PROBE/cache" > "$WORK/version-build.log" 2>&1; then
+            # What the build resolved, as SwiftPM pinned it: the tagged copy and nothing else.
+            if EXTRA="$(python3 - "$PROBE/consumer/Package.resolved" "$COPY" <<'PY'
+# resolved-inventory
+import json
+import sys
+
+path, copy = sys.argv[1:3]
+expected = copy.lower()
+try:
+    with open(path, encoding="utf-8") as handle:
+        resolved = json.load(handle)
+except (OSError, ValueError) as error:
+    print(f"  Package.resolved cannot be read: {error}")
+    sys.exit(1)
+if not isinstance(resolved, dict) or resolved.get("version") not in (2, 3) or not isinstance(resolved.get("pins"), list):
+    print("  Package.resolved is not of format version 2 or 3 with a list of pins, and only those are read")
+    sys.exit(1)
+identities = [pin.get("identity") for pin in resolved["pins"]]
+problems = []
+for pin in resolved["pins"]:
+    if pin.get("identity") != expected:
+        state = pin.get("state", {})
+        problems.append(f"  {pin.get('identity')} ({pin.get('kind')}, {state.get('version') or state.get('revision')}, {pin.get('location')})")
+if expected not in identities:
+    problems.append(f"  {expected}, the tagged copy, is not among the resolved packages")
+print("\n".join(problems))
+sys.exit(1 if problems else 0)
+PY
+)"; then
+                echo "check-manifest: the manifest of README.md asks for the podspec's URL and the changelog's newest version $VERSION, resolves and builds by version, and the consumer resolves this package only."
+            else
+                echo "check-manifest: the consumer of README.md's manifest does not resolve this package only:" >&2
+                printf '%s\n' "$EXTRA" >&2
+                FAILED=1
+            fi
         else
             echo "check-manifest: the manifest of README.md does not resolve or build by version:" >&2
             ERRORS="$(grep -E "error:|cannot be used|unstable|unsafe" "$WORK/version-build.log" | cut -c1-300 | head -5 || true)"
