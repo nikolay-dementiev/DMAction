@@ -144,12 +144,13 @@ the rules above it would have needed a major version. The rules apply from the r
 - `.github/workflows/ci.yml` is the place that says what CI runs; this file does not restate it.
   The policy needs four facts. The oldest iOS runtime that CI runs is iOS 18.5. iOS 17.5 runs
   locally before a release (CONTRIBUTING.md, "Releases"). The `floor` job runs Swift 6.0, the
-  oldest compiler line the manifest allows. watchOS is built by the `podspec` job, and no test runs
-  there.
+  oldest compiler line the manifest allows. The `watchos` job runs the suite on watchOS 26.5 and
+  on 11.5, the oldest watchOS runtime that a hosted image offers, and builds the library for the
+  watchOS device SDK; the `podspec` job builds the sources for watchOS too.
 - "Oldest tested runtime" and "oldest supported version" are different statements. The supported
   version is a promise: the platforms the manifest declares. The tested runtime is evidence: the
-  oldest runtime a test has run on. That is iOS 17.5 against a promise of iOS 17.0, and none for
-  watchOS.
+  oldest runtime a test has run on. That is iOS 17.5 against a promise of iOS 17.0, and watchOS
+  11.5 against a promise of watchOS 7.0.
 - No dependency without the maintainer's approval. `Scripts/check-manifest.sh` rejects any
   dependency in the manifest, named, so a dependency cannot land without a change of that check
   in the same pull request, where the reviewer sees it. It also rejects a plugin on any target,

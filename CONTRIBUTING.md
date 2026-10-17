@@ -6,7 +6,8 @@ compatibility and release policy.
 
 ## Build and test
 
-You need Xcode 16.0 or later (Swift 6.0) and an iOS simulator. CI runs Xcode 16.2, 16.4 and 26.6.
+You need Xcode 16.0 or later (Swift 6.0) and an iOS simulator, and a watchOS one to run the
+watchOS tests. CI runs Xcode 16.2, 16.4 and 26.6.
 
 ```bash
 swift test
@@ -23,6 +24,17 @@ and once more under the Thread Sanitizer:
 ```bash
 swift test --sanitize=thread
 ```
+
+The `watchos` job of CI runs the suite on a watchOS simulator, builds the library for the watchOS
+device SDK, and builds `Fixtures/Consumer` for the watchOS Simulator:
+
+```bash
+xcodebuild test -scheme DMAction -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm),OS=26.5' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+xcodebuild build -scheme DMAction -sdk watchos -destination 'generic/platform=watchOS' -configuration Release SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+```
+
+`Scripts/prepare-simulator.sh "<device type name>" <version> [iOS|watchOS]` boots the simulator
+that a CI job uses, creates its device when the image has none, and prints the udid.
 
 ## The checks CI runs
 
