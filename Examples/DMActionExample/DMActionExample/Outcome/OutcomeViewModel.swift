@@ -24,14 +24,13 @@ package protocol OutcomeViewModel: AnyObject, Observable {
 package final class DefaultOutcomeViewModel: OutcomeViewModel {
     package var failuresBeforeSuccess = 1
     package private(set) var state = OutcomeState.idle
-    private let source: any QuoteSource
+    private let actions: any OutcomeActionFactory
 
-    package init(source: any QuoteSource) {
-        self.source = source
+    package init(actions: any OutcomeActionFactory) {
+        self.actions = actions
     }
 
-    /// Fetches a quote, retries a failed fetch twice, and shows the cached quote when all three
-    /// attempts have failed.
+    /// Asks the factory for the action of one load and runs it.
     package func load() {
         // One run at a time: a second one would deliver into the same state. The view disables
         // its button while loading, but the view model does not rely on that.
@@ -39,17 +38,8 @@ package final class DefaultOutcomeViewModel: OutcomeViewModel {
             return
         }
         state = .loading
-        let failures = failuresBeforeSuccess
-        var fetches = 0
-        let fetch = DMButtonAction { [source] completion in
-            fetches += 1
-            source.fetchQuote(failing: fetches <= failures, completion: completion)
-        }
-        let cached = DMButtonAction { [source] completion in
-            source.cachedQuote(completion: completion)
-        }
-        let fetchOrCached = fetch.retry(2).fallbackTo(cached)
-        fetchOrCached { [weak self] result in
+        let action = actions.makeAction(failingFetches: failuresBeforeSuccess)
+        action { [weak self] result in
             self?.show(result)
         }
     }

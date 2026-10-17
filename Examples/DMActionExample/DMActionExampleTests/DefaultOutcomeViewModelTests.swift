@@ -1,3 +1,4 @@
+import DMAction
 import DMActionExample
 import Foundation
 import XCTest
@@ -13,9 +14,34 @@ final class DefaultOutcomeViewModelTests: XCTestCase {
     /// The UI test expects the label of one failed attempt, so it relies on this default.
     @MainActor
     func test_failuresBeforeSuccess_byDefault_isOne() {
-        let viewModel = DefaultOutcomeViewModel(source: QuoteSourceSpy())
+        let viewModel = DefaultOutcomeViewModel(actions: OutcomeActionFactorySpy())
 
         XCTAssertEqual(viewModel.failuresBeforeSuccess, 1)
+    }
+
+    @MainActor
+    func test_load_whenIdle_requestsOneActionWithSelectedFailureCount() {
+        let actions = OutcomeActionFactorySpy()
+        let viewModel = DefaultOutcomeViewModel(actions: actions)
+        viewModel.failuresBeforeSuccess = 3
+
+        viewModel.load()
+
+        XCTAssertEqual(actions.requestedFailureCounts, [3], "one request, with the count the user selected")
+    }
+
+    /// The first run never completes, so the view model is still loading when the second load comes.
+    @MainActor
+    func test_load_whileLoading_requestsNoSecondAction() {
+        let actions = OutcomeActionFactorySpy()
+        actions.action = DMButtonAction { _ in }
+        let viewModel = DefaultOutcomeViewModel(actions: actions)
+        viewModel.failuresBeforeSuccess = 3
+
+        viewModel.load()
+        viewModel.load()
+
+        XCTAssertEqual(actions.requestedFailureCounts, [3], "one request: a load while loading asks for nothing")
     }
 
     @MainActor
@@ -98,6 +124,17 @@ final class DefaultOutcomeViewModelTests: XCTestCase {
         XCTAssertEqual(source.fetches, [false, false], "a fetch for each load")
     }
 
+    /// The first fetch of every load fails, so a counter that outlived a load would let the second fetch pass.
+    @MainActor
+    func test_load_twiceWithOneFailure_failsTheFirstFetchOfEachLoad() {
+        let (viewModel, source) = makeSUT(failuresBeforeSuccess: 1)
+
+        viewModel.load()
+        viewModel.load()
+
+        XCTAssertEqual(source.fetches, [true, false, true, false], "each load counts its own fetches from zero")
+    }
+
     @MainActor
     func test_load_afterAFailure_loadsAgain() {
         let (viewModel, source) = makeSUT(failuresBeforeSuccess: 4)
@@ -116,7 +153,7 @@ final class DefaultOutcomeViewModelTests: XCTestCase {
     @MainActor
     private func makeSUT(failuresBeforeSuccess: Int = 1) -> (viewModel: DefaultOutcomeViewModel, source: QuoteSourceSpy) {
         let source = QuoteSourceSpy()
-        let viewModel = DefaultOutcomeViewModel(source: source)
+        let viewModel = DefaultOutcomeViewModel(actions: DefaultOutcomeActionFactory(source: source))
         viewModel.failuresBeforeSuccess = failuresBeforeSuccess
         return (viewModel, source)
     }
