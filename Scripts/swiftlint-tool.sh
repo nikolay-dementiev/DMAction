@@ -69,8 +69,9 @@ swiftlint_fetch() {
     fi
     # Unpacked into a folder of its own and moved onto its place with one rename. A run that is
     # executing the tool keeps its file, and a run that starts now gets a whole one, even when
-    # another run unpacks at the same moment. A run that is killed in the middle leaves its folder
-    # in .build/tools, which a clean of .build removes.
+    # another run unpacks at the same moment. A run that is killed in the middle of the transfer or
+    # of the unpack leaves its part file or its folder in .build/tools, which a clean of .build
+    # removes. They are never read: only the archive and the tool under their final names are.
     stage="$(mktemp -d "$tools/unpack.XXXXXX")" || return $?
     status=0
     unzip -q -o "$archive" swiftlint -d "$stage" || status=$?
