@@ -1,0 +1,4 @@
+// Linted as Sources/DMAction/Domain/Nested/FacadeNamesNested.swift: the Domain rules reach a subfolder
+// of the Domain folder and a file whose name starts with a capital letter.
+let button = DMButtonAction() // expect: domain_no_facade_types
+import os // expect: domain_foundation_only

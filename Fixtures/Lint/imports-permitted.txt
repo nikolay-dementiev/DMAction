@@ -1,5 +1,12 @@
 import Foundation
 public import Foundation
+#if canImport(os)
+import os
+#endif
+import os.log
+import func os.os_log
+public import os
+@preconcurrency import os
 import Foundation.NSURL
 import struct Foundation.URL
 internal import Foundation

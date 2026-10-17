@@ -1,0 +1,7 @@
+// Linted as a file of the library root: these are the library's own types, and only the Domain
+// folder keeps their names out, so no rule reports any line here.
+let anyAction: any DMAction = value
+let button = DMButtonAction()
+let composed: DMActionWithFallback? = nil
+let wrapped: DMActionResultValue? = nil
+let marker: PlaceholderCopyable? = nil

@@ -1,0 +1,14 @@
+// Linted outside the library, where no rule of the contract applies: no line here expects a diagnostic.
+func terminate() {
+    fatalError("x")
+    preconditionFailure("x")
+    assertionFailure("x")
+    precondition(false)
+    assert(false)
+    dispatchPrecondition(condition: .onQueue(.main))
+    abort()
+    exit(1)
+}
+import UIKit
+import os
+let button = DMButtonAction()
