@@ -5,17 +5,27 @@
 #
 #   Scripts/check-manifest.sh
 #
-# 1. The manifest has no dependency by branch or revision, uses no plugin on any target,
-#    passes no unsafe flag and does not read the environment. SwiftPM refuses a package
-#    with an unstable dependency or an unsafe flag as a dependency by version, a build
-#    plugin of a dependency runs in every consumer's build, and a manifest that reads the
-#    environment describes more than one package.
+# 1. The manifest declares no dependency, uses no plugin on any target, passes no unsafe
+#    flag and does not read the environment. A dependency needs the maintainer's approval and
+#    a change of this check in the same pull request. Item 2 sees only a dependency that a
+#    target of a product uses: SwiftPM leaves one that nothing uses, that only the tests use
+#    or that only a target outside every product uses out of what a consumer resolves, so
+#    only the manifest shows it. A dependency by branch or revision is named for its
+#    requirement as well: SwiftPM refuses a package with an unstable dependency or an unsafe
+#    flag as a dependency by version. A build plugin of a dependency runs in every
+#    consumer's build, and a manifest that reads the environment describes more than one
+#    package.
 # 2. The installation manifest of README.md works. Its URL is the podspec's, its version is
 #    that of the newest dated release heading of CHANGELOG.md, and no platform it declares is
 #    below the package's. With only its URL pointed at a throw-away tagged copy of the
 #    tracked manifest and sources, it resolves and builds: a consumer that depends on the
 #    checkout by path cannot show a failure of a version requirement, and only a build shows
-#    a wrong product or package name.
+#    a wrong product or package name. The Package.resolved of that build pins the copy and
+#    nothing else, so a consumer of the package resolves this package only: any other pin is
+#    named with its kind, version and location, and a file that cannot be read, that holds
+#    no pin or more than one pin of the copy, or that is not of format version 2 or 3 is a
+#    failure. The build keeps its own cache, so manifests and repositories cached on the
+#    machine of whoever runs this cannot stand in for what the build resolves.
 # 3. Fixtures/Consumer builds without a warning. It uses the released public declarations
 #    with their exact types and the shapes the downstream package relies on, so if it
 #    stops building, a consumer's code stops building.
@@ -74,9 +84,13 @@ import sys
 manifest = json.load(open(sys.argv[1]))
 source = open(sys.argv[2]).read()
 problems = []
-for dependency in manifest.get("dependencies", []):
+for dependency in manifest["dependencies"]:
     for entries in dependency.values():
         for entry in entries:
+            problems.append(
+                f"dependency '{entry.get('identity')}' is declared: a dependency needs the maintainer's "
+                "approval and a change of this check in the same pull request"
+            )
             requirement = entry.get("requirement", {})
             for unstable in ("branch", "revision"):
                 if unstable in requirement:
@@ -99,7 +113,7 @@ PY
 then
     FAILED=1
 else
-    echo "check-manifest: no unstable requirement, no plugin, no unsafe flag and no environment switch in Package.swift."
+    echo "check-manifest: no dependency, no plugin, no unsafe flag and no environment switch in Package.swift."
 fi
 
 # 2. The installation manifest of README.md, against a throw-away tagged copy of the tracked
@@ -205,8 +219,49 @@ else
             mkdir -p "$PROBE/consumer/Sources/$TARGET"
             echo "import $MODULE" > "$PROBE/consumer/Sources/$TARGET/$TARGET.swift"
         done <<< "$TARGETS"
-        if swift build --package-path "$PROBE/consumer" > "$WORK/version-build.log" 2>&1; then
-            echo "check-manifest: the manifest of README.md asks for the podspec's URL and the changelog's newest version $VERSION, and resolves and builds by version."
+        # The cache lies in the folder of the probe, so that manifests and repositories cached on
+        # the machine of whoever runs this cannot stand in for what the build resolves.
+        if swift build --package-path "$PROBE/consumer" --cache-path "$PROBE/cache" > "$WORK/version-build.log" 2>&1; then
+            # What the build resolved, as SwiftPM pinned it: the tagged copy and nothing else.
+            if EXTRA="$(python3 - "$PROBE/consumer/Package.resolved" "$COPY" <<'PY'
+# resolved-inventory
+import json
+import sys
+
+path, copy = sys.argv[1:3]
+expected = copy.lower()
+try:
+    with open(path, encoding="utf-8") as handle:
+        resolved = json.load(handle)
+except (OSError, ValueError) as error:
+    print(f"  Package.resolved cannot be read: {error}")
+    sys.exit(1)
+readable = isinstance(resolved, dict) and resolved.get("version") in (2, 3) and isinstance(resolved.get("pins"), list)
+if not readable or not all(isinstance(pin, dict) for pin in resolved["pins"]):
+    print("  Package.resolved is not of format version 2 or 3 with a list of pins, and only those are read")
+    sys.exit(1)
+identities = [pin.get("identity") for pin in resolved["pins"]]
+problems = []
+for pin in resolved["pins"]:
+    if pin.get("identity") != expected:
+        state = pin.get("state")
+        if not isinstance(state, dict):
+            state = {}
+        problems.append(f"  {pin.get('identity')} ({pin.get('kind')}, {state.get('version') or state.get('revision')}, {pin.get('location')})")
+if identities.count(expected) == 0:
+    problems.append(f"  {expected}, the tagged copy, is not among the resolved packages")
+elif identities.count(expected) > 1:
+    problems.append(f"  {expected}, the tagged copy, is pinned {identities.count(expected)} times")
+print("\n".join(problems))
+sys.exit(1 if problems else 0)
+PY
+)"; then
+                echo "check-manifest: the manifest of README.md asks for the podspec's URL and the changelog's newest version $VERSION, resolves and builds by version, and the consumer resolves this package only."
+            else
+                echo "check-manifest: the consumer of README.md's manifest does not resolve this package only:" >&2
+                printf '%s\n' "$EXTRA" >&2
+                FAILED=1
+            fi
         else
             echo "check-manifest: the manifest of README.md does not resolve or build by version:" >&2
             ERRORS="$(grep -E "error:|cannot be used|unstable|unsafe" "$WORK/version-build.log" | cut -c1-300 | head -5 || true)"
