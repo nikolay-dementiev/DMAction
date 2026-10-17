@@ -6,14 +6,15 @@
 #   Scripts/check-manifest.sh
 #
 # 1. The manifest declares no dependency, uses no plugin on any target, passes no unsafe
-#    flag and does not read the environment. A dependency needs the owner's approval and a
-#    change of this check in the same pull request. Item 2 sees only a dependency that a
-#    library target uses: SwiftPM leaves one that nothing uses, or that only the tests use,
-#    out of what a consumer resolves, so only the manifest shows it. A dependency by branch
-#    or revision is named for its requirement as well: SwiftPM refuses a package with an
-#    unstable dependency or an unsafe flag as a dependency by version. A build plugin of a
-#    dependency runs in every consumer's build, and a manifest that reads the environment
-#    describes more than one package.
+#    flag and does not read the environment. A dependency needs the maintainer's approval and
+#    a change of this check in the same pull request. Item 2 sees only a dependency that a
+#    target of a product uses: SwiftPM leaves one that nothing uses, that only the tests use
+#    or that only a target outside every product uses out of what a consumer resolves, so
+#    only the manifest shows it. A dependency by branch or revision is named for its
+#    requirement as well: SwiftPM refuses a package with an unstable dependency or an unsafe
+#    flag as a dependency by version. A build plugin of a dependency runs in every
+#    consumer's build, and a manifest that reads the environment describes more than one
+#    package.
 # 2. The installation manifest of README.md works. Its URL is the podspec's, its version is
 #    that of the newest dated release heading of CHANGELOG.md, and no platform it declares is
 #    below the package's. With only its URL pointed at a throw-away tagged copy of the
@@ -22,9 +23,9 @@
 #    a wrong product or package name. The Package.resolved of that build pins the copy and
 #    nothing else, so a consumer of the package resolves this package only: any other pin is
 #    named with its kind, version and location, and a file that cannot be read, that holds
-#    no pin of the copy or that is not of format version 2 or 3 is a failure. The build keeps
-#    its own manifest cache, so a package in the cache of whoever runs this cannot stand in
-#    for a fetch.
+#    no pin or more than one pin of the copy, or that is not of format version 2 or 3 is a
+#    failure. The build keeps its own cache, so manifests and repositories cached on the
+#    machine of whoever runs this cannot stand in for what the build resolves.
 # 3. Fixtures/Consumer builds without a warning. It uses the released public declarations
 #    with their exact types and the shapes the downstream package relies on, so if it
 #    stops building, a consumer's code stops building.
