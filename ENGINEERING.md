@@ -121,15 +121,17 @@ the rules above it would have needed a major version. The rules apply from the r
   SwiftLint's `force_unwrapping`, `force_try` and `force_cast`. The force unwrap rule has no
   exemption for a call with a literal argument, so `URL(string: "...")!` is reported too.
 - **The rules are proved.** A rule that never matches reports nothing, so
-  `Scripts/check-lint-contract.sh` lints the fixtures of `Fixtures/Lint` as files of the Domain
-  folder and proves that `domain_imports`, `domain_no_facade_types`, `domain_foundation_only`,
-  `force_unwrapping` and `no_process_termination` fire on the lines that expect them and on no
-  other line. The fixtures cannot show that the two Domain rules reach that folder only; the real
-  tree does, because the facade names those types and the executor imports `os`, so
-  `Scripts/lint.sh` fails when either rule is widened. They cannot show either that `domain_imports`
-  and `no_process_termination` reach the rest of the library and not only the Domain folder, and
-  nothing else shows it: that needs a contract that lints fixtures in more than one folder. CI runs
-  the contract right after `Scripts/lint.sh`.
+  `Scripts/check-lint-contract.sh` lints the fixtures of `Fixtures/Lint` and proves that
+  `domain_imports`, `domain_no_facade_types`, `domain_foundation_only`, `force_unwrapping` and
+  `no_process_termination` fire on the lines that expect them and on no other line. Where a fixture
+  lies decides where it is linted: in the root of `Fixtures/Lint` as a file of the library, in
+  `Domain/` (and its subfolders) as a Domain file, and under `Outside/` outside the library, where
+  no rule applies and the fixture expects nothing. So the contract shows that the library-wide
+  rules reach the root of the library and the Domain folder, that the two Domain rules reach the
+  Domain folder and its subfolders and not the root, and that no rule reaches a fixture package or
+  a second module. The real tree adds a second proof of the Domain scope: the facade names those
+  types and the executor imports `os`, so `Scripts/lint.sh` fails when either Domain rule is
+  widened. CI runs the contract right after `Scripts/lint.sh`.
 
 ## Toolchain and platforms
 
