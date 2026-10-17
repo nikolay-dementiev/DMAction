@@ -36,26 +36,6 @@ struct ActionPlan {
 
 extension ActionPlan {
     typealias Completion = (DMButtonAction.ResultType) -> Void
-
-    /// The plan of an action. A built-in action carries its own. Any other conformer is one
-    /// call of its `action`, which is read here, once.
-    init(of action: any DMAction) {
-        switch action {
-        case let button as DMButtonAction:
-            self = button.plan
-        case let composed as DMActionWithFallback:
-            self = composed.plan
-        default:
-            self.init(.produce(action.action))
-        }
-    }
-
-    /// Runs the steps in order and calls `completion` with the first success or with the
-    /// failure of the last step. A success is labelled `base` plus the number of attempts that
-    /// failed before it in this run. Each run is an `ActionRun` of its own.
-    func run(base: UInt, _ completion: @escaping Completion) {
-        ActionRun(base: base, completion: completion).start(self)
-    }
 }
 
 extension UInt {
