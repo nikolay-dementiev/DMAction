@@ -165,7 +165,7 @@ for relative, path, _, outside in fixtures:
         if not match:
             continue
         if outside:
-            stop(f"{relative}:{number} expects a diagnostic, and a fixture under Outside expects none: no rule applies outside the library")
+            stop(f"{relative}:{number} expects a diagnostic, and a fixture under Outside expects none: the rules that have an include do not apply outside the library")
         wanted = match.group(1).split()
         for rule in wanted:
             if rule not in rules:
