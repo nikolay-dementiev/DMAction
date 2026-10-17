@@ -28,10 +28,11 @@ set -euo pipefail
 # these settings.
 
 # The folder of the package layout that the include patterns of the rules name, relative to the
-# repository root. The fixtures are linted as files of this folder.
-LIBRARY_DIR="Sources/DMAction"
+# repository root. The fixtures are linted as files of this folder. Here it is the Domain folder,
+# the strictest one: the rules of the whole library cover it too, so every rule reaches a fixture.
+LIBRARY_DIR="Sources/DMAction/Domain"
 # The rules of the contract, separated by spaces. Each one needs a fixture that expects it.
-RULES="domain_imports force_unwrapping no_process_termination"
+RULES="domain_foundation_only domain_imports domain_no_facade_types force_unwrapping no_process_termination"
 # The folder of the fixtures, relative to the repository root.
 FIXTURE_DIR="Fixtures/Lint"
 
