@@ -20,7 +20,7 @@ final class ActionRun {
     /// What the loop does next: start an attempt, or act on the result of one.
     private enum Work {
         case start(Cursor)
-        case finish(Cursor, DMButtonAction.ResultType)
+        case finish(Cursor, ProducerResult)
     }
 
     /// Each producer call gets its own, so that a late completion of an earlier call can be told
@@ -32,7 +32,7 @@ final class ActionRun {
         /// The thread inside the producer call, until the call returns.
         var callingThread: Thread?
         /// The first result, when it arrived on the calling thread before the call returned.
-        var deposit: DMButtonAction.ResultType?
+        var deposit: ProducerResult?
 
         init(cursor: Cursor, callingThread: Thread) {
             self.cursor = cursor
@@ -86,7 +86,7 @@ final class ActionRun {
     /// The caller keeps `cursor`, and with it the frames and the plan, until this returns. So
     /// they are released after the delivery once every producer call of the run has returned,
     /// not while a producer is still inside its call.
-    private func call(_ cursor: Cursor) -> DMButtonAction.ResultType? {
+    private func call(_ cursor: Cursor) -> ProducerResult? {
         let attempt = Attempt(cursor: cursor, callingThread: Thread.current)
         // The run is held strongly: a producer may keep its completion and call it after
         // everything else has let go of the run.
@@ -101,7 +101,7 @@ final class ActionRun {
         return deposit
     }
 
-    private func complete(_ attempt: Attempt, with result: DMButtonAction.ResultType) {
+    private func complete(_ attempt: Attempt, with result: ProducerResult) {
         lock.lock()
         guard let cursor = attempt.cursor else {
             lock.unlock()
@@ -122,7 +122,7 @@ final class ActionRun {
         drive(.finish(cursor, result))
     }
 
-    private func deliver(_ result: DMButtonAction.ResultType) {
+    private func deliver(_ result: ProducerResult) {
         lock.lock()
         let completion = self.completion
         self.completion = nil

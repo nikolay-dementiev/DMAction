@@ -10,7 +10,7 @@ struct ActionPlan {
     /// One call of a producer, or a unit of steps that runs again while it fails.
     enum Step {
         /// One call of a producer.
-        case produce(DMButtonAction.ActionType)
+        case produce(Producer)
         /// The unit, then up to `retries` more runs of it while it fails.
         case repeating(ActionPlan, retries: UInt)
     }
@@ -35,7 +35,7 @@ struct ActionPlan {
 }
 
 extension ActionPlan {
-    typealias Completion = (DMButtonAction.ResultType) -> Void
+    typealias Completion = (ProducerResult) -> Void
 }
 
 extension UInt {

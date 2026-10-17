@@ -10,7 +10,7 @@
 /// many attempts of the run failed before this one.
 struct Cursor {
     private let frames: [Frame]
-    let produce: DMButtonAction.ActionType
+    let produce: Producer
     /// The attempts of the run that failed before this one. It saturates at `.max`. Even at a
     /// billion attempts a second, a 64-bit `UInt` would take more than 500 years to get there;
     /// watchOS on arm64_32 has a 32-bit `UInt`, which a long enough run can reach.
@@ -23,7 +23,7 @@ struct Cursor {
         self.init(frames: frames, produce: produce, failed: 0)
     }
 
-    private init(frames: [Frame], produce: @escaping DMButtonAction.ActionType, failed: UInt) {
+    private init(frames: [Frame], produce: @escaping Producer, failed: UInt) {
         self.frames = frames
         self.produce = produce
         self.failed = failed
@@ -54,14 +54,14 @@ struct Cursor {
     }
 
     /// Opens a list of steps and goes down to its first producer.
-    private static func enter(_ steps: [ActionPlan.Step], frames: inout [Frame]) -> DMButtonAction.ActionType {
+    private static func enter(_ steps: [ActionPlan.Step], frames: inout [Frame]) -> Producer {
         frames.append(.list(steps, index: 0))
         return descend(into: steps[0], frames: &frames)
     }
 
     /// Goes down from `step` to its first producer, opening the repeated units on the way. A
     /// loop, not a recursion: units nested by repeated `retry` calls do not grow the stack.
-    private static func descend(into step: ActionPlan.Step, frames: inout [Frame]) -> DMButtonAction.ActionType {
+    private static func descend(into step: ActionPlan.Step, frames: inout [Frame]) -> Producer {
         var step = step
         while true {
             switch step {
