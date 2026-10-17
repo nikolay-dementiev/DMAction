@@ -125,13 +125,15 @@ the rules above it would have needed a major version. The rules apply from the r
   `domain_imports`, `domain_no_facade_types`, `domain_foundation_only`, `force_unwrapping` and
   `no_process_termination` fire on the lines that expect them and on no other line. Where a fixture
   lies decides where it is linted: in the root of `Fixtures/Lint` as a file of the library, in
-  `Domain/` (and its subfolders) as a Domain file, and under `Outside/` outside the library, where
-  no rule applies and the fixture expects nothing. So the contract shows that the library-wide
-  rules reach the root of the library and the Domain folder, that the two Domain rules reach the
-  Domain folder and its subfolders and not the root, and that no rule reaches a fixture package or
-  a second module. The real tree adds a second proof of the Domain scope: the facade names those
-  types and the executor imports `os`, so `Scripts/lint.sh` fails when either Domain rule is
-  widened. CI runs the contract right after `Scripts/lint.sh`.
+  `Domain/` (and its subfolders) or `Adapters/` as a file of that folder, and under `Outside/`
+  outside the library, where the fixture expects nothing. So the contract shows that the
+  library-wide rules reach the root, the Domain folder and the Adapters folder, that the two Domain
+  rules reach the Domain folder and its subfolders and neither the root nor the Adapters folder,
+  and that the rules that have an include do not reach a fixture package or a second module, one
+  whose name starts like the library's included. `force_unwrapping` has no include and applies
+  everywhere. The real tree adds a second proof of the Domain scope: the facade names those types
+  and the executor imports `os`, so `Scripts/lint.sh` fails when either Domain rule is widened. CI
+  runs the contract right after `Scripts/lint.sh`.
 
 ## Toolchain and platforms
 
