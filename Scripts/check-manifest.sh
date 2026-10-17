@@ -77,6 +77,10 @@ problems = []
 for dependency in manifest.get("dependencies", []):
     for entries in dependency.values():
         for entry in entries:
+            problems.append(
+                f"dependency '{entry.get('identity')}' is declared: a dependency needs the owner's "
+                "approval and a change of this check in the same pull request"
+            )
             requirement = entry.get("requirement", {})
             for unstable in ("branch", "revision"):
                 if unstable in requirement:
@@ -99,7 +103,7 @@ PY
 then
     FAILED=1
 else
-    echo "check-manifest: no unstable requirement, no plugin, no unsafe flag and no environment switch in Package.swift."
+    echo "check-manifest: no dependency, no plugin, no unsafe flag and no environment switch in Package.swift."
 fi
 
 # 2. The installation manifest of README.md, against a throw-away tagged copy of the tracked
