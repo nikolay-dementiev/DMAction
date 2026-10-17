@@ -57,7 +57,7 @@ What each platform is verified with:
 | Platform | How |
 |---|---|
 | iOS 26.5 (Xcode 26.6), iOS 18.5 (Xcode 16.4) | the tests run on simulators in CI, for the library and the example app |
-| iOS 17.5, iOS 18.6 | the tests run on simulators before a release |
+| iOS 17.5 | the library's tests run on a simulator before a release |
 | macOS, the host | the tests run in CI with Swift 6.0.3, and again under the Thread Sanitizer. macOS is not a declared platform |
 | watchOS | CI builds the library for watchOS with `pod lib lint`. No test runs on watchOS |
 
@@ -310,8 +310,8 @@ doc comments, compiles as written. `CONTRIBUTING.md` lists the commands.
 ## Versions and migration
 
 DMAction follows semantic versioning. `CHANGELOG.md` records every release. From the release after
-1.1.0 on, every change that is not purely additive, in the declarations or in observable
-behaviour, needs a major version; [ENGINEERING.md](ENGINEERING.md) has the rules.
+1.1.0 on, every breaking change, as ENGINEERING.md defines it, needs a major version, and a fix
+of behaviour is one; [ENGINEERING.md](ENGINEERING.md) has the rules.
 
 Coming from 1.0.x: no declaration changed, but some behaviour did, and `CHANGELOG.md` lists each
 change with a table. The ones most likely to matter:
