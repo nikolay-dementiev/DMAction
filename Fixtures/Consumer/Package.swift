@@ -9,7 +9,7 @@ let package = Package(
     platforms: [
         .iOS(.v17),
         // A package that depends on DMAction for watchOS declares at least its floor.
-        .watchOS(.v7),
+        .watchOS(.v7)
     ],
     products: [
         .library(name: "Consumer", targets: ["Consumer"])
