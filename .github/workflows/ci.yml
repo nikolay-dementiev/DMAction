@@ -137,6 +137,90 @@ jobs:
           path: ${{ runner.temp }}/DMAction.xcresult
           retention-days: 7
 
+  # The package's own tests on a watchOS simulator, and the library built for the device SDK.
+  # The podspec job builds the library's sources for watchOS, but no test file and no run.
+  watchos:
+    name: watchos (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The newest hosted image, Xcode and watchOS runtime.
+          - name: watchOS 26.5
+            runner: macos-26
+            xcode: "26.6"
+            device: Apple Watch Series 11 (46mm)
+            os: "26.5"
+          # The oldest hosted image and the oldest watchOS runtime it offers.
+          - name: watchOS 11.5
+            runner: macos-15
+            xcode: "16.4"
+            device: Apple Watch Series 10 (46mm)
+            os: "11.5"
+    env:
+      XCODE: ${{ matrix.xcode }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
+      - name: Prepare the simulator
+        env:
+          DEVICE: ${{ matrix.device }}
+          OS: ${{ matrix.os }}
+        run: |
+          udid="$(Scripts/prepare-simulator.sh "$DEVICE" "$OS" watchOS)"
+          echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
+      # The tests build the simulator slices. Only this step builds the device slices, which
+      # include arm64_32, where Int and pointers are 32 bits wide.
+      - name: Build the library for the watchOS device SDK
+        run: |
+          xcodebuild build \
+            -scheme DMAction \
+            -sdk watchos \
+            -destination 'generic/platform=watchOS' \
+            -configuration Release \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+      - name: Build the consumer fixture for the watchOS Simulator
+        working-directory: Fixtures/Consumer
+        run: |
+          xcodebuild build \
+            -scheme Consumer \
+            -destination 'generic/platform=watchOS Simulator'
+      - name: Test
+        run: |
+          xcodebuild test \
+            -scheme DMAction \
+            -destination "platform=watchOS Simulator,id=$SIMULATOR" \
+            -resultBundlePath "$RUNNER_TEMP/DMAction-watchOS.xcresult" \
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+      # A run that lost tests, or skipped them, passes too. So every test method of the test
+      # files must be in the result bundle, run and passed.
+      - name: Check the test count
+        run: |
+          # git grep exits 1 when nothing matches. Without the || true, pipefail would end the step
+          # before the check below could say that it expected no test.
+          EXPECTED="$({ git grep -hcE '^[[:space:]]*func test[[:alnum:]_]*\(\)' -- 'Tests/DMActionTests/*.swift' || true; } \
+            | awk '{ total += $1 } END { print total + 0 }')"
+          xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/DMAction-watchOS.xcresult" > "$RUNNER_TEMP/summary.json"
+          if ! jq -e --argjson expected "$EXPECTED" \
+              '$expected > 0 and .totalTestCount == $expected and .passedTests == $expected and .failedTests == 0 and .skippedTests == 0' \
+              "$RUNNER_TEMP/summary.json" > /dev/null; then
+            echo "Expected $EXPECTED tests to run and pass on watchOS:"
+            jq '{totalTestCount, passedTests, failedTests, skippedTests}' "$RUNNER_TEMP/summary.json"
+            exit 1
+          fi
+      - name: Upload the result bundle
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: xcresult-watchos-${{ matrix.runner }}
+          path: ${{ runner.temp }}/DMAction-watchOS.xcresult
+          retention-days: 7
+
   example:
     name: example (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
@@ -411,8 +495,8 @@ jobs:
           esac
 
   # The pod is frozen at 1.1.0 and nothing goes to the trunk again. The job lints the current
-  # sources as a pod; it is also the only watchOS build of the package until a SwiftPM watchOS
-  # job exists.
+  # sources as a pod, which builds them for watchOS too. The watchos job builds and tests the
+  # package itself.
   podspec:
     runs-on: macos-26
     timeout-minutes: 20
