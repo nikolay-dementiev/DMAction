@@ -83,11 +83,11 @@ import sys
 manifest = json.load(open(sys.argv[1]))
 source = open(sys.argv[2]).read()
 problems = []
-for dependency in manifest.get("dependencies", []):
+for dependency in manifest["dependencies"]:
     for entries in dependency.values():
         for entry in entries:
             problems.append(
-                f"dependency '{entry.get('identity')}' is declared: a dependency needs the owner's "
+                f"dependency '{entry.get('identity')}' is declared: a dependency needs the maintainer's "
                 "approval and a change of this check in the same pull request"
             )
             requirement = entry.get("requirement", {})
@@ -218,8 +218,8 @@ else
             mkdir -p "$PROBE/consumer/Sources/$TARGET"
             echo "import $MODULE" > "$PROBE/consumer/Sources/$TARGET/$TARGET.swift"
         done <<< "$TARGETS"
-        # The cache lies in the folder of the probe, so that a package in the cache of whoever runs
-        # this cannot stand in for a fetch.
+        # The cache lies in the folder of the probe, so that manifests and repositories cached on
+        # the machine of whoever runs this cannot stand in for what the build resolves.
         if swift build --package-path "$PROBE/consumer" --cache-path "$PROBE/cache" > "$WORK/version-build.log" 2>&1; then
             # What the build resolved, as SwiftPM pinned it: the tagged copy and nothing else.
             if EXTRA="$(python3 - "$PROBE/consumer/Package.resolved" "$COPY" <<'PY'
@@ -235,17 +235,22 @@ try:
 except (OSError, ValueError) as error:
     print(f"  Package.resolved cannot be read: {error}")
     sys.exit(1)
-if not isinstance(resolved, dict) or resolved.get("version") not in (2, 3) or not isinstance(resolved.get("pins"), list):
+readable = isinstance(resolved, dict) and resolved.get("version") in (2, 3) and isinstance(resolved.get("pins"), list)
+if not readable or not all(isinstance(pin, dict) for pin in resolved["pins"]):
     print("  Package.resolved is not of format version 2 or 3 with a list of pins, and only those are read")
     sys.exit(1)
 identities = [pin.get("identity") for pin in resolved["pins"]]
 problems = []
 for pin in resolved["pins"]:
     if pin.get("identity") != expected:
-        state = pin.get("state", {})
+        state = pin.get("state")
+        if not isinstance(state, dict):
+            state = {}
         problems.append(f"  {pin.get('identity')} ({pin.get('kind')}, {state.get('version') or state.get('revision')}, {pin.get('location')})")
-if expected not in identities:
+if identities.count(expected) == 0:
     problems.append(f"  {expected}, the tagged copy, is not among the resolved packages")
+elif identities.count(expected) > 1:
+    problems.append(f"  {expected}, the tagged copy, is pinned {identities.count(expected)} times")
 print("\n".join(problems))
 sys.exit(1 if problems else 0)
 PY
