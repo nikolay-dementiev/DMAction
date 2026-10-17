@@ -117,8 +117,9 @@ to the CocoaPods trunk.
 
 After the tag, open the package's page on the Swift Package Index,
 https://swiftpackageindex.com/nikolay-dementiev/DMAction, and check that the new version and its
-documentation are listed. `.spi.yml` configures the documentation build; no script or CI job
-checks the index.
+documentation are listed. The index picks up a tag on its own schedule, so they may not be listed at
+once; check again later. `.spi.yml` configures the documentation build; no script or CI job checks
+the index.
 
 ## Security
 

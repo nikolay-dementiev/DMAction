@@ -67,8 +67,8 @@ observable behaviour that the notes do not declare, which a test catches only wh
 behaviour. A change of behaviour is caught by a test that pins it, not by the interface checks: with
 the nested delivery of 1.0.x restored in a scratch clone,
 `test_run_withSynchronousProducers_startsTheFallbackAfterThePrimaryReturns` fails, while
-`Scripts/check-api.sh` still matches the baseline and `Scripts/check-api-digester.sh 1.1.0` finds no
-break.
+`Scripts/check-api.sh` still reports that the interface matches the baseline and
+`Scripts/check-api-digester.sh 1.1.0` finds no break.
 
 ## Deprecation
 
