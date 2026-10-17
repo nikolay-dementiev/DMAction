@@ -64,7 +64,11 @@ class, the changes of observable behaviour and the release the change needs. The
 the rest: that the baseline changes in the same commit as the declaration; whether an added line
 adds an overload that makes an existing call ambiguous, which no script sees; and every change of
 observable behaviour that the notes do not declare, which a test catches only where a test pins the
-behaviour.
+behaviour. A change of behaviour is caught by a test that pins it, not by the interface checks: with
+the nested delivery of 1.0.x restored in a scratch clone,
+`test_run_withSynchronousProducers_startsTheFallbackAfterThePrimaryReturns` fails, while
+`Scripts/check-api.sh` still matches the baseline and `Scripts/check-api-digester.sh 1.1.0` finds no
+break.
 
 ## Deprecation
 
