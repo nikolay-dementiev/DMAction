@@ -19,6 +19,17 @@ final class DefaultOutcomeViewModelTests: XCTestCase {
     }
 
     @MainActor
+    func test_load_whenIdle_requestsOneActionWithSelectedFailureCount() {
+        let actions = OutcomeActionFactorySpy()
+        let viewModel = DefaultOutcomeViewModel(actions: actions)
+        viewModel.failuresBeforeSuccess = 3
+
+        viewModel.load()
+
+        XCTAssertEqual(actions.requestedFailureCounts, [3], "one request, with the count the user selected")
+    }
+
+    @MainActor
     func test_load_whileTheFetchIsOutstanding_isLoading() {
         let (viewModel, source) = makeSUT()
         source.holdsFetches = true
