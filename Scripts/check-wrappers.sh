@@ -13,11 +13,14 @@
 #
 # 1. The shim is called once, as `run --quiet --package-path Tools devkit <command> <arguments>`,
 #    from the root of the repository, even when the script is started in another directory. The
-#    arguments reach it as they were given: plain, with a space, empty, a star, a dash, with quotes.
+#    arguments reach it as they were given: plain, with a space, with a newline, empty, a star, a
+#    dash, with quotes.
 # 2. Started with no argument and from its own folder, it passes none, and finds the root.
 # 3. The status of the shim is the status of the script: 0, 1, 2, 64, 70 and 130.
-# 4. Standard output and standard error are the shim's, with nothing added. The script that
-#    prints a simulator's UDID depends on this.
+# 4. Standard output and standard error are the shim's, byte for byte, with nothing added, whatever
+#    the status. The script that prints a simulator's UDID depends on this.
+# 5. The script ends in an exec: the process that was started is the process of the shim, so a
+#    signal sent to the script reaches devkit.
 #
 # Exit codes: 0 all hold, 1 one does not, 2 wrong usage or a script missing from the folder.
 
@@ -62,7 +65,8 @@ done
 REPO="$(cd "$WORK/repo" && pwd -P)"
 
 # The shim writes one record for each call: CALL, the physical working directory and every
-# argument, each ended by a NUL byte, so that an argument with a space or a newline stays one.
+# argument, each ended by a NUL byte, so that an argument with a space or a newline stays one. It
+# also writes its process id, which equals the one that run() started only if the script exec'd it.
 cat > "$WORK/bin/swift" <<'SHIM'
 #!/bin/bash
 {
@@ -71,6 +75,7 @@ cat > "$WORK/bin/swift" <<'SHIM'
         printf '%s\0' "$ARGUMENT"
     done
 } >> "$SHIM_LOG"
+printf '%s' "$$" > "$SHIM_PID"
 echo "out from the shim"
 echo "err from the shim" >&2
 exit "${SHIM_STATUS:-0}"
@@ -82,14 +87,18 @@ chmod 755 "$WORK/bin/swift" "$WORK/bin/xcrun" "$WORK/bin/curl"
 STATUS=0
 # run <path of the script> <directory to start it in> <status the shim ends with> [arguments...]
 # Leaves the record of the shim in $WORK/log, the streams in $WORK/stdout and $WORK/stderr, and
-# the status of the script in $STATUS.
+# the status of the script in $STATUS. A small launcher writes its process id and then execs the
+# script, so that $WORK/launcher.pid can be compared with the id the shim wrote to $WORK/shim.pid.
 run() {
     local script="$1" directory="$2" shim_status="$3"
     shift 3
     : > "$WORK/log"
+    rm -f "$WORK/launcher.pid" "$WORK/shim.pid"
     STATUS=0
-    (cd "$directory" && PATH="$WORK/bin:$PATH" SHIM_LOG="$WORK/log" SHIM_STATUS="$shim_status" \
-        "$script" "$@" > "$WORK/stdout" 2> "$WORK/stderr") || STATUS=$?
+    (cd "$directory" && PATH="$WORK/bin:$PATH" SHIM_LOG="$WORK/log" SHIM_PID="$WORK/shim.pid" \
+        SHIM_STATUS="$shim_status" LAUNCHER_PID="$WORK/launcher.pid" \
+        sh -c 'echo $$ > "$LAUNCHER_PID"; exec "$@"' sh "$script" "$@" \
+        > "$WORK/stdout" 2> "$WORK/stderr") || STATUS=$?
 }
 
 # expect <command> [arguments...]: the one record that a faithful script leaves, in $WORK/expected.
@@ -105,13 +114,17 @@ show() {
     tr '\0' ' ' < "$1"
 }
 
+printf 'out from the shim\n' > "$WORK/expected.out"
+printf 'err from the shim\n' > "$WORK/expected.err"
+NEWLINE_ARGUMENT=$'two\nlines'
+
 for STEM in $STEMS; do
     SCRIPT="$WORK/repo/Scripts/$STEM.sh"
     BEFORE=$FAILURES
 
     CHECKS=$((CHECKS + 1))
-    run "$SCRIPT" "$WORK/elsewhere" 0 plain "two words" "" '*' -x 'say "hi"' "it's"
-    expect "$STEM" plain "two words" "" '*' -x 'say "hi"' "it's"
+    run "$SCRIPT" "$WORK/elsewhere" 0 plain "two words" "$NEWLINE_ARGUMENT" "" '*' -x 'say "hi"' "it's"
+    expect "$STEM" plain "two words" "$NEWLINE_ARGUMENT" "" '*' -x 'say "hi"' "it's"
     if [ "$STATUS" -ne 0 ] || ! cmp -s "$WORK/log" "$WORK/expected"; then
         fail "$STEM.sh started in another directory: expected the call [$(show "$WORK/expected")], got [$(show "$WORK/log")], status $STATUS"
     fi
@@ -129,14 +142,19 @@ for STEM in $STEMS; do
         if [ "$STATUS" -ne "$WANTED" ]; then
             fail "$STEM.sh ended with status $STATUS where the shim ended with $WANTED"
         fi
+        if ! cmp -s "$WORK/stdout" "$WORK/expected.out"; then
+            fail "$STEM.sh printed [$(cat "$WORK/stdout")] on standard output when the shim ended with $WANTED, not the output of the shim alone"
+        fi
+        if ! cmp -s "$WORK/stderr" "$WORK/expected.err"; then
+            fail "$STEM.sh printed [$(cat "$WORK/stderr")] on standard error when the shim ended with $WANTED, not the output of the shim alone"
+        fi
     done
 
     CHECKS=$((CHECKS + 1))
     run "$SCRIPT" "$WORK/elsewhere" 0
-    if [ "$(cat "$WORK/stdout")" != "out from the shim" ]; then
-        fail "$STEM.sh printed [$(cat "$WORK/stdout")] on standard output, not the output of the shim alone"
-    elif [ "$(cat "$WORK/stderr")" != "err from the shim" ]; then
-        fail "$STEM.sh printed [$(cat "$WORK/stderr")] on standard error, not the output of the shim alone"
+    if [ "$(cat "$WORK/launcher.pid" 2> /dev/null)" != "$(cat "$WORK/shim.pid" 2> /dev/null)" ] ||
+        [ ! -s "$WORK/shim.pid" ]; then
+        fail "$STEM.sh did not exec swift: process $(cat "$WORK/launcher.pid" 2> /dev/null) started it and process $(cat "$WORK/shim.pid" 2> /dev/null) ran swift"
     fi
 
     if [ "$FAILURES" -eq "$BEFORE" ]; then
