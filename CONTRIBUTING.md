@@ -66,8 +66,9 @@ changes in those files.
 
 `Scripts/lint.sh`, `Scripts/check-lint-contract.sh`, `Scripts/check-lint-tool.sh` and
 `Scripts/prepare-simulator.sh` are wrappers of
-[DMDevKit](https://github.com/nikolay-dementiev/DMDevKit), the tooling that DMAction shares with
-DMVariableBlurView and DMUnLoader. Each goes to the repository root and runs
+[DMDevKit](https://github.com/nikolay-dementiev/DMDevKit), the tooling that DMAction,
+DMVariableBlurView and DMUnLoader are to share; DMAction is the first to use it. Each goes to the
+repository root, which `devkit` finds with git, so run them in a clone, and runs
 `swift run --quiet --package-path Tools devkit <command>` with the arguments it was given, so the
 paths that CI and this file name stay as they were. The other scripts of `Scripts/` have not moved.
 
@@ -77,11 +78,16 @@ paths that CI and this file name stay as they were. The other scripts of `Script
   fetch DMDevKit.
 - `devkit.conf` holds the settings of this repository that the commands read: the library folder,
   the lint rules and the folder of their fixtures. A change to a command is a change to DMDevKit.
-- The first run builds `devkit` and takes several seconds; the next runs take under a second. A
-  clean checkout gets SwiftLint, at the version that `.swiftlint.yml` pins, by running
+- The first run builds `devkit`, takes several seconds and prints the lines that SwiftPM writes
+  while it fetches DMDevKit; each next run adds under a second to the script. If `swift run`
+  itself fails, a fetch or a build, the script ends with its status, which can be 1, the status
+  that the scripts also use for findings.
+- A clean checkout gets SwiftLint, at the version that `.swiftlint.yml` pins, by running
   `Scripts/lint.sh`, or alone with
   `swift run --quiet --package-path Tools devkit swiftlint-fetch 0.65.1`.
-  Both need `curl`, `unzip` and `shasum`.
+  Both need `curl`, `unzip` and `shasum`. `.swiftlint.yml` can pin only a version that DMDevKit
+  has a checksum for: for another one `Scripts/lint.sh` ends with status 2 and says so, so a
+  bump of SwiftLint waits for a DMDevKit release that knows the version.
 - `swift run --quiet --package-path Tools devkit --help` lists the commands.
 
 ## The example app
