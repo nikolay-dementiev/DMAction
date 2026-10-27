@@ -128,6 +128,9 @@ for STEM in $STEMS; do
     if [ "$STATUS" -ne 0 ] || ! cmp -s "$WORK/log" "$WORK/expected"; then
         fail "$STEM.sh started in another directory: expected the call [$(show "$WORK/expected")], got [$(show "$WORK/log")], status $STATUS"
     fi
+    if ! cmp -s "$WORK/stdout" "$WORK/expected.out" || ! cmp -s "$WORK/stderr" "$WORK/expected.err"; then
+        fail "$STEM.sh started with arguments printed [$(cat "$WORK/stdout")] on standard output and [$(cat "$WORK/stderr")] on standard error, not the output of the shim alone"
+    fi
 
     CHECKS=$((CHECKS + 1))
     run "./$STEM.sh" "$WORK/repo/Scripts" 0
