@@ -218,8 +218,11 @@ if [ "${#TOOLS[@]}" -gt 0 ]; then
     write_canary "$WORK/tools/Sources/$CANARY/main.swift"
     echo "canary()" >> "$WORK/tools/Sources/$CANARY/main.swift"
     write_manifest "$WORK/tools" ".macOS(.v14)" executableTarget "" "${TOOLS[@]}" "$CANARY"
-    if swift build --package-path "$WORK/tools" --scratch-path "$TOOLS_BUILD" > "$WORK/tools.log" 2>&1; then
-        check_compiled "$WORK/tools.log" "Compiling NAME main\.swift" "${TOOLS[@]}" "$CANARY"
+    # Swift 6.4 colours a log file, and its progress lines name only some of the targets. With -v the
+    # compiler command of every module that is compiled in this run is in the log, whichever build
+    # system runs, and its -module-name is the name of the block.
+    if NO_COLOR=1 swift build -v --package-path "$WORK/tools" --scratch-path "$TOOLS_BUILD" > "$WORK/tools.log" 2>&1; then
+        check_compiled "$WORK/tools.log" " -module-name NAME " "${TOOLS[@]}" "$CANARY"
         check_warnings "$WORK/tools.log"
     else
         report "$WORK/tools.log" "the blocks for a command-line tool"
