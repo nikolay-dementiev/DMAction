@@ -34,7 +34,8 @@ xcodebuild build -scheme DMAction -sdk watchos -destination 'generic/platform=wa
 ```
 
 `Scripts/prepare-simulator.sh "<device type name>" <version> [iOS|watchOS]` boots the simulator
-that a CI job uses, creates its device when the image has none, and prints the udid.
+that a CI job uses, creates its device when the image has none, and prints the udid. It is one of
+the scripts that DMDevKit provides (see "The tools").
 
 ## The checks CI runs
 
@@ -45,8 +46,9 @@ of "Build and test" and of "The example app".
 | Script | What it checks |
 |---|---|
 | `Scripts/lint.sh` | SwiftLint, at the version pinned in `.swiftlint.yml`. The first run fetches that version into `.build/tools` and checks its checksum; runs at once on one checkout do not disturb each other. `--analyze <xcodebuild log>` also runs the analyzer rules |
-| `Scripts/check-lint-tool.sh` | that the helper which fetches SwiftLint (`Scripts/swiftlint-tool.sh`) is safe to run twice at once: with a fake archive and shims for `unzip` and `curl` it checks that the tool stays whole while another run unpacks and is replaced by a rename, that two first-time runs both succeed, that a wrong checksum never reaches the unpack, and that a failed download or unpack leaves nothing behind |
-| `Scripts/check-lint-contract.sh` | that the lint rules fire: it lints the fixtures of `Fixtures/Lint` where their folder says (the root as files of the library, `Domain/` and `Adapters/` as files of that folder, `Outside/` outside the library) and compares the diagnostics of the import, Domain, force unwrap and termination rules with the ones each line expects |
+| `Scripts/check-lint-tool.sh` | that the helper which fetches SwiftLint (DMDevKit's `swiftlint-tool.sh`) is safe to run twice at once: with a fake archive and shims for `unzip` and `curl` it checks that the tool stays whole while another run unpacks and is replaced by a rename, that two first-time runs both succeed, that a wrong checksum never reaches the unpack, and that a failed download or unpack leaves nothing behind |
+| `Scripts/check-lint-contract.sh` | that the lint rules fire: it lints the fixtures of `Fixtures/Lint` where their folder says (the root as files of the library, `Domain/` and `Adapters/` as files of that folder, `Outside/` outside the library) and compares the diagnostics of the rules named in `devkit.conf` with the ones each line expects |
+| `Scripts/check-wrappers.sh` | that the four scripts which forward to `devkit` forward faithfully: with a shim in place of `swift` it checks the command and the arguments that reach `devkit`, the directory, the exit status and both standard streams, and that each script works from any directory |
 | `Scripts/check-api.sh` | the public interface against `Fixtures/API/public-interface.txt`; `--self-test` runs the cases of its normalisation; `--since <ref>` prints, without a compiler, the lines the baseline lost, changed or gained since a git ref such as a release tag. A deliberate change of the public API runs it with `--update` and commits the new baseline in the same commit |
 | `Scripts/check-release.sh <version>` | that the newest heading of `CHANGELOG.md` is that version, with a release date that is a day of the calendar and notes under it, and that the podspec still names 1.1.0, the version the pod is frozen at; it also compares the release with the one below it in the changelog and refuses a version that keeps its major version after a removed or changed line of the interface, after a `### Breaking changes` subsection, or when `Scripts/check-api-digester.sh` reports a break since the previous release |
 | `Scripts/check-api-digester.sh <ref>` | that swift-api-digester finds no break between the working tree and a git ref, such as the last release: a protocol requirement added without a default, a method that an extension declares and that becomes a requirement, a narrowed generic requirement; `--self-test` runs it on a scratch package. It builds for the host only, and it does not see a changed default value, an added associated type with a default, or the resolution of an overload |
@@ -56,7 +58,37 @@ of "Build and test" and of "The example app".
 
 The checks run code that the branch contains: `Package.swift` and the manifest blocks of the README
 are evaluated by Swift Package Manager, the podspec by CocoaPods, and `project.yml` by XcodeGen.
-Before you run them on someone else's branch, read what that branch changes in those files.
+`Tools/Package.swift` and `devkit.conf` are code of the same kind: `devkit.conf` is shell code that
+runs with your rights. Before you run the checks on someone else's branch, read what that branch
+changes in those files.
+
+## The tools
+
+`Scripts/lint.sh`, `Scripts/check-lint-contract.sh`, `Scripts/check-lint-tool.sh` and
+`Scripts/prepare-simulator.sh` are wrappers of
+[DMDevKit](https://github.com/nikolay-dementiev/DMDevKit), the tooling that DMAction,
+DMVariableBlurView and DMUnLoader are to share; DMAction is the first to use it. Each goes to the
+repository root, which `devkit` finds with git, so run them in a clone, and runs
+`swift run --quiet --package-path Tools devkit <command>` with the arguments it was given, so the
+paths that CI and this file name stay as they were. The other scripts of `Scripts/` have not moved.
+
+- `Tools/Package.swift` is a package of its own. It pins a release of DMDevKit, and
+  `Tools/Package.resolved` pins its commit; Dependabot proposes the newer releases. SwiftPM reads
+  only the manifest at the root of a dependency, so a package that depends on DMAction does not
+  fetch DMDevKit.
+- `devkit.conf` holds the settings of this repository that the commands read: the library folder,
+  the lint rules and the folder of their fixtures. A change to a command is a change to DMDevKit.
+- The first run builds `devkit`, takes several seconds and prints the lines that SwiftPM writes
+  while it fetches DMDevKit; each next run adds under a second to the script. If `swift run`
+  itself fails, a fetch or a build, the script ends with its status, which can be 1, the status
+  that the scripts also use for findings.
+- A clean checkout gets SwiftLint, at the version that `.swiftlint.yml` pins, by running
+  `Scripts/lint.sh`, or alone with
+  `swift run --quiet --package-path Tools devkit swiftlint-fetch 0.65.1`.
+  Both need `curl`, `unzip` and `shasum`. `.swiftlint.yml` can pin only a version that DMDevKit
+  has a checksum for: for another one `Scripts/lint.sh` ends with status 2 and says so, so a
+  bump of SwiftLint waits for a DMDevKit release that knows the version.
+- `swift run --quiet --package-path Tools devkit --help` lists the commands.
 
 ## The example app
 

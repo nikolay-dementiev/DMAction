@@ -1,5 +1,6 @@
 # The actions of the workflows are pinned to commits. Dependabot proposes the newer ones.
-# The package itself has no dependency to watch.
+# The package itself has no dependency to watch. The tools manifest in Tools/ pins DMDevKit, and
+# Dependabot proposes its newer releases too.
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -7,5 +8,12 @@ updates:
     schedule:
       interval: weekly
     # A release of an action is proposed a week after it appears, not on the day it does.
+    cooldown:
+      default-days: 7
+  - package-ecosystem: swift
+    directory: /Tools
+    schedule:
+      interval: weekly
+    # A release of DMDevKit is proposed a week after it appears, as for an action.
     cooldown:
       default-days: 7

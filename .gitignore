@@ -13,3 +13,6 @@ Package.resolved
 Fixtures/Rejected/.build/
 Fixtures/Rejected/.swiftpm/
 Fixtures/Rejected/Package.resolved
+# The tools manifest pins DMDevKit and keeps its lockfile, which the rule above would ignore.
+/Tools/.build
+!/Tools/Package.resolved
