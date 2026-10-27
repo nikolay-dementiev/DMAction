@@ -107,6 +107,26 @@ final class RunAsyncTests: XCTestCase {
         XCTAssertEqual(sut.mapped.count, 1, "the second completion is not mapped: the guarded call ignores it")
     }
 
+    /// A third-party action that puts a label of its own on each of two successes.
+    private struct ForgingAction: DMAction {
+        let currentAttempt: UInt = 3
+        let id = UUID()
+        let action: ActionType = { completion in
+            completion(.success(DMActionResultValue(value: "first", attemptCount: 99)))
+            completion(.success(DMActionResultValue(value: "second", attemptCount: 98)))
+        }
+    }
+
+    func test_runAsync_whenAConformerForgesLabels_returnsTheRunsLabelOfTheFirstCompletion() async throws {
+        let sut = makeSUT()
+
+        let outcome = try await ForgingAction().runAsync(mapSuccess: sut.map)
+
+        XCTAssertEqual(outcome.value, "mapped first", "the first completion wins, unwrapped")
+        XCTAssertEqual(outcome.attemptCount, 3, "the label of the run replaces the forged one")
+        XCTAssertEqual(sut.mapped.count, 1, "only the first completion is mapped")
+    }
+
     // MARK: - Cancellation
 
     func test_runAsync_cancelBeforeRegistration_completesWithCancellation() async {
