@@ -51,6 +51,10 @@
 
 set -euo pipefail
 
+# Swift 6.4 colours the diagnostics of `swift build` even in a log file, and the escape codes hide
+# the `: error:` that step 6 reads from the log.
+export NO_COLOR=1
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODULE="DMAction"
 
