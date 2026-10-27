@@ -3,7 +3,7 @@
 All notable changes to DMAction are recorded in this file. The format follows Keep a Changelog
 1.1.0, and versions follow Semantic Versioning 2.0.0.
 
-## [Unreleased]
+## [1.2.0] - 2026-10-27
 
 ### Added
 
