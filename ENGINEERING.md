@@ -115,7 +115,7 @@ the rules above it would have needed a major version. The rules apply from the r
   mapper turns the payload, which is not `Sendable`, into the only value that crosses to the
   caller. `runAsync` has one terminal-state owner, the continuation of an `AsyncThrowingStream`:
   `finish()` right after the first `yield` closes it, a cancelled task ends the iteration, and
-  there is no actor, no task and no continuation to resume twice.
+  there is no actor, no task and no checked continuation to resume twice.
 - **Documented limits.** What the library enforces and what it cannot promise are in the DocC
   article Running Actions (`Sources/DMAction/DMAction.docc/RunningActions.md`) and in the README,
   "Behaviour your app must know". This file points to them and does not restate them. A change of

@@ -116,7 +116,6 @@ mode:
 | A main-actor type, a custom actor or a nonisolated async function runs an action with `runAsync`, and uses the action again | Yes |
 | The mapper of `runAsync` returns a type that is not `Sendable` | No: the type does not conform to `Sendable` |
 | The mapper of `runAsync` captures a mutable reference | No: capture of a non-`Sendable` type in a `@Sendable` closure |
-| An action that an actor owns is run with `runAsync` from `Task.detached` | No: passing the closure as a `sending` parameter risks data races |
 
 Each of these shapes is a fixture of the repository, in `Fixtures/Consumer` and
 `Fixtures/Rejected`, and CI builds each one.
@@ -129,9 +128,10 @@ attempt label. A failure is thrown as it is, and so is an error of the mapper.
 
 - **Where things run.** The first producer runs on the calling thread, before the call suspends.
   The mapper runs where the completion arrives, which can be any thread, before the caller
-  resumes. It is `@Sendable`, so it cannot capture state of the caller: it is a quick, pure mapping.
-- **One terminal event.** The wait ends with the first of two events, the mapped result or the
-  cancellation of the task. After that the run cannot end it again.
+  resumes. It is `@Sendable`, so it can capture only `Sendable` state: it is a quick, pure mapping.
+- **One terminal event.** The wait ends with the first of two events, the result of the run (the
+  mapped value, or an error of the producer or the mapper) or the cancellation of the task. After
+  that the run cannot end it again.
 - **A cancellation during the mapping wins.** If the task is cancelled while the mapper runs, the
   call throws `CancellationError` and the mapped value is dropped.
 - **A late callback is mapped once.** A completion that arrives after the wait ended runs the

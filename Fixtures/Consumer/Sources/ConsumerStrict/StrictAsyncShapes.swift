@@ -42,9 +42,11 @@ struct OwnRunner: DMAction {
     }
 }
 
-func lookupPrefersTheMemberOfTheConformer() async throws -> (String, DMActionOutcome<String>) {
+/// No annotation names the type, so the compiler's own choice is what the two reads decide: `count`
+/// is a member of a `String` only, and `attemptCount` a member of the outcome only.
+func lookupPrefersTheMemberOfTheConformer() async throws -> Int {
     let own = OwnRunner()
-    let throughTheType: String = try await own.runAsync { _ in "x" }
-    let throughTheProtocol: DMActionOutcome<String> = try await (own as any DMAction).runAsync { _ in "x" }
-    return (throughTheType, throughTheProtocol)
+    let throughTheType = try await own.runAsync { _ in "x" }
+    let throughTheProtocol = try await (own as any DMAction).runAsync { _ in "x" }
+    return throughTheType.count + Int(throughTheProtocol.attemptCount)
 }

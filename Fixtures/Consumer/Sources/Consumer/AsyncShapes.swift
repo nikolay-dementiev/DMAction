@@ -2,7 +2,8 @@ import DMAction
 
 // Uses of the async surface from the three kinds of caller. They compile in Swift 6 mode and have
 // to keep compiling: a main-actor type and a custom actor that run actions they own, and a
-// nonisolated async function. The action stays usable after the await in each of them.
+// nonisolated async function. Where one of them runs an action twice, the action is still usable
+// after the first await.
 
 @MainActor
 final class AsyncModel {

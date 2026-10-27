@@ -14,8 +14,7 @@ let shapes = [
     "SendableAction",
     "SendableResult",
     "NonSendableOutput",
-    "MapperCapturesReference",
-    "ActorActionInDetachedTask"
+    "MapperCapturesReference"
 ]
 
 let package = Package(

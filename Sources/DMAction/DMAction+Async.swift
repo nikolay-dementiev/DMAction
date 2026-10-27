@@ -32,8 +32,9 @@ public extension DMAction {
     ///
     /// - A task that is cancelled when this is called throws `CancellationError` at once and
     ///   starts no producer.
-    /// - The wait ends with the first of two events: the mapped result, or the cancellation. A
-    ///   cancellation that arrives while `mapSuccess` runs wins, and the mapped value is dropped.
+    /// - The wait ends with the first of two events: the result of the run (the mapped value, or an
+    ///   error of the producer or of `mapSuccess`), or the cancellation. A cancellation that
+    ///   arrives while `mapSuccess` runs wins, and the mapped value is dropped.
     /// - A completion that arrives after the wait has ended is still mapped, once, and dropped.
     ///   Only the first completion of a run is ever mapped.
     /// - Cancellation stops no producer, request, retry or fallback. A producer that returns
@@ -77,8 +78,8 @@ public extension DMAction {
 }
 
 private enum AsyncRunError: Error {
-    /// A run labels every success it delivers, so this means the run broke its own rule. It ends
-    /// the wait instead of inventing a label.
+    /// Defensive, and unreachable through the public API: the guarded run labels every success it
+    /// delivers. If that rule were ever broken, this ends the wait instead of inventing a label.
     case missingAttemptLabel
 }
 
