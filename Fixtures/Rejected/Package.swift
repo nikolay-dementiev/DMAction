@@ -12,7 +12,10 @@ let shapes = [
     "ContinuationBridge",
     "GlobalStorage",
     "SendableAction",
-    "SendableResult"
+    "SendableResult",
+    "NonSendableOutput",
+    "MapperCapturesReference",
+    "ActorActionInDetachedTask"
 ]
 
 let package = Package(
