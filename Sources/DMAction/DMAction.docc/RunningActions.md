@@ -88,8 +88,10 @@ and a `simpleAction` it supplies itself are its own closures: nothing guards the
 
 - **Liveness.** A producer that never completes stalls its run. Nothing times out.
 - **A thread.** The consumer's completion runs on the thread where the run finished.
-- **Isolation.** No closure type is `@Sendable` and no type is `Sendable`. Use an action inside one
-  isolation domain. The next section shows what the compiler accepts.
+- **Isolation.** On the synchronous surface no closure type is `@Sendable` and no type is
+  `Sendable`. Use an action inside one isolation domain. The next section shows what the compiler
+  accepts. ``DMActionOutcome`` and the mapper of ``DMAction/DMAction/runAsync(isolation:mapSuccess:)``
+  are the `Sendable` part.
 - **Typed payloads.** The success type is erased to `any Copyable`.
 - **Unlimited nesting of composites.** Applying ``DMAction/DMAction/retry(_:)`` to a composite again
   and again nests one level per application. Running such an action does not grow the stack;
@@ -111,9 +113,37 @@ mode:
 | The result, a `DMAction.ResultType`, is sent out of the completion through `withCheckedContinuation` | No: sending the result risks data races |
 | A composed action is kept in a nonisolated `static let` | No: the static property is not concurrency-safe |
 | An action or a result is used as `any Sendable` | No: it does not conform to `Sendable` |
+| A main-actor type, a custom actor or a nonisolated async function runs an action with `runAsync`, and uses the action again | Yes |
+| The mapper of `runAsync` returns a type that is not `Sendable` | No: the type does not conform to `Sendable` |
+| The mapper of `runAsync` captures a mutable reference | No: capture of a non-`Sendable` type in a `@Sendable` closure |
+| An action that an actor owns is run with `runAsync` from `Task.detached` | No: passing the closure as a `sending` parameter risks data races |
 
 Each of these shapes is a fixture of the repository, in `Fixtures/Consumer` and
 `Fixtures/Rejected`, and CI builds each one.
+
+## Running from async code
+
+``DMAction/DMAction/runAsync(isolation:mapSuccess:)`` starts the same guarded run as call syntax,
+waits for its result and returns a ``DMActionOutcome``: what the mapper made of the payload, and the
+attempt label. A failure is thrown as it is, and so is an error of the mapper.
+
+- **Where things run.** The first producer runs on the calling thread, before the call suspends.
+  The mapper runs where the completion arrives, which can be any thread, before the caller
+  resumes. It is `@Sendable`, so it cannot capture state of the caller: it is a quick, pure mapping.
+- **One terminal event.** The wait ends with the first of two events, the mapped result or the
+  cancellation of the task. After that the run cannot end it again.
+- **A cancellation during the mapping wins.** If the task is cancelled while the mapper runs, the
+  call throws `CancellationError` and the mapped value is dropped.
+- **A late callback is mapped once.** A completion that arrives after the wait ended runs the
+  mapper once and drops the result. Only the first completion of a run is ever mapped: the guarded
+  call ignores the rest, a third-party conformer's included.
+- **Cancellation stops the wait and nothing else.** A task that is cancelled when the call starts
+  throws at once and starts no producer. Once a producer runs, cancelling stops no producer, request,
+  retry or fallback. A producer that returns without completing leaves the wait open until it
+  completes or the task is cancelled; one that never returns blocks inside the synchronous guarded
+  call, and cancellation cannot interrupt it.
+- **The action stays alive.** The run keeps the action until it delivers, so cancelling releases the
+  waiting caller and not the action.
 
 ## When a third-party conformer's properties are read
 

@@ -62,6 +62,11 @@ delivered, labelled 3.
 - ``DMActionResultValueProtocol``
 - ``PlaceholderCopyable``
 
+### Running from async code
+
+- ``DMAction/DMAction/runAsync(isolation:mapSuccess:)``
+- ``DMActionOutcome``
+
 ### Running actions
 
 - <doc:RunningActions>

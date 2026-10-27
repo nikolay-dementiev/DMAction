@@ -30,7 +30,7 @@ public extension DMAction {
     ///
     /// Cancelling the task ends the wait and nothing else.
     ///
-    /// - A task that is cancelled when this is called throws ``CancellationError`` at once and
+    /// - A task that is cancelled when this is called throws `CancellationError` at once and
     ///   starts no producer.
     /// - The wait ends with the first of two events: the mapped result, or the cancellation. A
     ///   cancellation that arrives while `mapSuccess` runs wins, and the mapped value is dropped.
@@ -49,7 +49,7 @@ public extension DMAction {
     ///     isolation domains.
     /// - Returns: The mapped value and the attempt label of the success.
     /// - Throws: The error of a failed run as it is, the error of `mapSuccess`, or
-    ///   ``CancellationError`` when the cancellation ends the wait.
+    ///   `CancellationError` when the cancellation ends the wait.
     func runAsync<Output: Sendable>(
         isolation: isolated (any Actor)? = #isolation,
         mapSuccess: @escaping @Sendable (any Copyable) throws -> Output
