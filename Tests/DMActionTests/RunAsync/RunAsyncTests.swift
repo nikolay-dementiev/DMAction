@@ -223,15 +223,23 @@ final class RunAsyncTests: XCTestCase {
             finished.signal()
         }
         completing.start()
-        await block { entered.wait() }
+        // A valve for a regression that leaves the wait open: it frees the mapper after five
+        // seconds, so that the test fails by assertion and does not hang with a blocked thread.
+        DispatchQueue.global().asyncAfter(deadline: .now() + 5) { release.signal() }
+        let mapperStarted = await block { entered.wait(timeout: .now() + 10) == .success }
+        guard mapperStarted else {
+            release.signal()
+            return XCTFail("the mapper did not start")
+        }
 
         task.cancel()
         let result = await task.result
         release.signal()
-        await block { finished.wait() }
+        let completionReturned = await block { finished.wait(timeout: .now() + 10) == .success }
 
         XCTAssertTrue(isCancellation(result), "the cancellation wins over a completion that is still being mapped")
         XCTAssertEqual(counter.count, 1, "the mapper ran once and its result was dropped")
+        XCTAssertTrue(completionReturned, "the thread that completed the run came back")
     }
 
     // MARK: - Threads and overlap
@@ -322,11 +330,10 @@ final class RunAsyncTests: XCTestCase {
 
     /// Runs a blocking wait on a dispatch thread, so that the test does not hold a thread of the
     /// cooperative pool.
-    private func block(_ wait: @escaping @Sendable () -> Void) async {
+    private func block(_ wait: @escaping @Sendable () -> Bool) async -> Bool {
         await withCheckedContinuation { continuation in
             DispatchQueue.global().async {
-                wait()
-                continuation.resume()
+                continuation.resume(returning: wait())
             }
         }
     }
