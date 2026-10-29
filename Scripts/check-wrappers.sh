@@ -35,7 +35,7 @@ case "$FOLDER" in
     /*) ;;
     *) FOLDER="$PWD/$FOLDER" ;;
 esac
-STEMS="lint check-lint-contract check-lint-tool prepare-simulator check-api check-release export-coverage"
+STEMS="lint check-lint-contract check-lint-tool prepare-simulator check-api check-release export-coverage count-tests"
 # shellcheck disable=SC2086  # the stems are words on purpose
 COUNT="$(printf '%s\n' $STEMS | wc -l | tr -d ' ')"
 for STEM in $STEMS; do

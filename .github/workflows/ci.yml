@@ -202,17 +202,7 @@ jobs:
       # A run that lost tests, or skipped them, passes too. So every test method of the test
       # files must be in the result bundle, run and passed.
       - name: Check the test count
-        run: |
-          EXPECTED="$(git grep -hcE '^[[:space:]]*func test[[:alnum:]_]*\(\)' -- 'Tests/DMActionTests/*.swift' \
-            | awk '{ total += $1 } END { print total + 0 }')"
-          xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/DMAction-watchOS.xcresult" > "$RUNNER_TEMP/summary.json"
-          if ! jq -e --argjson expected "$EXPECTED" \
-              '$expected > 0 and .totalTestCount == $expected and .passedTests == $expected and .failedTests == 0 and .skippedTests == 0' \
-              "$RUNNER_TEMP/summary.json" > /dev/null; then
-            echo "Expected $EXPECTED tests to run and pass on watchOS:"
-            jq '{totalTestCount, passedTests, failedTests, skippedTests}' "$RUNNER_TEMP/summary.json"
-            exit 1
-          fi
+        run: Scripts/count-tests.sh --label watchOS "$RUNNER_TEMP/DMAction-watchOS.xcresult" 'Tests/DMActionTests/*.swift'
       - name: Upload the result bundle
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -284,17 +274,7 @@ jobs:
       # A bundle whose tests were skipped, or that lost tests, passes too. So every test method of
       # the example's test files must be in the result bundle, run and passed.
       - name: Check the test counts
-        run: |
-          EXPECTED="$(git grep -hcE '^[[:space:]]*func test[[:alnum:]_]*\(\)' -- 'Examples/DMActionExample/*Tests/*.swift' \
-            | awk '{ total += $1 } END { print total + 0 }')"
-          xcrun xcresulttool get test-results summary --path "$RUNNER_TEMP/example.xcresult" > "$RUNNER_TEMP/summary.json"
-          if ! jq -e --argjson expected "$EXPECTED" \
-              '$expected > 0 and .totalTestCount == $expected and .passedTests == $expected and .failedTests == 0 and .skippedTests == 0' \
-              "$RUNNER_TEMP/summary.json" > /dev/null; then
-            echo "Expected $EXPECTED tests of the example to run and pass:"
-            jq '{totalTestCount, passedTests, failedTests, skippedTests}' "$RUNNER_TEMP/summary.json"
-            exit 1
-          fi
+        run: Scripts/count-tests.sh --label example "$RUNNER_TEMP/example.xcresult" 'Examples/DMActionExample/*Tests/*.swift'
       # Xcode compiles the package with its warnings suppressed, so warnings as errors cannot
       # cover the whole build. The library's own warnings fail the test job; this step covers
       # the sources of the example.
