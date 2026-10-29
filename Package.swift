@@ -3,7 +3,7 @@
 
 import PackageDescription
 
-// Every target compiles with these. Scripts/check-api.sh repeats them in SWIFT_FLAGS.
+// Every target compiles with these. devkit.conf repeats them in SWIFT_FLAGS.
 let swiftSettings: [SwiftSetting] = [.enableUpcomingFeature("ExistentialAny")]
 
 let package = Package(
