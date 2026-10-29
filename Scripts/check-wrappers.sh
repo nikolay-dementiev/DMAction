@@ -1,15 +1,14 @@
 #!/bin/bash
 #
-# Proves that the four scripts which forward to DMDevKit forward faithfully. It needs no network
+# Proves that the scripts which forward to DMDevKit forward faithfully. It needs no network
 # and no DMDevKit: `swift` is a shim that records how it was called, and `xcrun` and `curl` are
 # shims that fail, so a script that does its own work instead of forwarding cannot reach the
 # simulator or the network.
 #
-#   Scripts/check-wrappers.sh [<folder with the four scripts>]
+#   Scripts/check-wrappers.sh [<folder with the scripts>]
 #
-# The folder is Scripts/ next to this script unless one is given. For each of lint.sh,
-# check-lint-contract.sh, check-lint-tool.sh and prepare-simulator.sh, copied into a scratch
-# repository that has a Tools/ folder, it checks that:
+# The folder is Scripts/ next to this script unless one is given. For each script named in STEMS
+# below, copied into a scratch repository that has a Tools/ folder, it checks that:
 #
 # 1. The shim is called once, as `run --quiet --package-path Tools devkit <command> <arguments>`,
 #    from the root of the repository, even when the script is started in another directory. The
@@ -28,7 +27,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ "$#" -gt 1 ]; then
-    echo "usage: Scripts/check-wrappers.sh [<folder with the four scripts>]" >&2
+    echo "usage: Scripts/check-wrappers.sh [<folder with the scripts>]" >&2
     exit 2
 fi
 FOLDER="${1:-$ROOT/Scripts}"
@@ -36,7 +35,9 @@ case "$FOLDER" in
     /*) ;;
     *) FOLDER="$PWD/$FOLDER" ;;
 esac
-STEMS="lint check-lint-contract check-lint-tool prepare-simulator"
+STEMS="lint check-lint-contract check-lint-tool prepare-simulator check-api"
+# shellcheck disable=SC2086  # the stems are words on purpose
+COUNT="$(printf '%s\n' $STEMS | wc -l | tr -d ' ')"
 for STEM in $STEMS; do
     if [ ! -f "$FOLDER/$STEM.sh" ]; then
         echo "check-wrappers: $FOLDER/$STEM.sh does not exist" >&2
@@ -166,7 +167,7 @@ for STEM in $STEMS; do
 done
 
 if [ "$FAILURES" -gt 0 ]; then
-    echo "check-wrappers: $FAILURES failures in $CHECKS checks of 4 scripts" >&2
+    echo "check-wrappers: $FAILURES failures in $CHECKS checks of $COUNT scripts" >&2
     exit 1
 fi
-echo "check-wrappers: the 4 scripts forward to devkit as they should."
+echo "check-wrappers: the $COUNT scripts forward to devkit as they should."
