@@ -109,8 +109,13 @@ the rules above it would have needed a major version. The rules apply from the r
   `DMActionResultValue.labelling`, a helper of the facade that labels a success.
 - **One delivery.** A run of the library's actions delivers at most one result. A later completion
   of the same run is ignored.
-- **No `Sendable`.** Nothing public is `Sendable` and no closure type is `@Sendable`. An action is
-  used inside one isolation domain.
+- **`Sendable` only where a value leaves.** On the synchronous surface nothing public is
+  `Sendable` and no closure type is `@Sendable`; an action is used inside one isolation domain.
+  The async surface adds `DMActionOutcome`, which is `Sendable`, and a `@Sendable` mapper: the
+  mapper turns the payload, which is not `Sendable`, into the only value that crosses to the
+  caller. `runAsync` has one terminal-state owner, the continuation of an `AsyncThrowingStream`:
+  `finish()` right after the first `yield` closes it, a cancelled task ends the iteration, and
+  there is no actor, no task and no checked continuation to resume twice.
 - **Documented limits.** What the library enforces and what it cannot promise are in the DocC
   article Running Actions (`Sources/DMAction/DMAction.docc/RunningActions.md`) and in the README,
   "Behaviour your app must know". This file points to them and does not restate them. A change of

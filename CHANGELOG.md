@@ -3,6 +3,17 @@
 All notable changes to DMAction are recorded in this file. The format follows Keep a Changelog
 1.1.0, and versions follow Semantic Versioning 2.0.0.
 
+## [1.2.0] - 2026-10-28
+
+### Added
+
+- `DMAction.runAsync(isolation:mapSuccess:)` and `DMActionOutcome`: run an action from `async` code
+  and wait for its result. The mapper turns the payload into a `Sendable` value and the outcome
+  carries it with the attempt label; a failure is thrown as it is. The run is the guarded run of
+  call syntax, so a third-party conformer's duplicate completion is still ignored. Cancelling the
+  task ends the wait with `CancellationError` and stops no producer, request, retry or fallback.
+  Both are additive: no requirement is added to any protocol.
+
 ## [1.1.0] - 2026-10-03
 
 ### Added

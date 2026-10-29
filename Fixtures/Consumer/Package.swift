@@ -12,7 +12,7 @@ let package = Package(
         .watchOS(.v7)
     ],
     products: [
-        .library(name: "Consumer", targets: ["Consumer"])
+        .library(name: "Consumer", targets: ["Consumer", "ConsumerStrict"])
     ],
     dependencies: [
         .package(name: "DMAction", path: "../..")
@@ -23,6 +23,16 @@ let package = Package(
             dependencies: [
                 .product(name: "DMAction", package: "DMAction")
             ]
+        ),
+        // The same kind of use under the setting that DMAction itself builds with. Neither
+        // manifest of a dependency's target configures the target of its consumer, so a consumer
+        // that turns ExistentialAny on is checked here.
+        .target(
+            name: "ConsumerStrict",
+            dependencies: [
+                .product(name: "DMAction", package: "DMAction")
+            ],
+            swiftSettings: [.enableUpcomingFeature("ExistentialAny")]
         )
     ]
 )

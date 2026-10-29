@@ -1,3 +1,7 @@
+@available(macOS 10.15, *)
+extension DMAction.DMAction {
+  public func runAsync<Output>(isolation: isolated (any _Concurrency.Actor)? = #isolation, mapSuccess: @escaping @Sendable (any Swift.Copyable) throws -> Output) async throws -> DMAction.DMActionOutcome<Output> where Output : Swift.Sendable
+}
 extension DMAction.DMAction {
   public var simpleAction: () -> Swift.Void {
     get
@@ -27,6 +31,10 @@ public protocol DMAction {
 }
 public protocol DMActionResultValueProtocol {
   var attemptCount: Swift.UInt? { get }
+}
+public struct DMActionOutcome<Output> : Swift.Sendable where Output : Swift.Sendable {
+  public let value: Output
+  public let attemptCount: Swift.UInt
 }
 public struct DMActionResultValue : DMAction.DMActionResultValueProtocol {
   public let attemptCount: Swift.UInt?

@@ -40,10 +40,13 @@ or your own code, and a failure should be tried again or replaced by another sou
 
 It is not a fit when:
 
-- your code is `async`: a loop around `try await` says the same with less;
+- your code is `async` and the work already has an `async` form: a loop around `try await` says
+  the same with less. `runAsync` waits for one action from `async` code; it does not make the
+  producer `async`;
 - a retry must wait, back off or look at the error first: DMAction retries right away, after any
   error;
-- the work has to be cancelled: an action has no cancellation.
+- the work has to be cancelled: an action has no cancellation. Cancelling the task of `runAsync`
+  ends the wait with `CancellationError`, and the producer keeps working.
 
 ## Requirements
 
@@ -76,7 +79,7 @@ let package = Package(
     name: "MyApp",
     platforms: [.iOS(.v17)],
     dependencies: [
-        .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "1.1.0"),
+        .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "1.2.0"),
     ],
     targets: [
         .target(
@@ -173,6 +176,29 @@ let tap = DMButtonAction {
 }
 tap.simpleAction()
 ```
+
+### From `async` code
+
+`runAsync(mapSuccess:)` runs an action as the library runs it for call syntax, waits for the
+result and returns it mapped, with the attempt label. A failure is thrown as it is.
+
+```swift
+import DMAction
+
+let greeting = DMButtonAction { completion in
+    completion(.success("Hello"))
+}
+let outcome = try await greeting.retry(2).runAsync { payload in "\(payload), world" }
+print(outcome.value, outcome.attemptCount) // Hello, world 0
+```
+
+The mapper turns the payload into a `Sendable` value. It runs on the thread where the result
+arrives, before the caller resumes, so keep it quick and free of state. Cancelling the task ends
+the wait with `CancellationError` and nothing else: the producer, a request it started, and the
+retries of the run go on. If the cancellation arrives while the mapper runs, it wins and the
+mapped value is dropped; a result that arrives after the wait ended is mapped once and dropped.
+The first producer runs on the calling thread, and an action owned by an actor stays usable after
+the `await`. Running Actions, in the DocC catalog, has the whole contract.
 
 ### UIKit
 
@@ -277,8 +303,9 @@ interface.
   returned, and if every producer works that way, the result arrives on your thread before the call
   that started the run returns. A producer that calls its completion on its own thread must not
   then wait for something your completion does: it would wait forever.
-- **Threads.** The result arrives on the thread of the last completion. Nothing is `Sendable`: use
-  an action inside one isolation domain, such as the main actor.
+- **Threads.** The result arrives on the thread of the last completion. An action and its result
+  are not `Sendable`: use an action inside one isolation domain, such as the main actor. What
+  `runAsync` hands back, a `DMActionOutcome`, is `Sendable`.
 - **Stack.** A run needs no stack per attempt, unless a producer blocks its thread until a
   completion it handed to another thread has returned: then every such attempt takes one level.
 - **A compiler crash.** Swift 6.3 crashes when call syntax is applied directly to the value that
