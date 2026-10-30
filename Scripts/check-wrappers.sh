@@ -6,7 +6,7 @@
 # standard error too, but for the lines that SwiftPM prints while it fetches DMDevKit on a first
 # run. The script goes to the repository root first, because devkit takes the repository from the
 # working directory. --quiet keeps the build progress of `swift run` off standard error.
-# Scripts/check-wrappers.sh checks all of this, itself included.
+# devkit check-wrappers checks this script as well as the others.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 70
