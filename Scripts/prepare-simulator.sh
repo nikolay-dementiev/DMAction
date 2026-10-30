@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Kept at this path for its callers (CI, AGENTS.md, CONTRIBUTING.md); `devkit prepare-simulator`
+# Kept at this path for its callers (CI, CONTRIBUTING.md); `devkit prepare-simulator`
 # of DMDevKit, which Tools/Package.swift pins, does the work. Arguments, standard output and the
 # exit status pass through unchanged, and standard error too, but for the lines that SwiftPM prints
 # while it fetches DMDevKit on a first run. The script goes to the repository root first, because
