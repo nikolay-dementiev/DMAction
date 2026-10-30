@@ -40,8 +40,10 @@ the scripts that DMDevKit provides (see "The tools").
 ## The checks CI runs
 
 The checks below are scripts in `Scripts/`, and CI runs them as you do, except
-`check-example-project.sh`, which needs XcodeGen. The CI jobs that build and test run the commands
-of "Build and test" and of "The example app".
+`check-example-project.sh`, which needs XcodeGen, and `check-wrappers.sh`, which CI replaces by the
+command it forwards to, `swift run --quiet --package-path Tools devkit check-wrappers`, so that a
+fault of the script cannot turn the check into another one. The CI jobs that build and test run the
+commands of "Build and test" and of "The example app".
 
 | Script | What it checks |
 |---|---|
