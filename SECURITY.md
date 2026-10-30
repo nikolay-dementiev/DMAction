@@ -6,7 +6,7 @@ Security fixes are made for the latest release.
 
 | Version | Supported |
 |---|---|
-| 1.1.x | yes |
+| 1.2.x | yes |
 | earlier | no |
 
 ## Reporting a vulnerability
