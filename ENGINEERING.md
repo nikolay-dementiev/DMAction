@@ -46,10 +46,10 @@ moves no platform floor, changes no behaviour and asks nothing of a consumer. It
 release and its own line in the changelog. A raise that does any of these is breaking.
 
 The package has no dependency today. `Tools/Package.swift` depends on DMDevKit, the development
-tooling that the eight scripts of `Scripts/` named in CONTRIBUTING.md, "The tools", forward to, but
-it is a package of its own: SwiftPM reads the manifest at the root of a dependency only, so a
-consumer of DMAction does not fetch DMDevKit, and the root manifest that this policy and
-`Scripts/check-manifest.sh` govern does not change.
+tooling that the wrappers listed by `WRAPPERS` in `devkit.conf` forward to, but it is a package of
+its own: SwiftPM reads the manifest at the root of a dependency only, so a consumer of DMAction
+does not fetch DMDevKit, and the root manifest that this policy and `Scripts/check-manifest.sh`
+govern does not change.
 
 Who checks. The `api` job of CI runs `Scripts/check-api.sh` on every pull request and fails it when
 the public interface differs from the baseline; it also writes to the job summary the delta against
