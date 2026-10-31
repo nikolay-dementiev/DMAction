@@ -18,8 +18,7 @@ of [Documentation/Review/README.md](../../../Documentation/Review/README.md).
 - An actor, a task or a checked continuation in `runAsync`, or a second owner of its terminal
   state. (ENGINEERING.md, "`Sendable` only where a value leaves")
 - A failure that does not reach the caller through the result of the run.
-  (ENGINEERING.md, "The library never stops its host")
-  (AGENTS.md, "The library never stops its host")
+  (ENGINEERING.md, "A failure reaches the caller through the result of the run")
 - A change to what the library enforces or cannot promise, as written in the DocC article Running
   Actions and in the README. Hand the finding to the lane public-api-and-documentation as a change
   of behaviour. (ENGINEERING.md, "Documented limits")

@@ -11,15 +11,17 @@ of [Documentation/Review/README.md](../../../Documentation/Review/README.md).
 
 ## What it checks
 
-- A new test for which the change of the code that it fails on is not named.
+- A new test for which the change of the code that it fails on is not named, or is named and would
+  not make the test fail. For a behaviour that already holds, a temporary change of the code under
+  test counts. (CONTRIBUTING.md, "Show it red against the code before your change")
   (AGENTS.md, "Every new test must be able to fail")
   (CONTRIBUTING.md, "A test must be able to fail")
   (PR template, "For each new test, the change to the code that it fails on")
 - A test that reaches past the public API, for example with `@testable import`.
   (AGENTS.md, "with no `@testable import`")
   (CONTRIBUTING.md, "XCTest, through the public API only")
-- A test class without a `makeSUT()` factory, or a double that asserts inside itself instead of a
-  hand-written spy that records calls. (CONTRIBUTING.md, "One `makeSUT()` factory per test class")
+- A test class without a `makeSUT()` factory, or a double that is not a hand-written spy that
+  records calls. (CONTRIBUTING.md, "One `makeSUT()` factory per test class")
 - A name that does not say the subject, the condition and the expected result, or a test with two
   or more assertions where one has no message. (CONTRIBUTING.md, "Names say the subject")
   (CONTRIBUTING.md, "every assertion carries a message")
