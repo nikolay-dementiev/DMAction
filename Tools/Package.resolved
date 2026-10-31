@@ -1,13 +1,13 @@
 {
-  "originHash" : "263a22a40b34ec0bcc7559434b69670885efca0c1a389556353d3cfc29c9c6f7",
+  "originHash" : "49d75f75f902bcbccf851b4403a237ce9626d4b37c9218abbdab129cd4b4d263",
   "pins" : [
     {
       "identity" : "dmdevkit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/nikolay-dementiev/DMDevKit",
       "state" : {
-        "revision" : "c2bde731d14ef26df826205bb76fc8691365891c",
-        "version" : "0.4.0"
+        "revision" : "36eb71776eba14ae84e84235c031b0d5265deb77",
+        "version" : "0.5.0"
       }
     }
   ],
