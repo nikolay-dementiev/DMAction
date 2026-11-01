@@ -16,6 +16,8 @@
 
 `ENGINEERING.md` in the repository root defines the classes.
 
+`Documentation/Review/README.md` says how the change is reviewed.
+
 - Class of the change: none / additive / breaking (a change of observable behaviour is breaking)
 - Observable behaviour changes, each one listed, or "none":
 - Dependency changes, or "none":

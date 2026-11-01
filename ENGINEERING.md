@@ -174,5 +174,8 @@ the rules above it would have needed a major version. The rules apply from the r
 - [CONTRIBUTING.md](CONTRIBUTING.md): how to build and test, the checks CI runs, the rules for
   tests, commits and releases.
 - `Sources/DMAction/DMAction.docc`: what each symbol does, and how a run behaves.
+- [Documentation/Review/README.md](Documentation/Review/README.md): how a change is reviewed, with
+  the lanes in `.agents/skills`, the finding format and the handling of an automated reviewer's
+  remarks.
 - [CHANGELOG.md](CHANGELOG.md): the history of every release.
 - [README.md](README.md): installation and usage.
