@@ -43,10 +43,12 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
-        run: Scripts/ci-changes.sh "$EVENT" "$BASE" | tee -a "$GITHUB_OUTPUT"
+        run: |
+          set -o pipefail
+          Scripts/ci-changes.sh "$EVENT" "$BASE" | tee -a "$GITHUB_OUTPUT"
   lint:
     needs: changes
-    if: needs.changes.outputs.light == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -84,7 +86,7 @@ jobs:
 
   test:
     needs: changes
-    if: needs.changes.outputs.heavy == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     name: test (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
@@ -198,7 +200,7 @@ jobs:
   # The podspec job builds the library's sources for watchOS, but no test file and no run.
   watchos:
     needs: changes
-    if: needs.changes.outputs.heavy == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     name: watchos (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
@@ -291,7 +293,7 @@ jobs:
 
   example:
     needs: changes
-    if: needs.changes.outputs.heavy == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     name: example (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -412,7 +414,7 @@ jobs:
 
   docs:
     needs: changes
-    if: needs.changes.outputs.light == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -432,7 +434,7 @@ jobs:
 
   snippets:
     needs: changes
-    if: needs.changes.outputs.light == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -446,7 +448,7 @@ jobs:
 
   floor:
     needs: changes
-    if: needs.changes.outputs.heavy == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     # The oldest toolchain the manifest promises: swift-tools-version 6.0 is Xcode 16.0 to 16.2.
     runs-on: macos-15
     timeout-minutes: 15
@@ -468,7 +470,7 @@ jobs:
 
   thread-sanitizer:
     needs: changes
-    if: needs.changes.outputs.heavy == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     # A run continues on whichever thread completes an attempt. The suite runs once more
     # under the Thread Sanitizer, on the host, where it is fastest.
     runs-on: macos-26
@@ -484,7 +486,7 @@ jobs:
 
   consumer:
     needs: changes
-    if: needs.changes.outputs.light == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -502,7 +504,7 @@ jobs:
 
   api:
     needs: changes
-    if: needs.changes.outputs.light == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     # The interface text depends on the compiler: this job and the baseline use Xcode 26.6.
     runs-on: macos-26
     timeout-minutes: 10
@@ -598,7 +600,7 @@ jobs:
   # package itself.
   podspec:
     needs: changes
-    if: needs.changes.outputs.light == 'run'
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 20
     steps:

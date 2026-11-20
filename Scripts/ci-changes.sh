@@ -55,15 +55,18 @@ decide() {
     esac
 }
 
+# The repository is the third argument so that the self-test can run the real diff on a scratch one.
 run_diff() {
-    local event="$1" base="$2" paths
+    local event="$1" base="$2" repo="${3-$ROOT}" paths
     if [ "$event" != pull_request ]; then
         printf '' | decide "$event"
         return
     fi
     # A base that is not in the clone, or no common ancestor, must run everything: a path that no
     # class lists stands for the change that could not be listed.
-    if ! paths="$(git -C "$ROOT" diff --name-only "$base"...HEAD)"; then
+    # --no-renames lists both paths of a moved file, so a source file moved into Documentation is
+    # still a source change; core.quotePath=false keeps a non-ASCII path as it is, not in quotes.
+    if ! paths="$(git -C "$repo" -c core.quotePath=false diff --no-renames --name-only "$base"...HEAD)"; then
         echo "ci-changes: git diff against $base failed, so every job runs." >&2
         paths="unlisted/unknown-change"
     fi
@@ -97,8 +100,8 @@ check_job_table() {
             continue
         fi
         block="$(awk -v job="$job" '$0 == "  " job ":" { on = 1; next } on && /^  [a-z][a-z-]*:$/ { exit } on { print }' "$workflow")"
-        if ! printf '%s\n' "$block" | grep -q "needs.changes.outputs.$group == 'run'"; then
-            echo "ci-changes self-test: job '$job' does not ask for needs.changes.outputs.$group" >&2
+        if ! printf '%s\n' "$block" | grep -qF "if: \${{ !cancelled() && needs.changes.outputs.$group != 'skip' }}"; then
+            echo "ci-changes self-test: job '$job' does not carry if: \${{ !cancelled() && needs.changes.outputs.$group != 'skip' }}" >&2
             failures=$((failures + 1))
         fi
     done
@@ -109,6 +112,42 @@ check_job_table() {
             ;;
         esac
     done
+}
+
+# Runs the real diff on a scratch repository: a source file moved into Documentation, and a document
+# whose name is not ASCII.
+check_real_diff() {
+    local dir base
+    dir="$(mktemp -d)"
+    git -C "$dir" init -q
+    git -C "$dir" config user.name scratch
+    git -C "$dir" config user.email scratch@example.com
+    mkdir -p "$dir/Sources/DMAction" "$dir/Documentation"
+    echo "let value = 1" > "$dir/Sources/DMAction/Foo.swift"
+    echo "text" > "$dir/README.md"
+    git -C "$dir" add -A
+    git -C "$dir" commit -q -m base
+    base="$(git -C "$dir" rev-parse HEAD)"
+    git -C "$dir" mv Sources/DMAction/Foo.swift Documentation/Foo.md
+    git -C "$dir" commit -q -m moved
+    expect_diff "a source file moved to Documentation/*.md runs every job" "$dir" "$base" "light=run heavy=run"
+    git -C "$dir" reset -q --hard "$base"
+    mkdir -p "$dir/Documentation"
+    echo "text" > "$dir/Documentation/R$(printf '\303\251')sum$(printf '\303\251').md"
+    git -C "$dir" add -A
+    git -C "$dir" commit -q -m document
+    expect_diff "a document with a non-ASCII name skips the heavy jobs" "$dir" "$base" "light=run heavy=skip"
+    rm -rf "$dir"
+}
+
+expect_diff() {
+    local label="$1" repo="$2" base="$3" want="$4" got
+    got="$(run_diff pull_request "$base" "$repo" | tr '\n' ' ')"
+    got="${got% }"
+    if [ "$got" != "$want" ]; then
+        echo "ci-changes self-test: $label: wanted '$want', got '$got'" >&2
+        failures=$((failures + 1))
+    fi
 }
 
 self_test() {
@@ -134,6 +173,7 @@ self_test() {
         expect "the event $event runs every job for the inert file" "$event" ".coderabbit.yaml" "$all"
     done
     check_job_table
+    check_real_diff
     if [ "$failures" -ne 0 ]; then
         echo "ci-changes self-test: $failures failed." >&2
         exit 1
