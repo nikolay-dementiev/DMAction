@@ -21,7 +21,31 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Decides from the changed paths which jobs a pull request needs (Scripts/ci-changes.sh). It runs on
+  # Linux, so it takes no macOS slot. The clone has its whole history: the diff against the base of the
+  # pull request needs the merge base, and a diff that cannot be made runs every job.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      light: ${{ steps.decide.outputs.light }}
+      heavy: ${{ steps.decide.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check the filter
+        run: Scripts/ci-changes.sh --self-test
+      - name: Decide which jobs run
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: Scripts/ci-changes.sh "$EVENT" "$BASE" | tee -a "$GITHUB_OUTPUT"
   lint:
+    needs: changes
+    if: needs.changes.outputs.light == 'run'
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -58,6 +82,8 @@ jobs:
         run: Scripts/lint.sh --analyze "$RUNNER_TEMP/build.log"
 
   test:
+    needs: changes
+    if: needs.changes.outputs.heavy == 'run'
     name: test (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
@@ -170,6 +196,8 @@ jobs:
   # The package's own tests on a watchOS simulator, and the library built for the device SDK.
   # The podspec job builds the library's sources for watchOS, but no test file and no run.
   watchos:
+    needs: changes
+    if: needs.changes.outputs.heavy == 'run'
     name: watchos (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
@@ -261,6 +289,8 @@ jobs:
           retention-days: 7
 
   example:
+    needs: changes
+    if: needs.changes.outputs.heavy == 'run'
     name: example (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -380,6 +410,8 @@ jobs:
           retention-days: 7
 
   docs:
+    needs: changes
+    if: needs.changes.outputs.light == 'run'
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -398,6 +430,8 @@ jobs:
             OTHER_DOCC_FLAGS="--warnings-as-errors"
 
   snippets:
+    needs: changes
+    if: needs.changes.outputs.light == 'run'
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -410,6 +444,8 @@ jobs:
         run: Scripts/check-snippets.sh
 
   floor:
+    needs: changes
+    if: needs.changes.outputs.heavy == 'run'
     # The oldest toolchain the manifest promises: swift-tools-version 6.0 is Xcode 16.0 to 16.2.
     runs-on: macos-15
     timeout-minutes: 15
@@ -430,6 +466,8 @@ jobs:
           swift test -Xswiftc -warnings-as-errors
 
   thread-sanitizer:
+    needs: changes
+    if: needs.changes.outputs.heavy == 'run'
     # A run continues on whichever thread completes an attempt. The suite runs once more
     # under the Thread Sanitizer, on the host, where it is fastest.
     runs-on: macos-26
@@ -444,6 +482,8 @@ jobs:
         run: swift test --sanitize=thread
 
   consumer:
+    needs: changes
+    if: needs.changes.outputs.light == 'run'
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -460,6 +500,8 @@ jobs:
         run: Scripts/check-manifest.sh
 
   api:
+    needs: changes
+    if: needs.changes.outputs.light == 'run'
     # The interface text depends on the compiler: this job and the baseline use Xcode 26.6.
     runs-on: macos-26
     timeout-minutes: 10
@@ -554,6 +596,8 @@ jobs:
   # sources as a pod, which builds them for watchOS too. The watchos job builds and tests the
   # package itself.
   podspec:
+    needs: changes
+    if: needs.changes.outputs.light == 'run'
     runs-on: macos-26
     timeout-minutes: 20
     steps:
