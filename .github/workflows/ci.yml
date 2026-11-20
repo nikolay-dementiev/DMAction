@@ -8,8 +8,9 @@ on:
   # The release workflow runs all of it on a version tag.
   workflow_call:
   schedule:
-    # Mondays. A new runner image or OS that breaks the package shows up within a week.
-    - cron: "23 5 * * 1"
+    # Thursdays. A new runner image or OS that breaks the package shows up within a week. The other
+    # repositories of the family run on other days: runs that start together queue behind each other.
+    - cron: "23 5 * * 4"
 
 permissions:
   contents: read
