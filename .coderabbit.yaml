@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# The hosted reviewer runs only when a maintainer asks for it in a pull request comment that
+# starts with "@coderabbitai review". Its remarks are advisory: CI is the gate.
+tone_instructions: "Report defects only, each with the file, the line and why it fails. No praise, no summaries, no style or formatting remarks."
+reviews:
+  profile: quiet
+  auto_review:
+    enabled: false
+  high_level_summary: false
+  review_status: false
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  assess_linked_issues: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  suggested_reviewers: false
+  in_progress_fortune: false
+  finishing_touches:
+    unit_tests:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+  path_instructions:
+    - path: "**"
+      instructions: |
+        Review against ENGINEERING.md and the lanes of Documentation/Review/README.md. Remark only on a
+        defect: wrong behaviour, a data race or an isolation error, a public API or a document that
+        disagrees with the code, a test that would pass on a broken implementation, or a broken
+        dependency or layering rule. No remarks on style, formatting or naming: SwiftLint runs in CI.
+  tools:
+    swiftlint:
+      enabled: false
+    markdownlint:
+      enabled: false
+    yamllint:
+      enabled: false
+    languagetool:
+      enabled: false
+chat:
+  auto_reply: false
