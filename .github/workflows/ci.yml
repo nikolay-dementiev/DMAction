@@ -284,46 +284,23 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
       # The first launch on a simulator that is still booting can fail to install the test
-      # runner, so the simulator is booted and ready before the tests start. It boots in the
-      # background while the example builds; see the test job.
-      - name: Start the simulator
+      # runner, so the simulator is booted and ready before the tests start.
+      - name: Prepare the simulator
         env:
           DEVICE: ${{ matrix.device }}
           OS: ${{ matrix.os }}
         run: |
-          sim="$RUNNER_TEMP/sim"
-          mkdir -p "$sim"
-          {
-            status=0
-            Scripts/prepare-simulator.sh "$DEVICE" "$OS" > "$sim/udid" 2> "$sim/log" || status=$?
-            echo "$status" > "$sim/status"
-          } > /dev/null 2>&1 < /dev/null &
-      - name: Build the example
+          udid="$(Scripts/prepare-simulator.sh "$DEVICE" "$OS")"
+          echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
+      - name: Build the example and run its tests
         run: |
           set -o pipefail
-          xcodebuild build-for-testing \
-            -project Examples/DMActionExample/DMActionExample.xcodeproj \
-            -scheme DMActionExample \
-            -destination 'generic/platform=iOS Simulator' \
-            ARCHS=arm64 \
-            2>&1 | tee "$RUNNER_TEMP/example.log"
-      # A boot that failed, or that took more than ten minutes, fails the job here.
-      - name: Wait for the simulator
-        run: |
-          sim="$RUNNER_TEMP/sim"
-          for _ in $(seq 1 600); do [ -f "$sim/status" ] && break; sleep 1; done
-          cat "$sim/log" >&2
-          [ -f "$sim/status" ] && [ "$(cat "$sim/status")" = 0 ] || { echo "The simulator did not boot." >&2; exit 1; }
-          echo "SIMULATOR=$(cat "$sim/udid")" >> "$GITHUB_ENV"
-      - name: Run the example's tests
-        run: |
-          set -o pipefail
-          xcodebuild test-without-building \
+          xcodebuild test \
             -project Examples/DMActionExample/DMActionExample.xcodeproj \
             -scheme DMActionExample \
             -destination "platform=iOS Simulator,id=$SIMULATOR" \
             -resultBundlePath "$RUNNER_TEMP/example.xcresult" \
-            2>&1 | tee -a "$RUNNER_TEMP/example.log"
+            2>&1 | tee "$RUNNER_TEMP/example.log"
       # A scheme that lost a test bundle would still build and pass.
       - name: Check that both test bundles ran
         run: |
