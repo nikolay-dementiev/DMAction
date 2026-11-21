@@ -117,22 +117,15 @@ jobs:
           persist-credentials: false
       - name: Select Xcode
         run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
-      # The simulator boots in the background while the job builds. The udid names the device,
-      # not a name and an OS: a hosted image can list a runtime with no device in it, and the
-      # script creates the device then. Every descriptor of the background command goes to a
-      # file, because a step waits for a process that keeps its output open.
-      - name: Start the simulator
+      # The udid names the device, not a name and an OS: a hosted image can list a runtime with
+      # no device in it, and the script creates the device then.
+      - name: Prepare the simulator
         env:
           DEVICE: ${{ matrix.device }}
           OS: ${{ matrix.os }}
         run: |
-          sim="$RUNNER_TEMP/sim"
-          mkdir -p "$sim"
-          {
-            status=0
-            Scripts/prepare-simulator.sh "$DEVICE" "$OS" > "$sim/udid" 2> "$sim/log" || status=$?
-            echo "$status" > "$sim/status"
-          } > /dev/null 2>&1 < /dev/null &
+          udid="$(Scripts/prepare-simulator.sh "$DEVICE" "$OS")"
+          echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
       # The tests build in Debug. Code that only a Release build compiles is built here.
       - name: Build the library in Release
         run: |
@@ -142,71 +135,15 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -configuration Release \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
-      # A generic destination builds every architecture of the SDK; the simulator is arm64, and
-      # the tests built for it before, so one architecture is built here.
-      - name: Build the tests
-        run: |
-          xcodebuild build-for-testing \
-            -scheme DMAction \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
-            -enableCodeCoverage YES \
-            ARCHS=arm64 \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
-      # A boot that failed, or that took more than ten minutes, fails the job here.
-      - name: Wait for the simulator
-        run: |
-          sim="$RUNNER_TEMP/sim"
-          for _ in $(seq 1 600); do [ -f "$sim/status" ] && break; sleep 1; done
-          cat "$sim/log" >&2
-          [ -f "$sim/status" ] && [ "$(cat "$sim/status")" = 0 ] || { echo "The simulator did not boot." >&2; exit 1; }
-          echo "SIMULATOR=$(cat "$sim/udid")" >> "$GITHUB_ENV"
-      # The tests line up five threads at a barrier that spins, so their time depends on the cores
-      # that are free. A simulator that has just booted keeps the host busy for a while (a Mac with
-      # ten cores showed 14 to 70 percent idle in the first twelve seconds and 75 to 92 afterwards),
-      # so the tests wait for a quiet host: idle at or above 80 percent, which is under one busy core
-      # of the three or four of a hosted runner, five seconds in a row. After 180 seconds the step
-      # says so and goes on; it never fails the job, the tests decide.
-      - name: Wait for the host to settle
-        env:
-          IDLE_PERCENT: "80"
-        run: |
-          start=$SECONDS
-          calm_since=""
-          while [ $((SECONDS - start)) -lt 180 ]; do
-            idle="$(top -l 2 -s 1 -n 0 | awk '/^CPU usage/ { line = $0 } END { n = split(line, f, " "); for (i = 1; i <= n; i++) if (f[i] == "idle") print f[i - 1] + 0 }' || true)"
-            echo "$(date -u +%H:%M:%S) idle ${idle:-unknown} percent"
-            if awk -v idle="${idle:-0}" -v floor="$IDLE_PERCENT" 'BEGIN { exit !(idle >= floor) }'; then
-              calm_since="${calm_since:-$SECONDS}"
-            else
-              calm_since=""
-            fi
-            if [ -n "$calm_since" ] && [ $((SECONDS - calm_since)) -ge 5 ]; then
-              echo "The host settled after $((SECONDS - start)) seconds."
-              exit 0
-            fi
-          done
-          echo "The host did not settle within $((SECONDS - start)) seconds; the tests go on."
-      - name: Host state before the tests
-        run: |
-          date -u +%H:%M:%S
-          uptime
-          top -l 2 -n 8 -o cpu || true
       - name: Test
         run: |
-          xcodebuild test-without-building \
+          xcodebuild test \
             -scheme DMAction \
             -sdk iphonesimulator \
             -destination "platform=iOS Simulator,id=$SIMULATOR" \
             -enableCodeCoverage YES \
             -resultBundlePath "$RUNNER_TEMP/DMAction.xcresult" \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
-      - name: Host state after the tests
-        if: always()
-        run: |
-          date -u +%H:%M:%S
-          uptime
-          top -l 2 -n 8 -o cpu || true
       - name: Coverage
         run: Scripts/coverage-gate.sh "$RUNNER_TEMP/DMAction.xcresult"
       - name: Export library coverage
@@ -265,19 +202,13 @@ jobs:
           persist-credentials: false
       - name: Select Xcode
         run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
-      # The simulator boots in the background while the job builds; see the test job.
-      - name: Start the simulator
+      - name: Prepare the simulator
         env:
           DEVICE: ${{ matrix.device }}
           OS: ${{ matrix.os }}
         run: |
-          sim="$RUNNER_TEMP/sim"
-          mkdir -p "$sim"
-          {
-            status=0
-            Scripts/prepare-simulator.sh "$DEVICE" "$OS" watchOS > "$sim/udid" 2> "$sim/log" || status=$?
-            echo "$status" > "$sim/status"
-          } > /dev/null 2>&1 < /dev/null &
+          udid="$(Scripts/prepare-simulator.sh "$DEVICE" "$OS" watchOS)"
+          echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
       # The tests build the simulator slices. Only this step builds the device slices, which
       # include arm64_32, where Int and pointers are 32 bits wide.
       - name: Build the library for the watchOS device SDK
@@ -294,67 +225,15 @@ jobs:
           xcodebuild build \
             -scheme Consumer \
             -destination 'generic/platform=watchOS Simulator'
-      - name: Build the tests
-        run: |
-          xcodebuild build-for-testing \
-            -scheme DMAction \
-            -destination 'generic/platform=watchOS Simulator' \
-            ARCHS=arm64 \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
-      # A boot that failed, or that took more than ten minutes, fails the job here.
-      - name: Wait for the simulator
-        run: |
-          sim="$RUNNER_TEMP/sim"
-          for _ in $(seq 1 600); do [ -f "$sim/status" ] && break; sleep 1; done
-          cat "$sim/log" >&2
-          [ -f "$sim/status" ] && [ "$(cat "$sim/status")" = 0 ] || { echo "The simulator did not boot." >&2; exit 1; }
-          echo "SIMULATOR=$(cat "$sim/udid")" >> "$GITHUB_ENV"
-      # The tests line up five threads at a barrier that spins, so their time depends on the cores
-      # that are free. A simulator that has just booted keeps the host busy for a while (a Mac with
-      # ten cores showed 14 to 70 percent idle in the first twelve seconds and 75 to 92 afterwards),
-      # so the tests wait for a quiet host: idle at or above 80 percent, which is under one busy core
-      # of the three or four of a hosted runner, five seconds in a row. After 180 seconds the step
-      # says so and goes on; it never fails the job, the tests decide.
-      - name: Wait for the host to settle
-        env:
-          IDLE_PERCENT: "80"
-        run: |
-          start=$SECONDS
-          calm_since=""
-          while [ $((SECONDS - start)) -lt 180 ]; do
-            idle="$(top -l 2 -s 1 -n 0 | awk '/^CPU usage/ { line = $0 } END { n = split(line, f, " "); for (i = 1; i <= n; i++) if (f[i] == "idle") print f[i - 1] + 0 }' || true)"
-            echo "$(date -u +%H:%M:%S) idle ${idle:-unknown} percent"
-            if awk -v idle="${idle:-0}" -v floor="$IDLE_PERCENT" 'BEGIN { exit !(idle >= floor) }'; then
-              calm_since="${calm_since:-$SECONDS}"
-            else
-              calm_since=""
-            fi
-            if [ -n "$calm_since" ] && [ $((SECONDS - calm_since)) -ge 5 ]; then
-              echo "The host settled after $((SECONDS - start)) seconds."
-              exit 0
-            fi
-          done
-          echo "The host did not settle within $((SECONDS - start)) seconds; the tests go on."
-      - name: Host state before the tests
-        run: |
-          date -u +%H:%M:%S
-          uptime
-          top -l 2 -n 8 -o cpu || true
       - name: Test
         run: |
-          xcodebuild test-without-building \
+          xcodebuild test \
             -scheme DMAction \
             -destination "platform=watchOS Simulator,id=$SIMULATOR" \
             -resultBundlePath "$RUNNER_TEMP/DMAction-watchOS.xcresult" \
             SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
       # A run that lost tests, or skipped them, passes too. So every test method of the test
       # files must be in the result bundle, run and passed.
-      - name: Host state after the tests
-        if: always()
-        run: |
-          date -u +%H:%M:%S
-          uptime
-          top -l 2 -n 8 -o cpu || true
       - name: Check the test count
         run: Scripts/count-tests.sh --label watchOS "$RUNNER_TEMP/DMAction-watchOS.xcresult" 'Tests/DMActionTests/*.swift'
       - name: Upload the result bundle
