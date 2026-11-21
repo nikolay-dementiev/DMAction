@@ -74,9 +74,10 @@ run_diff() {
 }
 
 failures=0
+# The fifth argument is the ref, main by default: only a pull request or a push to main is filtered.
 expect() {
-    local label="$1" event="$2" paths="$3" want="$4" got
-    got="$(printf '%s\n' "$paths" | decide "$event" | tr '\n' ' ')"
+    local label="$1" event="$2" paths="$3" want="$4" ref="${5-refs/heads/main}" got
+    got="$(printf '%s\n' "$paths" | decide "$event" "$ref" | tr '\n' ' ')"
     got="${got% }"
     if [ "$got" != "$want" ]; then
         echo "ci-changes self-test: $label: wanted '$want', got '$got'" >&2
@@ -168,10 +169,21 @@ self_test() {
     expect "the inert file with a README skips the heavy jobs" pull_request $'.coderabbit.yaml\nREADME.md' "$docs"
     expect "the inert file with a source file runs every job" pull_request $'.coderabbit.yaml\nSources/DMAction/X.swift' "$all"
     expect "an empty list runs every job" pull_request "" "$all"
-    for event in push schedule workflow_dispatch workflow_call; do
+    for event in schedule workflow_dispatch workflow_call; do
         expect "the event $event runs every job whatever changed" "$event" "README.md" "$all"
         expect "the event $event runs every job for the inert file" "$event" ".coderabbit.yaml" "$all"
     done
+    for path in Sources/DMAction/X.swift Tests/DMActionTests/X.swift Package.swift Examples/DMActionExample/X.swift Scripts/lint.sh Tools/Package.swift Fixtures/Consumer/X.swift DMAction.podspec .swiftlint.yml .github/workflows/ci.yml new/dir/x.bin; do
+        expect "a push to main with a change at $path runs every job" push "$path" "$all"
+    done
+    expect "a push to main with a README alone skips the heavy jobs" push "README.md" "$docs"
+    expect "a push to main with the inert file alone skips every job" push ".coderabbit.yaml" "$none"
+    expect "a push to main with a README and a source file runs every job" push $'README.md\nSources/DMAction/X.swift' "$all"
+    expect "a push to main with an empty list runs every job" push "" "$all"
+    expect "a push of a release tag runs every job for a README" push "README.md" "$all" refs/tags/1.2.0
+    expect "a push of a release tag runs every job for the inert file" push ".coderabbit.yaml" "$all" refs/tags/1.2.0
+    expect "a push to another branch runs every job" push "README.md" "$all" refs/heads/other
+    expect "a push with no ref runs every job" push "README.md" "$all" ""
     check_job_table
     check_real_diff
     if [ "$failures" -ne 0 ]; then
