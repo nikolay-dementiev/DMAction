@@ -22,9 +22,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Decides from the changed paths which jobs a pull request needs (Scripts/ci-changes.sh). It runs on
-  # Linux, so it takes no macOS slot. The clone has its whole history: the diff against the base of the
-  # pull request needs the merge base, and a diff that cannot be made runs every job.
+  # Decides from the changed paths which jobs a pull request or a push to main needs
+  # (Scripts/ci-changes.sh). It runs on Linux, so it takes no macOS slot. The clone has its whole
+  # history: the diff against the base needs the merge base or the commit main had before the push,
+  # and a diff that cannot be made runs every job. The schedule, a manual run and the release (a
+  # version tag) run every job.
   changes:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -42,10 +44,12 @@ jobs:
         id: decide
         env:
           EVENT: ${{ github.event_name }}
-          BASE: ${{ github.event.pull_request.base.sha }}
+          # A pull request is diffed from its base, a push from the commit main had before it.
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          REF: ${{ github.ref }}
         run: |
           set -o pipefail
-          Scripts/ci-changes.sh "$EVENT" "$BASE" | tee -a "$GITHUB_OUTPUT"
+          Scripts/ci-changes.sh "$EVENT" "$BASE" "$REF" | tee -a "$GITHUB_OUTPUT"
   lint:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
