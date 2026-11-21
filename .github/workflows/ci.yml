@@ -8,8 +8,9 @@ on:
   # The release workflow runs all of it on a version tag.
   workflow_call:
   schedule:
-    # Mondays. A new runner image or OS that breaks the package shows up within a week.
-    - cron: "23 5 * * 1"
+    # Thursdays. A new runner image or OS that breaks the package shows up within a week. The other
+    # repositories of the family run on other days: runs that start together queue behind each other.
+    - cron: "23 5 * * 4"
 
 permissions:
   contents: read
@@ -21,7 +22,33 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Decides from the changed paths which jobs a pull request needs (Scripts/ci-changes.sh). It runs on
+  # Linux, so it takes no macOS slot. The clone has its whole history: the diff against the base of the
+  # pull request needs the merge base, and a diff that cannot be made runs every job.
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      light: ${{ steps.decide.outputs.light }}
+      heavy: ${{ steps.decide.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check the filter
+        run: Scripts/ci-changes.sh --self-test
+      - name: Decide which jobs run
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -o pipefail
+          Scripts/ci-changes.sh "$EVENT" "$BASE" | tee -a "$GITHUB_OUTPUT"
   lint:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -58,6 +85,8 @@ jobs:
         run: Scripts/lint.sh --analyze "$RUNNER_TEMP/build.log"
 
   test:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     name: test (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
@@ -144,6 +173,8 @@ jobs:
   # The package's own tests on a watchOS simulator, and the library built for the device SDK.
   # The podspec job builds the library's sources for watchOS, but no test file and no run.
   watchos:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     name: watchos (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
@@ -214,6 +245,8 @@ jobs:
           retention-days: 7
 
   example:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     name: example (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -247,23 +280,46 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s "/Applications/Xcode_${XCODE}.app"
       # The first launch on a simulator that is still booting can fail to install the test
-      # runner, so the simulator is booted and ready before the tests start.
-      - name: Prepare the simulator
+      # runner, so the simulator is booted and ready before the tests start. It boots in the
+      # background while the example builds; see the test job.
+      - name: Start the simulator
         env:
           DEVICE: ${{ matrix.device }}
           OS: ${{ matrix.os }}
         run: |
-          udid="$(Scripts/prepare-simulator.sh "$DEVICE" "$OS")"
-          echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
-      - name: Build the example and run its tests
+          sim="$RUNNER_TEMP/sim"
+          mkdir -p "$sim"
+          {
+            status=0
+            Scripts/prepare-simulator.sh "$DEVICE" "$OS" > "$sim/udid" 2> "$sim/log" || status=$?
+            echo "$status" > "$sim/status"
+          } > /dev/null 2>&1 < /dev/null &
+      - name: Build the example
         run: |
           set -o pipefail
-          xcodebuild test \
+          xcodebuild build-for-testing \
+            -project Examples/DMActionExample/DMActionExample.xcodeproj \
+            -scheme DMActionExample \
+            -destination 'generic/platform=iOS Simulator' \
+            ARCHS=arm64 \
+            2>&1 | tee "$RUNNER_TEMP/example.log"
+      # A boot that failed, or that took more than ten minutes, fails the job here.
+      - name: Wait for the simulator
+        run: |
+          sim="$RUNNER_TEMP/sim"
+          for _ in $(seq 1 600); do [ -f "$sim/status" ] && break; sleep 1; done
+          cat "$sim/log" >&2
+          [ -f "$sim/status" ] && [ "$(cat "$sim/status")" = 0 ] || { echo "The simulator did not boot." >&2; exit 1; }
+          echo "SIMULATOR=$(cat "$sim/udid")" >> "$GITHUB_ENV"
+      - name: Run the example's tests
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
             -project Examples/DMActionExample/DMActionExample.xcodeproj \
             -scheme DMActionExample \
             -destination "platform=iOS Simulator,id=$SIMULATOR" \
             -resultBundlePath "$RUNNER_TEMP/example.xcresult" \
-            2>&1 | tee "$RUNNER_TEMP/example.log"
+            2>&1 | tee -a "$RUNNER_TEMP/example.log"
       # A scheme that lost a test bundle would still build and pass.
       - name: Check that both test bundles ran
         run: |
@@ -310,6 +366,8 @@ jobs:
           retention-days: 7
 
   docs:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -328,6 +386,8 @@ jobs:
             OTHER_DOCC_FLAGS="--warnings-as-errors"
 
   snippets:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 20
     steps:
@@ -340,6 +400,8 @@ jobs:
         run: Scripts/check-snippets.sh
 
   floor:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     # The oldest toolchain the manifest promises: swift-tools-version 6.0 is Xcode 16.0 to 16.2.
     runs-on: macos-15
     timeout-minutes: 15
@@ -360,6 +422,8 @@ jobs:
           swift test -Xswiftc -warnings-as-errors
 
   thread-sanitizer:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
     # A run continues on whichever thread completes an attempt. The suite runs once more
     # under the Thread Sanitizer, on the host, where it is fastest.
     runs-on: macos-26
@@ -374,6 +438,8 @@ jobs:
         run: swift test --sanitize=thread
 
   consumer:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 15
     steps:
@@ -390,6 +456,8 @@ jobs:
         run: Scripts/check-manifest.sh
 
   api:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     # The interface text depends on the compiler: this job and the baseline use Xcode 26.6.
     runs-on: macos-26
     timeout-minutes: 10
@@ -484,6 +552,8 @@ jobs:
   # sources as a pod, which builds them for watchOS too. The watchos job builds and tests the
   # package itself.
   podspec:
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
     runs-on: macos-26
     timeout-minutes: 20
     steps:
