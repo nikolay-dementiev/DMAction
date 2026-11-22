@@ -1,10 +1,11 @@
 #!/bin/bash
 #
-# Decides which jobs of .github/workflows/ci.yml a pull request needs, from the paths it changes.
+# Decides which jobs of .github/workflows/ci.yml a pull request or a push to main needs, from the
+# paths it changes.
 #
-#   Scripts/ci-changes.sh <event> <base sha>   diffs HEAD against the base, prints light=... heavy=...
-#   Scripts/ci-changes.sh --classify <event>   the same decision for the paths on standard input
-#   Scripts/ci-changes.sh --self-test          proves the decision on fixtures and the job table on ci.yml
+#   Scripts/ci-changes.sh <event> <base> <ref>        diffs HEAD against the base, prints light=... heavy=...
+#   Scripts/ci-changes.sh --classify <event> [<ref>]  the same decision for the paths on standard input
+#   Scripts/ci-changes.sh --self-test                 proves the decision on fixtures and the job table on ci.yml
 #
 # Two groups of jobs, each answered with run or skip:
 #   light  lint, docs, snippets, api, consumer, podspec: macOS without a simulator, short. They read
@@ -13,9 +14,14 @@
 #
 # A change that only touches documents (*.md outside the code directories, Documentation, LICENSE)
 # skips heavy. A change that only touches an inert file (.coderabbit.yaml, which no job reads) skips
-# both. Every other path runs both, and so does a path nobody listed, an empty list, a diff that
-# cannot be made, and every event that is not a pull request (push, schedule, workflow_dispatch and
-# workflow_call, which is the release).
+# both. Every other path runs both, and so does a path nobody listed, an empty list and a diff that
+# cannot be made.
+#
+# Only a pull request and a push to refs/heads/main are filtered. A push is diffed from the commit
+# main had before it (the base) to HEAD; a base that is empty, all zeros or not in the clone runs
+# everything. Every other run starts everything: schedule, workflow_dispatch, workflow_call, a push to
+# another branch, and the release, which calls this workflow from a push of a version tag (the event
+# inside a called workflow is the caller's, so it reads push with a tag ref and a zero base).
 
 set -euo pipefail
 
@@ -33,9 +39,18 @@ classify() {
     esac
 }
 
-# Reads paths on standard input, takes the event as its argument, prints the two answers.
+# Only a pull request and a push to main are decided from their paths.
+filtered() {
+    case "$1" in
+        pull_request) return 0 ;;
+        push) [ "${2-}" = refs/heads/main ] ;;
+        *) return 1 ;;
+    esac
+}
+
+# Reads paths on standard input, takes the event and the ref as its arguments, prints the two answers.
 decide() {
-    local event="$1" path count=0 mode=inert
+    local event="$1" ref="${2-}" path count=0 mode=inert
     while IFS= read -r path; do
         [ -n "$path" ] || continue
         count=$((count + 1))
@@ -45,7 +60,7 @@ decide() {
             *) ;;
         esac
     done
-    if [ "$event" != pull_request ] || [ "$count" -eq 0 ]; then
+    if ! filtered "$event" "$ref" || [ "$count" -eq 0 ]; then
         mode=code
     fi
     case "$mode" in
@@ -55,28 +70,34 @@ decide() {
     esac
 }
 
-# The repository is the third argument so that the self-test can run the real diff on a scratch one.
+# The repository is the fourth argument so that the self-test can run the real diff on a scratch one.
 run_diff() {
-    local event="$1" base="$2" repo="${3-$ROOT}" paths
-    if [ "$event" != pull_request ]; then
-        printf '' | decide "$event"
+    local event="$1" base="$2" ref="$3" repo="${4-$ROOT}" paths
+    if ! filtered "$event" "$ref"; then
+        printf '' | decide "$event" "$ref"
         return
     fi
     # A base that is not in the clone, or no common ancestor, must run everything: a path that no
     # class lists stands for the change that could not be listed.
     # --no-renames lists both paths of a moved file, so a source file moved into Documentation is
     # still a source change; core.quotePath=false keeps a non-ASCII path as it is, not in quotes.
-    if ! paths="$(git -C "$repo" -c core.quotePath=false diff --no-renames --name-only "$base"...HEAD)"; then
-        echo "ci-changes: git diff against $base failed, so every job runs." >&2
+    # A pull request is diffed from the merge base; a push from the commit main had before it.
+    local range=("$base...HEAD")
+    if [ "$event" = push ]; then
+        range=("$base" HEAD)
+    fi
+    if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]] || ! paths="$(git -C "$repo" -c core.quotePath=false diff --no-renames --name-only "${range[@]}")"; then
+        echo "ci-changes: no usable diff against '$base', so every job runs." >&2
         paths="unlisted/unknown-change"
     fi
-    printf '%s\n' "$paths" | decide "$event"
+    printf '%s\n' "$paths" | decide "$event" "$ref"
 }
 
 failures=0
+# The fifth argument is the ref, main by default: only a pull request or a push to main is filtered.
 expect() {
-    local label="$1" event="$2" paths="$3" want="$4" got
-    got="$(printf '%s\n' "$paths" | decide "$event" | tr '\n' ' ')"
+    local label="$1" event="$2" paths="$3" want="$4" ref="${5-refs/heads/main}" got
+    got="$(printf '%s\n' "$paths" | decide "$event" "$ref" | tr '\n' ' ')"
     got="${got% }"
     if [ "$got" != "$want" ]; then
         echo "ci-changes self-test: $label: wanted '$want', got '$got'" >&2
@@ -130,19 +151,26 @@ check_real_diff() {
     base="$(git -C "$dir" rev-parse HEAD)"
     git -C "$dir" mv Sources/DMAction/Foo.swift Documentation/Foo.md
     git -C "$dir" commit -q -m moved
-    expect_diff "a source file moved to Documentation/*.md runs every job" "$dir" "$base" "light=run heavy=run"
+    expect_diff "a source file moved to Documentation/*.md runs every job" "$dir" pull_request "$base" refs/pull/1/merge "light=run heavy=run"
+    expect_diff "the same move in a push to main runs every job" "$dir" push "$base" refs/heads/main "light=run heavy=run"
     git -C "$dir" reset -q --hard "$base"
     mkdir -p "$dir/Documentation"
     echo "text" > "$dir/Documentation/R$(printf '\303\251')sum$(printf '\303\251').md"
     git -C "$dir" add -A
     git -C "$dir" commit -q -m document
-    expect_diff "a document with a non-ASCII name skips the heavy jobs" "$dir" "$base" "light=run heavy=skip"
+    expect_diff "a document with a non-ASCII name skips the heavy jobs" "$dir" pull_request "$base" refs/pull/1/merge "light=run heavy=skip"
+    expect_diff "a push to main of a document skips the heavy jobs" "$dir" push "$base" refs/heads/main "light=run heavy=skip"
+    expect_diff "a push of a release tag runs every job for the same document" "$dir" push "$base" refs/tags/1.2.0 "light=run heavy=run"
+    expect_diff "a push with a base of zeros runs every job" "$dir" push "0000000000000000000000000000000000000000" refs/heads/main "light=run heavy=run"
+    expect_diff "a push with an empty base runs every job" "$dir" push "" refs/heads/main "light=run heavy=run"
+    expect_diff "a push with a base that is not in the clone runs every job" "$dir" push "1111111111111111111111111111111111111111" refs/heads/main "light=run heavy=run"
+    expect_diff "a pull request with a base of zeros runs every job" "$dir" pull_request "0000000000000000000000000000000000000000" refs/pull/1/merge "light=run heavy=run"
     rm -rf "$dir"
 }
 
 expect_diff() {
-    local label="$1" repo="$2" base="$3" want="$4" got
-    got="$(run_diff pull_request "$base" "$repo" | tr '\n' ' ')"
+    local label="$1" repo="$2" event="$3" base="$4" ref="$5" want="$6" got
+    got="$(run_diff "$event" "$base" "$ref" "$repo" | tr '\n' ' ')"
     got="${got% }"
     if [ "$got" != "$want" ]; then
         echo "ci-changes self-test: $label: wanted '$want', got '$got'" >&2
@@ -168,10 +196,21 @@ self_test() {
     expect "the inert file with a README skips the heavy jobs" pull_request $'.coderabbit.yaml\nREADME.md' "$docs"
     expect "the inert file with a source file runs every job" pull_request $'.coderabbit.yaml\nSources/DMAction/X.swift' "$all"
     expect "an empty list runs every job" pull_request "" "$all"
-    for event in push schedule workflow_dispatch workflow_call; do
+    for event in schedule workflow_dispatch workflow_call; do
         expect "the event $event runs every job whatever changed" "$event" "README.md" "$all"
         expect "the event $event runs every job for the inert file" "$event" ".coderabbit.yaml" "$all"
     done
+    for path in Sources/DMAction/X.swift Tests/DMActionTests/X.swift Package.swift Examples/DMActionExample/X.swift Scripts/lint.sh Tools/Package.swift Fixtures/Consumer/X.swift DMAction.podspec .swiftlint.yml .github/workflows/ci.yml new/dir/x.bin; do
+        expect "a push to main with a change at $path runs every job" push "$path" "$all"
+    done
+    expect "a push to main with a README alone skips the heavy jobs" push "README.md" "$docs"
+    expect "a push to main with the inert file alone skips every job" push ".coderabbit.yaml" "$none"
+    expect "a push to main with a README and a source file runs every job" push $'README.md\nSources/DMAction/X.swift' "$all"
+    expect "a push to main with an empty list runs every job" push "" "$all"
+    expect "a push of a release tag runs every job for a README" push "README.md" "$all" refs/tags/1.2.0
+    expect "a push of a release tag runs every job for the inert file" push ".coderabbit.yaml" "$all" refs/tags/1.2.0
+    expect "a push to another branch runs every job" push "README.md" "$all" refs/heads/other
+    expect "a push with no ref runs every job" push "README.md" "$all" ""
     check_job_table
     check_real_diff
     if [ "$failures" -ne 0 ]; then
@@ -184,15 +223,15 @@ self_test() {
 case "${1-}" in
     --self-test) self_test ;;
     --classify)
-        [ "$#" -eq 2 ] || { echo "usage: Scripts/ci-changes.sh --classify <event>" >&2; exit 2; }
-        decide "$2"
+        [ "$#" -ge 2 ] && [ "$#" -le 3 ] || { echo "usage: Scripts/ci-changes.sh --classify <event> [<ref>]" >&2; exit 2; }
+        decide "$2" "${3-}"
         ;;
     "" | -*)
-        echo "usage: Scripts/ci-changes.sh <event> <base sha> | --classify <event> | --self-test" >&2
+        echo "usage: Scripts/ci-changes.sh <event> <base> <ref> | --classify <event> [<ref>] | --self-test" >&2
         exit 2
         ;;
     *)
-        [ "$#" -eq 2 ] || { echo "usage: Scripts/ci-changes.sh <event> <base sha>" >&2; exit 2; }
-        run_diff "$1" "$2"
+        [ "$#" -eq 3 ] || { echo "usage: Scripts/ci-changes.sh <event> <base> <ref>" >&2; exit 2; }
+        run_diff "$1" "$2" "$3"
         ;;
 esac
