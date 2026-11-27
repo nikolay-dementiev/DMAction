@@ -22,10 +22,10 @@ xcodebuild test -scheme DMAction -destination 'platform=iOS Simulator,name=iPhon
 `SWIFT_SUPPRESS_WARNINGS=NO` belongs to that flag: Xcode compiles a dependency with its warnings
 suppressed, and the compiler rejects the two together. It also holds DMCore to the same rule.
 
-Then once more under the Thread Sanitizer:
+Then once more on the Mac under the Thread Sanitizer, with warnings as errors:
 
 ```bash
-swift test --sanitize=thread
+swift test --sanitize=thread -Xswiftc -warnings-as-errors
 ```
 
 The `watchos` job of CI runs the suite on a watchOS simulator, builds the library for the watchOS

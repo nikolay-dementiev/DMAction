@@ -20,6 +20,8 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - name: Check that the tag and the changelog agree
         run: Scripts/check-release.sh "$GITHUB_REF_NAME"
       # A version tag on a branch that was never merged would release unreviewed code.
@@ -47,6 +49,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.6.app
       - name: Write the release notes from the changelog
         run: Scripts/check-release.sh --notes "$GITHUB_REF_NAME" > "$RUNNER_TEMP/notes.md"
       # The tag could have been moved while CI ran. The draft must name the commit CI tested.
