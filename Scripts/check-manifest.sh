@@ -4,7 +4,7 @@
 # on the machine of whoever runs it.
 #
 #   Scripts/check-manifest.sh              run the checks below
-#   Scripts/check-manifest.sh --self-test  run the reader of Package.resolved of item 2 on built-in texts
+#   Scripts/check-manifest.sh --self-test  run the rules of items 1 and 2 on built-in texts
 #
 # 1. The manifest declares no dependency, uses no plugin on any target, passes no unsafe
 #    flag and does not read the environment. A dependency needs the maintainer's approval and
@@ -57,8 +57,11 @@ export NO_COLOR=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODULE="DMAction"
+# The one dependency the library may have, required by version from 1.0.0.
+DMCORE_URL="https://github.com/nikolay-dementiev/DMCore.git"
 
-# Runs the reader of Package.resolved (the block of step 2) on built-in texts, and exits.
+# Runs the dependency rule of step 1 and the reader of Package.resolved (the block of step 2) on
+# built-in texts, and exits.
 SELF_TEST_WORK=""
 self_test() {
     local script total=0 failures=0 dm found
@@ -69,29 +72,33 @@ self_test() {
     fi
     SELF_TEST_WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-manifest-self-test.XXXXXX")" || exit 2
     trap 'rm -rf "$SELF_TEST_WORK"' EXIT
-    # Step 2 runs the text from its heredoc to the line PY. The self-test must take that same text:
-    # one marker, directly under the line that opens the heredoc, so that a line added above the
-    # marker or a second marker cannot make the two differ.
-    found="$(awk '/^# resolved-inventory$/ { count++; opener = prev } { prev = $0 } END { print count + 0 ":" opener }' "$script")"
-    case "$found" in
-        "1:"*"<<'PY'") ;;
-        *)
-            echo "check-manifest: self-test: the marker resolved-inventory must appear once, under the line that opens the heredoc of step 2 (found '$found')" >&2
+    # Steps 1 and 2 run the text from their heredocs to the line PY. The self-test must take those
+    # same texts: each marker once, directly under the line that opens its heredoc, so that a line
+    # added above a marker or a second marker cannot make the two differ.
+    block() {  # <marker> <file to write>
+        found="$(awk -v marker="# $1" '$0 == marker { count++; opener = prev } { prev = $0 } END { print count + 0 ":" opener }' "$script")"
+        case "$found" in
+            "1:"*"<<'PY'") ;;
+            *)
+                echo "check-manifest: self-test: the marker $1 must appear once, under the line that opens a heredoc (found '$found')" >&2
+                exit 2
+                ;;
+        esac
+        awk -v marker="# $1" '$0 == marker { found = 1 } found && /^PY$/ { exit } found' "$script" > "$2"
+        if [ ! -s "$2" ]; then
+            echo "check-manifest: self-test: the python block marked $1 is not in $script" >&2
             exit 2
-            ;;
-    esac
-    awk '/^# resolved-inventory$/ { found = 1 } found && /^PY$/ { exit } found' "$script" > "$SELF_TEST_WORK/reader.py"
-    if [ ! -s "$SELF_TEST_WORK/reader.py" ]; then
-        echo "check-manifest: self-test: the python block marked resolved-inventory is not in $script" >&2
-        exit 2
-    fi
+        fi
+    }
+    block dependency-rule "$SELF_TEST_WORK/rule.py"
+    block resolved-inventory "$SELF_TEST_WORK/reader.py"
     pin() {  # <identity> <version>
         printf '{"identity":"%s","kind":"localSourceControl","location":"/x/%s","state":{"revision":"abc","version":"%s"}}' "$1" "$1" "$2"
     }
-    expect() {  # <name> <expected status> <expected text>: the reader on Package.resolved as it is
+    judge() {  # <name> <expected status> <expected text> <python block and its arguments...>
         local got=0 output
         total=$((total + 1))
-        output="$(python3 "$SELF_TEST_WORK/reader.py" "$SELF_TEST_WORK/Package.resolved" "$MODULE" 2>&1)" || got=$?
+        output="$(python3 "${@:4}" 2>&1)" || got=$?
         if [ "$got" -eq "$2" ] && printf '%s\n' "$output" | grep -q -F -- "$3"; then
             echo "check-manifest: self-test ok   $1"
         else
@@ -99,6 +106,9 @@ self_test() {
             echo "check-manifest: self-test FAIL $1: expected status $2 and '$3', got status $got:" >&2
             printf '%s\n' "$output" | head -5 | sed 's/^/    /' >&2
         fi
+    }
+    expect() {  # <name> <expected status> <expected text>: the reader on Package.resolved as it is
+        judge "$1" "$2" "$3" "$SELF_TEST_WORK/reader.py" "$SELF_TEST_WORK/Package.resolved" "$MODULE" "$DMCORE_URL"
     }
     check() {  # <name> <expected status> <expected text> <text of Package.resolved>
         printf '%s\n' "$4" > "$SELF_TEST_WORK/Package.resolved"
@@ -117,13 +127,47 @@ self_test() {
     check "the copy twice" 1 "pinned 2 times" "{\"version\":3,\"pins\":[$dm,$(pin dmaction 1.2.0)]}"
     check "a pin that is not an object" 1 "not of format version 2 or 3" "{\"version\":3,\"pins\":[$dm,\"text\"]}"
     check "a null state" 1 "second (registry, None, None)" "{\"version\":3,\"pins\":[$dm,{\"identity\":\"second\",\"kind\":\"registry\",\"state\":null}]}"
+    core() {  # <location> <state>
+        printf '{"identity":"dmcore","kind":"remoteSourceControl","location":"%s","state":%s}' "$1" "$2"
+    }
+    released() {  # <version>
+        printf '{"revision":"abc","version":"%s"}' "$1"
+    }
+    check "DMCore beside the copy" 0 "" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" "$(released 1.0.0)")]}"
+    check "a later DMCore 1.x" 0 "" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" "$(released 1.4.2)")]}"
+    check "DMCore 2.0.0" 1 "dmcore (remoteSourceControl, 2.0.0, $DMCORE_URL)" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" "$(released 2.0.0)")]}"
+    check "DMCore by branch" 1 "dmcore (remoteSourceControl, abc, $DMCORE_URL)" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" '{"branch":"main","revision":"abc"}')]}"
+    check "DMCore from another location" 1 "dmcore (remoteSourceControl, 1.0.0, https://example.invalid/DMCore.git)" "{\"version\":3,\"pins\":[$dm,$(core https://example.invalid/DMCore.git "$(released 1.0.0)")]}"
+    check "DMCore twice" 1 "dmcore is pinned 2 times" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" "$(released 1.0.0)"),$(core "$DMCORE_URL" "$(released 1.1.0)")]}"
     rm -f "$SELF_TEST_WORK/Package.resolved"
     expect "a file that is not there" 1 "cannot be read"
+
+    remote() {  # <identity> <url> <requirement>
+        printf '{"sourceControl":[{"identity":"%s","location":{"remote":[{"urlString":"%s"}]},"requirement":%s}]}' "$1" "$2" "$3"
+    }
+    rule() {  # <name> <expected status> <expected text> <dependencies> [<targets>] [<text of Package.swift>]
+        printf '{"dependencies":[%s],"targets":[%s]}\n' "$4" "${5-}" > "$SELF_TEST_WORK/manifest.json"
+        printf '%s\n' "${6-}" > "$SELF_TEST_WORK/Package.swift"
+        judge "$1" "$2" "$3" "$SELF_TEST_WORK/rule.py" "$SELF_TEST_WORK/manifest.json" "$SELF_TEST_WORK/Package.swift" "$DMCORE_URL"
+    }
+    local from_one='{"range":[{"lowerBound":"1.0.0","upperBound":"2.0.0"}]}' wanted core_dependency
+    wanted="dependency 'dmcore' is not the allowed one"
+    core_dependency="$(remote dmcore "$DMCORE_URL" "$from_one")"
+    rule "no dependency" 0 "" ""
+    rule "DMCore from 1.0.0 from its repository" 0 "" "$core_dependency"
+    rule "another dependency beside DMCore" 1 "dependency 'other' is declared" "$core_dependency,$(remote other https://example.invalid/Other.git "$from_one")"
+    rule "DMCore by branch" 1 "dependency 'dmcore' is required by branch" "$(remote dmcore "$DMCORE_URL" '{"branch":["main"]}')"
+    rule "DMCore from a local path" 1 "$wanted" '{"fileSystem":[{"identity":"dmcore","path":"/x/DMCore"}]}'
+    rule "DMCore from another repository" 1 "$wanted" "$(remote dmcore https://example.invalid/DMCore.git "$from_one")"
+    rule "DMCore up to the next minor" 1 "$wanted" "$(remote dmcore "$DMCORE_URL" '{"range":[{"lowerBound":"1.0.0","upperBound":"1.1.0"}]}')"
+    rule "DMCore at an exact version" 1 "$wanted" "$(remote dmcore "$DMCORE_URL" '{"exact":["1.0.0"]}')"
+    rule "a plugin on a target" 1 "target 'A' uses a plugin" "" '{"name":"A","pluginUsages":[{"plugin":["P"]}]}'
+    rule "a manifest that reads the environment" 1 "Package.swift reads the environment" "" "" 'let flag = ProcessInfo.processInfo'
     if [ "$failures" -gt 0 ]; then
         echo "check-manifest: self-test: $failures of $total checks failed" >&2
         exit 1
     fi
-    echo "check-manifest: self-test: $total checks of the reader of Package.resolved, all ok."
+    echo "check-manifest: self-test: $total checks of the dependency rule and of the reader of Package.resolved, all ok."
     exit 0
 }
 
@@ -168,7 +212,8 @@ trap cleanup EXIT
 
 # 1. Static check of the manifest.
 swift package --package-path "$ROOT" dump-package > "$WORK/manifest.json"
-if ! python3 - "$WORK/manifest.json" "$ROOT/Package.swift" <<'PY'
+if ! python3 - "$WORK/manifest.json" "$ROOT/Package.swift" "$DMCORE_URL" <<'PY'
+# dependency-rule
 import json
 import re
 import sys
@@ -315,7 +360,7 @@ else
         # the machine of whoever runs this cannot stand in for what the build resolves.
         if swift build --package-path "$PROBE/consumer" --cache-path "$PROBE/cache" > "$WORK/version-build.log" 2>&1; then
             # What the build resolved, as SwiftPM pinned it: the tagged copy and nothing else.
-            if EXTRA="$(python3 - "$PROBE/consumer/Package.resolved" "$COPY" <<'PY'
+            if EXTRA="$(python3 - "$PROBE/consumer/Package.resolved" "$COPY" "$DMCORE_URL" <<'PY'
 # resolved-inventory
 import json
 import sys
