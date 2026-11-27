@@ -6,26 +6,27 @@
 #   Scripts/check-manifest.sh              run the checks below
 #   Scripts/check-manifest.sh --self-test  run the rules of items 1 and 2 on built-in texts
 #
-# 1. The manifest declares no dependency, uses no plugin on any target, passes no unsafe
-#    flag and does not read the environment. A dependency needs the maintainer's approval and
-#    a change of this check in the same pull request. Item 2 sees only a dependency that a
-#    target of a product uses: SwiftPM leaves one that nothing uses, that only the tests use
-#    or that only a target outside every product uses out of what a consumer resolves, so
-#    only the manifest shows it. A dependency by branch or revision is named for its
-#    requirement as well: SwiftPM refuses a package with an unstable dependency or an unsafe
-#    flag as a dependency by version. A build plugin of a dependency runs in every
-#    consumer's build, and a manifest that reads the environment describes more than one
-#    package.
+# 1. The manifest declares no dependency but DMCore, from 1.0.0 from its repository, uses no
+#    plugin on any target, passes no unsafe flag and does not read the environment. Another
+#    dependency needs the maintainer's approval and a change of this check in the same pull
+#    request. Item 2 sees only a dependency that a target of a product uses: SwiftPM leaves
+#    one that nothing uses, that only the tests use or that only a target outside every product
+#    uses out of what a consumer resolves, so only the manifest shows it. A dependency by
+#    branch or revision is named for its requirement as well: SwiftPM refuses a package with
+#    an unstable dependency or an unsafe flag as a dependency by version. A local path, such
+#    as one used while DMCore is developed next to this package, is refused too. A build
+#    plugin of a dependency runs in every consumer's build, and a manifest that reads the
+#    environment describes more than one package.
 # 2. The installation manifest of README.md works. Its URL is the podspec's, its version is
 #    that of the newest dated release heading of CHANGELOG.md, and no platform it declares is
 #    below the package's. With only its URL pointed at a throw-away tagged copy of the
 #    tracked manifest and sources, it resolves and builds: a consumer that depends on the
 #    checkout by path cannot show a failure of a version requirement, and only a build shows
-#    a wrong product or package name. The Package.resolved of that build pins the copy and
-#    nothing else, so a consumer of the package resolves this package only: any other pin is
+#    a wrong product or package name. The Package.resolved of that build pins the copy and at
+#    most a 1.x release of DMCore, so a consumer resolves nothing else: any other pin is
 #    named with its kind, version and location, and a file that cannot be read, that holds
-#    no pin or more than one pin of the copy, or that is not of format version 2 or 3 is a
-#    failure. The build keeps its own cache, so manifests and repositories cached on the
+#    no pin or more than one pin of the copy or of DMCore, or that is not of format version
+#    2 or 3 is a failure. The build keeps its own cache, so manifests and repositories cached on the
 #    machine of whoever runs this cannot stand in for what the build resolves.
 # 3. Fixtures/Consumer builds without a warning. It uses the released public declarations
 #    with their exact types and the shapes the downstream package relies on, so if it
@@ -40,14 +41,15 @@
 #    rejected, each with the error it names. Each one is a target of Fixtures/Rejected.
 #    One that starts to compile means the concurrency limits of the library have changed.
 #
-# --self-test needs no network, no build and no swift. A reader that never fails looks the same
-# as a clean tree, so it takes the python block of item 2 out of this very file, the text that the
-# check runs, and runs it on Package.resolved texts that it carries: a pin of the copy alone, an
-# extra pin, no pin, the copy twice, a format other than 2 and 3, and input that is not a
-# resolution at all. A reader that was changed to pass one of these fails the self-test.
+# --self-test needs no network, no build and no swift. A check that never fails looks the same
+# as a clean tree, so it takes the python blocks of items 1 and 2 out of this very file, the texts
+# that the check runs, and runs them on manifests and Package.resolved texts that it carries: a
+# pin of the copy alone, DMCore beside it, an extra pin, no pin, the copy twice, a format other
+# than 2 and 3, input that is not a resolution at all, and a dependency that is not DMCore from
+# 1.0.0. A block that was changed to pass one of these fails the self-test.
 #
-# Exit codes: 0 every check passed, 1 a check failed, 2 wrong usage, or python3 is missing, or the
-# python block of item 2 is not where the self-test expects it.
+# Exit codes: 0 every check passed, 1 a check failed, 2 wrong usage, or python3 is missing, or a
+# python block is not where the self-test expects it.
 
 set -euo pipefail
 
@@ -220,21 +222,33 @@ import sys
 
 manifest = json.load(open(sys.argv[1]))
 source = open(sys.argv[2]).read()
+dmcore_url = sys.argv[3]
+# `from: "1.0.0"`, as `swift package dump-package` writes it.
+from_one = {"range": [{"lowerBound": "1.0.0", "upperBound": "2.0.0"}]}
 problems = []
 for dependency in manifest["dependencies"]:
-    for entries in dependency.values():
+    for kind, entries in dependency.items():
         for entry in entries:
-            problems.append(
-                f"dependency '{entry.get('identity')}' is declared: a dependency needs the maintainer's "
-                "approval and a change of this check in the same pull request"
-            )
+            identity = entry.get("identity")
             requirement = entry.get("requirement", {})
+            urls = []
+            if kind == "sourceControl":
+                urls = [remote.get("urlString") for remote in entry.get("location", {}).get("remote", [])]
+            if identity == "dmcore" and urls == [dmcore_url] and requirement == from_one:
+                continue
+            if identity == "dmcore":
+                problems.append(
+                    f"dependency 'dmcore' is not the allowed one: it must be "
+                    f".package(url: \"{dmcore_url}\", from: \"1.0.0\")"
+                )
+            else:
+                problems.append(
+                    f"dependency '{identity}' is declared: only DMCore is allowed; another one needs the "
+                    "maintainer's approval and a change of this check in the same pull request"
+                )
             for unstable in ("branch", "revision"):
                 if unstable in requirement:
-                    problems.append(
-                        f"dependency '{entry.get('identity')}' is required by {unstable} "
-                        f"{requirement[unstable]}"
-                    )
+                    problems.append(f"dependency '{identity}' is required by {unstable} {requirement[unstable]}")
 for target in manifest.get("targets", []):
     for usage in target.get("pluginUsages") or []:
         problems.append(f"target '{target['name']}' uses a plugin: {json.dumps(usage)}")
@@ -250,7 +264,7 @@ PY
 then
     FAILED=1
 else
-    echo "check-manifest: no dependency, no plugin, no unsafe flag and no environment switch in Package.swift."
+    echo "check-manifest: no dependency but DMCore, no plugin, no unsafe flag and no environment switch in Package.swift."
 fi
 
 # 2. The installation manifest of README.md, against a throw-away tagged copy of the tracked
@@ -365,7 +379,7 @@ else
 import json
 import sys
 
-path, copy = sys.argv[1:3]
+path, copy, dmcore_url = sys.argv[1:4]
 expected = copy.lower()
 try:
     with open(path, encoding="utf-8") as handle:
@@ -384,18 +398,24 @@ for pin in resolved["pins"]:
         state = pin.get("state")
         if not isinstance(state, dict):
             state = {}
+        released = str(state.get("version") or "").startswith("1.")
+        allowed = pin.get("identity") == "dmcore" and pin.get("kind") == "remoteSourceControl"
+        if allowed and pin.get("location") == dmcore_url and released:
+            continue
         problems.append(f"  {pin.get('identity')} ({pin.get('kind')}, {state.get('version') or state.get('revision')}, {pin.get('location')})")
 if identities.count(expected) == 0:
     problems.append(f"  {expected}, the tagged copy, is not among the resolved packages")
 elif identities.count(expected) > 1:
     problems.append(f"  {expected}, the tagged copy, is pinned {identities.count(expected)} times")
+if identities.count("dmcore") > 1:
+    problems.append(f"  dmcore is pinned {identities.count('dmcore')} times")
 print("\n".join(problems))
 sys.exit(1 if problems else 0)
 PY
 )"; then
-                echo "check-manifest: the manifest of README.md asks for the podspec's URL and the changelog's newest version $VERSION, resolves and builds by version, and the consumer resolves this package only."
+                echo "check-manifest: the manifest of README.md asks for the podspec's URL and the changelog's newest version $VERSION, resolves and builds by version, and the consumer resolves this package and DMCore only."
             else
-                echo "check-manifest: the consumer of README.md's manifest does not resolve this package only:" >&2
+                echo "check-manifest: the consumer of README.md's manifest resolves more than this package and DMCore:" >&2
                 printf '%s\n' "$EXTRA" >&2
                 FAILED=1
             fi
