@@ -297,6 +297,9 @@ interface.
   also after `retry(0)`, which returns the conformer itself: nothing guards them.
 - **No answer, no result.** A producer that never calls its completion stalls its run. Nothing
   times out.
+- **Signposts.** Each of those runs records its attempts, retries and fallbacks as signposts,
+  subsystem `DMAction`, category `ActionRun`, which Instruments shows on a timeline. They hold
+  numbers and constant names only, never a value of your app.
 - **Order.** The first producer runs on your thread before the call returns. When a producer calls
   its completion on that thread before it returns, the next attempt starts after the producer has
   returned, and if every producer works that way, the result arrives on your thread before the call
@@ -351,8 +354,10 @@ change with a table. The ones most likely to matter:
 
 ## The family
 
-DMAction is one of three packages that share their conventions:
+DMAction is one of a family of packages that share their conventions:
 
+- [DMCore](https://github.com/nikolay-dementiev/DMCore): the runtime core of the family. DMAction
+  depends on it to record its signposts.
 - [DMVariableBlurView](https://github.com/nikolay-dementiev/DMVariableBlurView): variable blur
   effects for SwiftUI.
 - [DMUnLoader](https://github.com/nikolay-dementiev/DMUnLoader): loading, error and success

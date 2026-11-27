@@ -229,5 +229,5 @@ extension ActionPlan {
 }
 
 /// Where the runs that the public entry points start report what they do: signposts of the system,
-/// which cost next to nothing while no tool records them.
+/// which a performance tool such as Instruments shows.
 let actionRunTracing: any Tracing = SystemTracing(subsystem: "DMAction", category: "ActionRun")
