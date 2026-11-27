@@ -4,7 +4,6 @@
 //  Created by Mykola Dementiev
 //
 
-@available(macOS 10.15, *)
 public extension DMAction {
     /// Runs the action as a guarded run, waits for its result and returns it mapped.
     ///

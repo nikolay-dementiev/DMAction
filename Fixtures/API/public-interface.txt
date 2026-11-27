@@ -1,4 +1,3 @@
-@available(macOS 10.15, *)
 extension DMAction.DMAction {
   public func runAsync<Output>(isolation: isolated (any _Concurrency.Actor)? = #isolation, mapSuccess: @escaping @Sendable (any Swift.Copyable) throws -> Output) async throws -> DMAction.DMActionOutcome<Output> where Output : Swift.Sendable
 }

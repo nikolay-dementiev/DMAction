@@ -191,9 +191,6 @@ final class AtMostOnceDeliveryTests: XCTestCase {
     }
 
     func test_run_whenTwoCompletionsAreIgnored_writesOneFaultToTheUnifiedLogForEach() throws {
-        guard #available(macOS 12, iOS 15, watchOS 8, tvOS 15, *) else {
-            throw XCTSkip("Reading the log of this process needs OSLogStore")
-        }
         // The lines are counted between two markers of this test. Neither a position nor a date
         // separated them from the lines of the tests before: the store returned those too.
         let marker = UUID().uuidString

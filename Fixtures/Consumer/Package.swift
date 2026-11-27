@@ -8,8 +8,9 @@ let package = Package(
     name: "Consumer",
     platforms: [
         .iOS(.v17),
-        // A package that depends on DMAction for watchOS declares at least its floor.
-        .watchOS(.v7)
+        // A package that depends on DMAction declares at least its floors.
+        .watchOS(.v10),
+        .macOS(.v13)
     ],
     products: [
         .library(name: "Consumer", targets: ["Consumer", "ConsumerStrict"])

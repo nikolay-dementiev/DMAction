@@ -10,7 +10,8 @@ let package = Package(
     name: "DMAction",
     platforms: [
         .iOS(.v17),
-        .watchOS(.v7),
+        .watchOS(.v10),
+        .macOS(.v13),
     ],
     products: [
         .library(
