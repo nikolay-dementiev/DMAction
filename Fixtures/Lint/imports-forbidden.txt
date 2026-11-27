@@ -15,6 +15,8 @@ private import UIKit // expect: domain_imports
 @_exported import UIKit // expect: domain_imports
 import os_signpost // expect: domain_imports
 import osLog // expect: domain_imports
+package import DMCoreTesting // expect: domain_imports
+import DMCoreExtras // expect: domain_imports
 	import UIKit // expect: domain_imports
 import  UIKit // expect: domain_imports
 import class UIKit.UIView // expect: domain_imports
