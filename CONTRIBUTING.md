@@ -52,16 +52,16 @@ commands of "Build and test" and of "The example app".
 | `Scripts/check-lint-contract.sh` | that the lint rules fire: it lints the fixtures of `Fixtures/Lint` where their folder says (the root as files of the library, `Domain/` and `Adapters/` as files of that folder, `Outside/` outside the library) and compares the diagnostics of the rules named in `devkit.conf` with the ones each line expects |
 | `Scripts/check-wrappers.sh` | that the nine scripts which `WRAPPERS` in `devkit.conf` lists forward to `devkit` faithfully (`lint`, `check-lint-contract`, `check-lint-tool`, `prepare-simulator`, `check-api`, `check-release`, `export-coverage`, `count-tests` and this one): `devkit check-wrappers` copies each into a scratch repository whose path holds a space and, with a shim in place of `swift`, checks the command and the arguments that reach `devkit`, the directory, the exit status and both standard streams, that the script ends in an `exec`, that `DEVELOPER_DIR` and standard input reach `swift` as the caller had them, that the first line is `#!/bin/bash`, and that each script works from any directory. Without `WRAPPERS` it ends with status 2 |
 | `Scripts/check-api.sh` | the public interface against `Fixtures/API/public-interface.txt`; `--self-test` runs the cases of its normalisation, which DMDevKit carries; `--since <ref>` prints, without a compiler, the lines the baseline lost, changed or gained since a git ref such as a release tag. A deliberate change of the public API runs it with `--update` and commits the new baseline in the same commit |
-| `Scripts/check-release.sh <version>` | that the newest heading of `CHANGELOG.md` is that version, with a release date that is a day of the calendar and notes under it, and that the podspec still names 1.1.0, the version the pod is frozen at; it also compares the release with the one before it, which is the highest release tag below the version that the commit reaches and which the next heading of the changelog must name, and refuses a version that keeps its major version after a removed or changed line of the interface, after a `### Breaking changes` subsection, or when `Scripts/check-api-digester.sh` reports a break since the previous release. It reads the tags, so it needs the history of the commit with its tags: in a shallow clone it ends with status 2 |
+| `Scripts/check-release.sh <version>` | that the newest heading of `CHANGELOG.md` is that version, with a release date that is a day of the calendar and notes under it; it also compares the release with the one before it, which is the highest release tag below the version that the commit reaches and which the next heading of the changelog must name, and refuses a version that keeps its major version after a removed or changed line of the interface, after a `### Breaking changes` subsection, or when `Scripts/check-api-digester.sh` reports a break since the previous release. It reads the tags, so it needs the history of the commit with its tags: in a shallow clone it ends with status 2 |
 | `Scripts/export-coverage.sh <result bundle> <target> <output>` | not a check: it exports the line coverage of the library from a result bundle to LCOV, for CI to upload to Codecov |
 | `Scripts/count-tests.sh [--label <text>] <result bundle> <glob>...` | that every test method of the files the globs name ran and passed in the result bundle: a run that lost a test class or skipped a test passes the build and the coverage floor too |
 | `Scripts/check-api-digester.sh <ref>` | that swift-api-digester finds no break between the working tree and a git ref, such as the last release: a protocol requirement added without a default, a method that an extension declares and that becomes a requirement, a narrowed generic requirement; `--self-test` runs it on a scratch package. It builds for the host only, and it does not see a changed default value, an added associated type with a default, or the resolution of an overload |
-| `Scripts/check-manifest.sh` | the manifest, which declares no dependency, plugin or unsafe flag and does not read the environment; the README's installation manifest built by version, whose resolution pins this package and nothing else; the consumer fixture, the podspec and the uses across isolation domains that the compiler must keep rejecting; `--self-test` runs the reader of the consumer's `Package.resolved` on built-in texts, with no build and no network |
+| `Scripts/check-manifest.sh` | the manifest, which declares no dependency but DMCore from 1.0.0, no plugin or unsafe flag and does not read the environment; the README's installation manifest built by version, whose resolution pins this package and at most a 1.x release of DMCore; the consumer fixture, the example's tooling and the uses across isolation domains that the compiler must keep rejecting; `--self-test` runs the dependency rule, the reader of the README's installation manifest and the reader of the consumer's `Package.resolved` on built-in texts, with no build and no network |
 | `Scripts/coverage-gate.sh <result bundle>` | the line coverage of the library |
 | `Scripts/check-snippets.sh` | every Swift block of a tracked Markdown file and of a doc comment in `Sources`, each compiled on its own against the checkout, as written: a manifest, a block for iOS, or a command-line tool for the Mac. A warning fails it too |
 
 The checks run code that the branch contains: `Package.swift` and the manifest blocks of the README
-are evaluated by Swift Package Manager, the podspec by CocoaPods, and `project.yml` by XcodeGen.
+are evaluated by Swift Package Manager, and `project.yml` by XcodeGen.
 `Tools/Package.swift` and `devkit.conf` are code of the same kind: `devkit.conf` is shell code that
 runs with your rights. Before you run the checks on someone else's branch, read what that branch
 changes in those files.
@@ -148,8 +148,7 @@ merge first, then tag. Before the tag is pushed:
    under it. `Scripts/check-release.sh <version>` checks it, in a clone that has the history and
    the tags (`git fetch --unshallow --tags` otherwise). The README's installation manifest
    asks for the version being released, `from: "<version>"`, and `Scripts/check-manifest.sh`
-   checks it against that heading, so the release pull request updates both together. The podspec
-   stays at 1.1.0, because the pod is frozen.
+   checks it against that heading, so the release pull request updates both together.
 2. Every breaking change, as ENGINEERING.md defines it, needs a new major version, with no
    exception for a small one. A removed or changed line of the interface is one:
    `Scripts/check-api.sh --since <previous version>` lists them. A change of behaviour is another,
@@ -172,8 +171,7 @@ merge first, then tag. Before the tag is pushed:
 
 On the tag, the release workflow runs the check, makes sure the tagged commit is on `main`, runs the
 whole CI workflow, makes sure the tag still points at the commit CI tested, and drafts a GitHub
-release from the changelog section. Publishing the release stays a manual step, and nothing goes
-to the CocoaPods trunk.
+release from the changelog section. Publishing the release stays a manual step.
 
 After the tag, open the package's page on the Swift Package Index,
 https://swiftpackageindex.com/nikolay-dementiev/DMAction, and check that the new version and its

@@ -148,23 +148,25 @@ the rules above it would have needed a major version. The rules apply from the r
 
 - The manifest declares `swift-tools-version: 6.0` and the Swift 6 language mode, so the package
   needs Xcode 16.0 or later. `ExistentialAny` is on in every target.
-- The declared platforms are iOS 17.0 and watchOS 7.0. Raising either platform floor, or the
-  `swift-tools-version`, is a breaking change.
+- The declared platforms are iOS 17.0, watchOS 10.0 and macOS 13.0. Raising a platform floor, or
+  the `swift-tools-version`, is a breaking change.
 - `.github/workflows/ci.yml` is the place that says what CI runs; this file does not restate it.
   The policy needs four facts. The oldest iOS runtime that CI runs is iOS 18.5. iOS 17.5 runs
   locally before a release (CONTRIBUTING.md, "Releases"). The `floor` job runs Swift 6.0, the
   oldest compiler line the manifest allows. The `watchos` job runs the suite on watchOS 26.5 and
   on 11.5, the oldest watchOS runtime that a hosted image offers, and builds the library for the
-  watchOS device SDK; the `podspec` job builds the sources for watchOS too.
+  watchOS device SDK.
 - "Oldest tested runtime" and "oldest supported version" are different statements. The supported
   version is a promise: the platforms the manifest declares. The tested runtime is evidence: the
-  oldest runtime a test has run on. That is iOS 17.5 against a promise of iOS 17.0, and watchOS
-  11.5 against a promise of watchOS 7.0.
-- No dependency without the maintainer's approval. `Scripts/check-manifest.sh` rejects any
-  dependency in the manifest, named, so a dependency cannot land without a change of that check
-  in the same pull request, where the reviewer sees it. It also rejects a plugin on any target,
-  an unsafe flag and a manifest that reads the environment, and it requires that a consumer of
-  the README's installation manifest resolves this package only.
+  oldest runtime a test has run on. That is iOS 17.5 against a promise of iOS 17.0, watchOS 11.5
+  against a promise of watchOS 10.0, and macOS 15 against a promise of macOS 13.0.
+- No dependency without the maintainer's approval. DMCore is the one that is approved.
+  `Scripts/check-manifest.sh` rejects any other dependency in the manifest, named, and DMCore
+  unless it is required from 1.0.0 from its own repository, so a dependency cannot land or change
+  without a change of that check in the same pull request, where the reviewer sees it. It also
+  rejects a plugin on any target, an unsafe flag and a manifest that reads the environment, and it
+  requires that a consumer of the README's installation manifest resolves this package and DMCore
+  only.
 - XCTest is the test framework. Another one comes only by the maintainer's decision.
 - The manifest sets no `defaultIsolation`: it would change the inferred isolation of public
   declarations, which is observable behaviour.

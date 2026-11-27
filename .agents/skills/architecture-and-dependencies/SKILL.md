@@ -14,7 +14,8 @@ format of [Documentation/Review/README.md](../../../Documentation/Review/README.
 - An import that follows a block comment on the same line. The lint rule `domain_imports` reports
   every other import outside Foundation and `os`; this is the one case it does not see.
   (ENGINEERING.md, "Imports")
-- A dependency, a plugin, an unsafe flag or a read of the environment that comes with a change of
+- A dependency other than DMCore, DMCore required other than from 1.0.0 from its repository, a
+  plugin, an unsafe flag or a read of the environment that comes with a change of
   `Scripts/check-manifest.sh`, or a change of that check that weakens it. The check rejects them
   by name, so a dependency lands only with a change of the check in the same pull request.
   (ENGINEERING.md, "No dependency without the maintainer's approval")

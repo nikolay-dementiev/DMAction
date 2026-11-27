@@ -4,7 +4,7 @@ Compose completion-based actions with retries and fallbacks, and get one result 
 
 [![CI](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml/badge.svg)](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml)
 [![Swift 6.0+](https://img.shields.io/badge/Swift-6.0%2B-orange?style=flat-square)](#requirements)
-[![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_7%2B-yellowgreen?style=flat-square)](#requirements)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_10%2B_%7C_macOS_13%2B-yellowgreen?style=flat-square)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction?ref=badge_shield)
 [![Commit activity](https://img.shields.io/github/commit-activity/y/nikolay-dementiev/DMAction)](https://github.com/nikolay-dementiev/DMAction/graphs/commit-activity)
@@ -50,10 +50,8 @@ It is not a fit when:
 
 ## Requirements
 
-- Swift 6.0 or later, which is Xcode 16 or later, for Swift Package Manager and for CocoaPods.
-  The podspec's `swift_versions`, 5.0 and 6.0, are the language modes the pod builds in, not
-  compiler versions.
-- iOS 17 or later, or watchOS 7 or later.
+- Swift 6.0 or later, which is Xcode 16 or later.
+- iOS 17 or later, watchOS 10 or later, or macOS 13 or later.
 
 What each platform is verified with:
 
@@ -61,9 +59,10 @@ What each platform is verified with:
 |---|---|
 | iOS 26.5 (Xcode 26.6), iOS 18.5 (Xcode 16.4) | the tests run on simulators in CI, for the library and the example app |
 | iOS 17.5 | the library's tests run on a simulator before a release |
-| macOS, the host | the tests run in CI with Swift 6.0.3, and again under the Thread Sanitizer. macOS is not a declared platform |
+| macOS, the host | the tests run in CI on macOS 15 with Swift 6.0.3, and on macOS 26 under the Thread Sanitizer |
+| macOS 13 | declared, not run: the oldest macOS a test has run on is 15 |
 | watchOS 26.5 (Xcode 26.6), watchOS 11.5 (Xcode 16.4) | the library's tests run on simulators in CI, and CI builds the library for the watchOS device SDK |
-| watchOS 7 | declared, not run: the oldest watchOS runtime a test has run on is 11.5 |
+| watchOS 10 | declared, not run: the oldest watchOS runtime a test has run on is 11.5 |
 
 ## Installation
 
@@ -100,7 +99,7 @@ pod 'DMAction', '1.1.0'
 ```
 
 Version 1.1.0 is the last release published to the CocoaPods trunk. Later releases come through
-Swift Package Manager only. The podspec stays in the repository, and CI lints it.
+Swift Package Manager only.
 
 ## Quick start
 
@@ -331,9 +330,9 @@ with the accessibility audit.
 
 The library's tests run on iOS simulators and on the host, with the Thread Sanitizer, and their
 line coverage is a gate in CI. CI also checks that the public interface matches its baseline, that
-a consumer of the package builds, that the documentation builds without a warning, that the
-podspec lints, and that every Swift example, in this README, the documentation catalog and the
-doc comments, compiles as written. `CONTRIBUTING.md` lists the commands.
+a consumer of the package builds, that the documentation builds without a warning, and that every
+Swift example, in this README, the documentation catalog and the doc comments, compiles as
+written. `CONTRIBUTING.md` lists the commands.
 
 ## Versions and migration
 

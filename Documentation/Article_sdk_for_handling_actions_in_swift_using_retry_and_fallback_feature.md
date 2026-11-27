@@ -113,7 +113,7 @@ This SDK is built on a protocol-oriented architecture, making it flexible and ea
 ## Get Started Today
 Ready to simplify your action handling? Check out the [GitHub repository](https://github.com/nikolay-dementiev/DMAction) for installation instructions, documentation, and examples.
 
-Installing this SDK is simple — just add it to your project using either Swift Package Manager or CocoaPods.
+Installing this SDK is simple — just add it to your project with Swift Package Manager. CocoaPods offers releases up to version 1.1.0.
 
 
 ## Final Thoughts
