@@ -16,10 +16,13 @@ swift test
 runs the suite on the Mac. The same suite on a simulator, with warnings as errors:
 
 ```bash
-xcodebuild test -scheme DMAction -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+xcodebuild test -scheme DMAction -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.5' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES SWIFT_SUPPRESS_WARNINGS=NO
 ```
 
-and once more under the Thread Sanitizer:
+`SWIFT_SUPPRESS_WARNINGS=NO` belongs to that flag: Xcode compiles a dependency with its warnings
+suppressed, and the compiler rejects the two together. It also holds DMCore to the same rule.
+
+Then once more under the Thread Sanitizer:
 
 ```bash
 swift test --sanitize=thread
@@ -29,8 +32,8 @@ The `watchos` job of CI runs the suite on a watchOS simulator, builds the librar
 device SDK, and builds `Fixtures/Consumer` for the watchOS Simulator:
 
 ```bash
-xcodebuild test -scheme DMAction -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm),OS=26.5' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
-xcodebuild build -scheme DMAction -sdk watchos -destination 'generic/platform=watchOS' -configuration Release SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+xcodebuild test -scheme DMAction -destination 'platform=watchOS Simulator,name=Apple Watch Series 11 (46mm),OS=26.5' SWIFT_TREAT_WARNINGS_AS_ERRORS=YES SWIFT_SUPPRESS_WARNINGS=NO
+xcodebuild build -scheme DMAction -sdk watchos -destination 'generic/platform=watchOS' -configuration Release SWIFT_TREAT_WARNINGS_AS_ERRORS=YES SWIFT_SUPPRESS_WARNINGS=NO
 ```
 
 `Scripts/prepare-simulator.sh "<device type name>" <version> [iOS|watchOS]` boots the simulator

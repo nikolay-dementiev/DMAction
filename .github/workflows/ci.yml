@@ -130,6 +130,9 @@ jobs:
         run: |
           udid="$(Scripts/prepare-simulator.sh "$DEVICE" "$OS")"
           echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
+      # Xcode compiles a dependency with its warnings suppressed, and the compiler rejects that
+      # beside warnings as errors. So every command with warnings as errors switches suppression
+      # off, which holds DMCore to the same rule.
       # The tests build in Debug. Code that only a Release build compiles is built here.
       - name: Build the library in Release
         run: |
@@ -138,7 +141,8 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Release \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            SWIFT_SUPPRESS_WARNINGS=NO
       - name: Test
         run: |
           xcodebuild test \
@@ -147,7 +151,8 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIMULATOR" \
             -enableCodeCoverage YES \
             -resultBundlePath "$RUNNER_TEMP/DMAction.xcresult" \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            SWIFT_SUPPRESS_WARNINGS=NO
       - name: Coverage
         run: Scripts/coverage-gate.sh "$RUNNER_TEMP/DMAction.xcresult"
       - name: Export library coverage
@@ -221,7 +226,8 @@ jobs:
             -sdk watchos \
             -destination 'generic/platform=watchOS' \
             -configuration Release \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            SWIFT_SUPPRESS_WARNINGS=NO
       - name: Build the consumer fixture for the watchOS Simulator
         working-directory: Fixtures/Consumer
         run: |
@@ -234,7 +240,8 @@ jobs:
             -scheme DMAction \
             -destination "platform=watchOS Simulator,id=$SIMULATOR" \
             -resultBundlePath "$RUNNER_TEMP/DMAction-watchOS.xcresult" \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            SWIFT_SUPPRESS_WARNINGS=NO
       # A run that lost tests, or skipped them, passes too. So every test method of the test
       # files must be in the result bundle, run and passed.
       - name: Check the test count
@@ -395,7 +402,8 @@ jobs:
       # compiler that the manifest promises. The other jobs run the tools on newer Xcode versions.
       - name: Build the tools with Swift 6.0
         run: swift run --quiet --package-path Tools devkit --version
-      # The package has no dependency, so the flag reaches only its own library and test targets.
+      # SwiftPM drops the flag for a dependency that it takes by URL, whose warnings it suppresses,
+      # so the flag reaches only the library and test targets of this package.
       - name: Build and test with Swift 6.0
         run: |
           swift --version
