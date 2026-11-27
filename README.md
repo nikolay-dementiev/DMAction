@@ -78,7 +78,7 @@ let package = Package(
     name: "MyApp",
     platforms: [.iOS(.v17), .macOS(.v13)],
     dependencies: [
-        .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "1.2.0"),
+        .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "2.0.0"),
     ],
     targets: [
         .target(
