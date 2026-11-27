@@ -29,8 +29,17 @@ struct Cursor {
         self.failed = failed
     }
 
-    /// The producer that runs after this one fails, or nil when nothing is left to try.
-    func next() -> Cursor? {
+    /// How a run reaches a producer after the one before it failed.
+    enum Move {
+        /// The run goes on to the next step of a list.
+        case fallback
+        /// The run starts a repeated unit again.
+        case retry
+    }
+
+    /// The producer that runs after this one fails and the move that leads to it, or nil when
+    /// nothing is left to try.
+    func next() -> (cursor: Cursor, move: Move)? {
         var frames = self.frames
         while let frame = frames.popLast() {
             switch frame {
@@ -40,14 +49,16 @@ struct Cursor {
                 }
                 frames.append(.list(steps, index: index + 1))
                 let produce = Self.descend(into: steps[index + 1], frames: &frames)
-                return Cursor(frames: frames, produce: produce, failed: failed.saturatingAdd(1))
+                let following = Cursor(frames: frames, produce: produce, failed: failed.saturatingAdd(1))
+                return (following, .fallback)
             case let .repeating(unit, remaining):
                 guard remaining > 0 else {
                     continue
                 }
                 frames.append(.repeating(unit, remaining: remaining - 1))
                 let produce = Self.enter(unit.steps, frames: &frames)
-                return Cursor(frames: frames, produce: produce, failed: failed.saturatingAdd(1))
+                let following = Cursor(frames: frames, produce: produce, failed: failed.saturatingAdd(1))
+                return (following, .retry)
             }
         }
         return nil
