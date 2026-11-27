@@ -89,6 +89,10 @@ and a `simpleAction` it supplies itself are its own closures: nothing guards the
 Each run that the library guards reports what it does as signposts of the system, subsystem
 `DMAction`, category `ActionRun`, so a performance tool such as Instruments shows it on a timeline.
 
+DMCore records the signposts. A recording shows each one with the signpost name `interval` or
+`event`: the name in the table below starts its message, followed by a colon and the detail where
+there is one. Look for a name in the message.
+
 | Name | Kind | When | Detail |
 |---|---|---|---|
 | `run` | interval | from the start of a run to its delivery | at the start, the label a first-try success carries; at the end, `success` or `failure` |

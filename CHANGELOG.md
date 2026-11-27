@@ -14,7 +14,8 @@ All notable changes to DMAction are recorded in this file. The format follows Ke
 
 To migrate, raise the watchOS deployment target to 10.0 or later, and add `.macOS(.v13)` or later
 to the `platforms` of a package manifest that also builds for a Mac. An app that has to support an
-older watchOS stays on 1.2.0. No public declaration of the interface changes.
+older watchOS stays on 1.2.0. No declaration of the public interface changes: `runAsync` only
+loses its `@available(macOS 10.15, *)` annotation, which the macOS floor covers.
 
 ### Added
 
