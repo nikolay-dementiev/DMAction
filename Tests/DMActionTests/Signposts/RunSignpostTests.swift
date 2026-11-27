@@ -109,6 +109,21 @@ final class RunSignpostTests: XCTestCase {
         XCTAssertEqual(consumer.count, 0, "no delivery")
     }
 
+    func test_run_whenItDelivers_endsTheRunIntervalBeforeTheConsumerRuns() {
+        let (sut, _) = makeSUT()
+        var seenByTheConsumer: [Call] = []
+
+        ProducerSpy.succeeding(onCall: 1).action.callAsFunction(tracing: sut) { _ in
+            seenByTheConsumer = sut.calls
+        }
+
+        XCTAssertEqual(
+            seenByTheConsumer.last,
+            .end("run", .label("success"), interval: 0),
+            "what the consumer does is not part of the run"
+        )
+    }
+
     // MARK: - Ignored completions
 
     func test_run_whenAProducerCompletesTwice_recordsTheIgnoredCompletion() {
@@ -164,7 +179,8 @@ final class RunSignpostTests: XCTestCase {
 
         action.callAsFunction(tracing: sut, completion: consumer.receive)
 
-        let largest = TraceDetail.number(.max)
+        // `UInt` is 32 bits wide on arm64_32, where its largest value fits a signpost number.
+        let largest = TraceDetail.number(Int64(clamping: UInt.max))
         XCTAssertEqual(sut.calls, [
             .begin("run", largest, interval: 0),
             .begin("attempt", largest, interval: 1),
