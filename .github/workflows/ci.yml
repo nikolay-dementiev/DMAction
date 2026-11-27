@@ -175,7 +175,6 @@ jobs:
           retention-days: 7
 
   # The package's own tests on a watchOS simulator, and the library built for the device SDK.
-  # The podspec job builds the library's sources for watchOS, but no test file and no run.
   watchos:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
@@ -433,7 +432,7 @@ jobs:
       # texts that it must reject.
       - name: Self-test of the reader of Package.resolved
         run: Scripts/check-manifest.sh --self-test
-      - name: Manifest, installation by version, consumer fixture, podspec, rejected shapes
+      - name: Manifest, installation by version, consumer fixture, rejected shapes
         run: Scripts/check-manifest.sh
 
   api:
@@ -528,23 +527,3 @@ jobs:
               exit "$status"
               ;;
           esac
-
-  # The pod is frozen at 1.1.0 and nothing goes to the trunk again. The job lints the current
-  # sources as a pod, which builds them for watchOS too. The watchos job builds and tests the
-  # package itself.
-  podspec:
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
-    runs-on: macos-26
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
-      # CocoaPods lints with the newest language mode the podspec lists.
-      - name: Lint the podspec
-        run: pod lib lint DMAction.podspec
-      - name: Lint the podspec in the Swift 5 language mode
-        run: pod lib lint DMAction.podspec --swift-version=5.0

@@ -17,7 +17,7 @@
 #    as one used while DMCore is developed next to this package, is refused too. A build
 #    plugin of a dependency runs in every consumer's build, and a manifest that reads the
 #    environment describes more than one package.
-# 2. The installation manifest of README.md works. Its URL is the podspec's, its version is
+# 2. The installation manifest of README.md works. Its URL is the package's, its version is
 #    that of the newest dated release heading of CHANGELOG.md, and no platform it declares is
 #    below the package's. With only its URL pointed at a throw-away tagged copy of the
 #    tracked manifest and sources, it resolves and builds: a consumer that depends on the
@@ -35,9 +35,7 @@
 #    used to delete the Xcode DerivedData folder of the whole machine on every install.
 #    This is a text search: it catches the usual spellings of such a call, it does not
 #    prove that a script has no side effect.
-# 5. The podspec describes the same product as the manifest: the same platforms, the
-#    language mode the package is built in, and no link against a test framework.
-# 6. The uses across isolation domains that the Swift 6 compiler rejects today are still
+# 5. The uses across isolation domains that the Swift 6 compiler rejects today are still
 #    rejected, each with the error it names. Each one is a target of Fixtures/Rejected.
 #    One that starts to compile means the concurrency limits of the library have changed.
 #
@@ -54,7 +52,7 @@
 set -euo pipefail
 
 # Swift 6.4 colours the diagnostics of `swift build` even in a log file, and the escape codes hide
-# the `: error:` that step 6 reads from the log.
+# the `: error:` that step 5 reads from the log.
 export NO_COLOR=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -200,7 +198,6 @@ fi
 
 WORK="$ROOT/.build/check-manifest"
 FAILED=0
-SKIPPED=""
 
 mkdir -p "$WORK"
 cd "$ROOT"
@@ -299,13 +296,13 @@ probe_git() {
 }
 # Writes the consumer's manifest and prints the version the README asks for and the name of
 # the copy.
-if ! ANSWER="$(python3 - "$ROOT/README.md" "$ROOT/$MODULE.podspec" "$ROOT/CHANGELOG.md" "$PROBE" "$WORK/manifest.json" <<'PY'
+if ! ANSWER="$(python3 - "$ROOT/README.md" "$ROOT/CHANGELOG.md" "$PROBE" "$WORK/manifest.json" "$PACKAGE_URL" <<'PY'
 # readme-installation
 import json
 import re
 import sys
 
-readme, podspec, changelog, probe, package_manifest = sys.argv[1:6]
+readme, changelog, probe, package_manifest, package_url = sys.argv[1:6]
 blocks = re.findall(r"^```swift\n(.*?)^```$", open(readme, encoding="utf-8").read(), re.S | re.M)
 manifests = [block for block in blocks if "Package(" in block]
 if len(manifests) != 1:
@@ -314,16 +311,13 @@ requirements = re.findall(r'\.package\(url: "([^"]+)", from: "([^"]+)"\)', manif
 if len(requirements) != 1:
     sys.exit("check-manifest: the manifest of README.md does not ask for the package with url: and from:")
 url, version = requirements[0]
-spec = open(podspec, encoding="utf-8").read()
-spec_url = re.search(r":git\s*=>\s*'([^']+)'", spec)
-# The pod is frozen, so the podspec no longer follows the releases. The version is that of the
-# newest dated release heading, '## [x.y.z] - YYYY-MM-DD'. A heading without a date, such as
-# Unreleased, is passed over: it is a normal state between two releases.
+# The version is that of the newest dated release heading, '## [x.y.z] - YYYY-MM-DD'. A heading
+# without a date, such as Unreleased, is passed over: it is a normal state between two releases.
 release = re.search(r"^## \[([0-9]+\.[0-9]+\.[0-9]+)\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$",
                     open(changelog, encoding="utf-8").read(), re.M)
 problems = []
-if not spec_url or url != spec_url.group(1):
-    problems.append(f"README.md installs from {url}, the podspec's source is {spec_url and spec_url.group(1)}")
+if url != package_url:
+    problems.append(f"README.md installs from {url}, the package's URL is {package_url}")
 if not release:
     problems.append("CHANGELOG.md has no release heading of the form '## [version] - date'")
 elif version != release.group(1):
@@ -431,7 +425,7 @@ print("\n".join(problems))
 sys.exit(1 if problems else 0)
 PY
 )"; then
-                echo "check-manifest: the manifest of README.md asks for the podspec's URL and the changelog's newest version $VERSION, resolves and builds by version, and the consumer resolves this package and DMCore only."
+                echo "check-manifest: the manifest of README.md asks for the package's URL and the changelog's newest version $VERSION, resolves and builds by version, and the consumer resolves this package and DMCore only."
             else
                 echo "check-manifest: the consumer of README.md's manifest resolves more than this package and DMCore:" >&2
                 printf '%s\n' "$EXTRA" >&2
@@ -517,53 +511,7 @@ else
     echo "check-manifest: no recursive delete in the example's tooling."
 fi
 
-# 5. The podspec. `pod ipc spec` prints it as JSON.
-#    It compares the manifest with the frozen 1.1.0 pod.
-if ! command -v pod > /dev/null; then
-    if [ -n "${CI:-}" ]; then
-        echo "check-manifest: CocoaPods is not installed on this runner; the podspec cannot be checked." >&2
-        FAILED=1
-    else
-        SKIPPED="the podspec (CocoaPods is not installed)"
-    fi
-elif ! pod ipc spec "$ROOT/$MODULE.podspec" > "$WORK/podspec.json" 2> "$WORK/podspec.log"; then
-    echo "check-manifest: the podspec cannot be read. See ${WORK#"$ROOT"/}/podspec.log" >&2
-    FAILED=1
-elif ! python3 - "$WORK/podspec.json" "$WORK/manifest.json" <<'PY'
-import json
-import sys
-
-spec = json.load(open(sys.argv[1]))
-manifest = json.load(open(sys.argv[2]))
-problems = []
-
-def listed(value):
-    return [value] if isinstance(value, str) else list(value or [])
-
-for key in ("frameworks", "weak_frameworks"):
-    if "XCTest" in listed(spec.get(key)):
-        problems.append(f"the podspec links XCTest ({key}) into a production pod")
-modes = listed(spec.get("swift_versions"))
-unknown = [mode for mode in modes if mode not in ("5.0", "6.0")]
-if unknown:
-    problems.append(f"swift_versions lists {unknown}: only language modes that exist belong there")
-if "6.0" not in modes:
-    problems.append("swift_versions does not list 6.0, the language mode the package is built in")
-package_platforms = {p["platformName"]: p["version"] for p in manifest.get("platforms", [])}
-pod_platforms = {name: version for name, version in (spec.get("platforms") or {}).items()}
-if package_platforms != pod_platforms:
-    problems.append(f"platforms differ: Package.swift {package_platforms}, podspec {pod_platforms}")
-for problem in problems:
-    print(f"check-manifest: {problem}", file=sys.stderr)
-sys.exit(1 if problems else 0)
-PY
-then
-    FAILED=1
-else
-    echo "check-manifest: the podspec matches the manifest and links no test framework."
-fi
-
-# 6. The rejected shapes. Each names the error it expects in an `// expected-error:` line.
+# 5. The rejected shapes. Each names the error it expects in an `// expected-error:` line.
 #    Every error the compiler reports for it must be that one: a typo or a missing module
 #    also stops a build, and proves nothing about isolation.
 #    The shapes build in a new folder on every run: a build folder kept between runs can
@@ -598,9 +546,4 @@ for shape in "$ROOT"/Fixtures/Rejected/Sources/*/; do
     fi
 done
 echo "check-manifest: $STILL_REJECTED cross-isolation shapes are rejected by the compiler, each with the error it names."
-
-# Last, so that a skipped step is not lost in the middle of the output.
-if [ -n "$SKIPPED" ]; then
-    echo "check-manifest: not checked on this machine: $SKIPPED."
-fi
 exit "$FAILED"
