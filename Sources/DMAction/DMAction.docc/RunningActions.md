@@ -105,10 +105,11 @@ An attempt whose producer never completes stays open, and so does its run. A lab
 numbers or constants of the library: no payload, error or other value of your app is recorded.
 
 The system records these signposts whether or not a tool is attached, so each run costs a little
-even when nobody looks. To watch them on a Mac from a terminal:
+even when nobody looks. To watch them on a Mac from a terminal, give the path of the tool,
+because zsh has a command of its own named `log`:
 
 ```bash
-log stream --signpost --predicate 'subsystem == "DMAction"'
+/usr/bin/log stream --signpost --predicate 'subsystem == "DMAction"'
 ```
 
 ## What the library cannot promise
