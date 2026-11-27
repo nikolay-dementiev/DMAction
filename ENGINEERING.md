@@ -124,7 +124,8 @@ the rules above it would have needed a major version. The rules apply from the r
   one of those limits is a change of behaviour.
 - **Composition root.** The public initializers of the library's actions, `fallbackTo` and `retry`
   create every concrete action. A run creates only its own internal state. There is no global
-  configuration and no singleton.
+  configuration and no singleton, with one exception that holds no state of a run:
+  `actionRunTracing`, the constant tracing value that the public entry points hand to their runs.
 - **The library never stops its host.** No `fatalError`, `preconditionFailure`,
   `assertionFailure`, `precondition`, `assert`, `dispatchPrecondition`, `abort` or `exit`, no force
   unwrap, no `try!` and no `as!`. A failure reaches the caller through the result of the run.
