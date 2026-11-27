@@ -5,6 +5,7 @@
 //
 
 import Foundation
+internal import DMCore
 #if canImport(os)
 import os
 #endif
@@ -42,6 +43,8 @@ final class ActionRun {
 
     /// The label of a success when no attempt failed before it.
     private let base: UInt
+    /// Where the run reports what it does, for a performance tool.
+    private let tracing: any Tracing
     /// The consumer's completion, until the run delivers to it. After that, a producer that
     /// keeps its own completion keeps nothing of the consumer alive.
     private var completion: ActionPlan.Completion?
@@ -49,8 +52,9 @@ final class ActionRun {
     /// completion is ever called while it is held.
     private let lock = NSLock()
 
-    init(base: UInt, completion: @escaping ActionPlan.Completion) {
+    init(base: UInt, tracing: any Tracing, completion: @escaping ActionPlan.Completion) {
         self.base = base
+        self.tracing = tracing
         self.completion = completion
     }
 

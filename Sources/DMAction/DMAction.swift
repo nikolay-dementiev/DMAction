@@ -5,6 +5,7 @@
 //
 
 import Foundation
+package import DMCore
 
 /// Work that reports one result through a completion, and that composes with fallbacks and
 /// retries.
@@ -180,13 +181,20 @@ public extension DMAction {
     ///
     /// - Parameter completion: Receives the first success, or the error of the last attempt.
     func callAsFunction(completion: @escaping (ResultType) -> Void) {
+        callAsFunction(tracing: actionRunTracing, completion: completion)
+    }
+}
+
+extension DMAction {
+    /// ``callAsFunction(completion:)`` that reports the run to `tracing`.
+    package func callAsFunction(tracing: any Tracing, completion: @escaping (ResultType) -> Void) {
         // The order is part of the contract, for a conformer whose getters have effects:
         // `action`, then `currentAttempt`, both at the call.
         let plan = ActionPlan(of: self)
         // The run keeps the receiver until it delivers, as call syntax did in 1.0.5: a
         // conformer's producer may refer to the conformer without retaining it. Naming `self`
         // in the closure is what captures it; `completion(result)` alone would not.
-        plan.run(base: currentAttempt) { result in
+        plan.run(base: currentAttempt, tracing: tracing) { result in
             withExtendedLifetime(self) {
                 completion(result)
             }
@@ -215,7 +223,11 @@ extension ActionPlan {
     /// Runs the steps in order and calls `completion` with the first success or with the
     /// failure of the last step. A success is labelled `base` plus the number of attempts that
     /// failed before it in this run. Each run is an `ActionRun` of its own.
-    func run(base: UInt, _ completion: @escaping Completion) {
-        ActionRun(base: base, completion: completion).start(self)
+    func run(base: UInt, tracing: any Tracing, _ completion: @escaping Completion) {
+        ActionRun(base: base, tracing: tracing, completion: completion).start(self)
     }
 }
+
+/// Where the runs that the public entry points start report what they do: signposts of the system,
+/// which cost next to nothing while no tool records them.
+let actionRunTracing: any Tracing = SystemTracing(subsystem: "DMAction", category: "ActionRun")
