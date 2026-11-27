@@ -12,7 +12,7 @@ format of [Documentation/Review/README.md](../../../Documentation/Review/README.
 ## What it checks
 
 - An import that follows a block comment on the same line. The lint rule `domain_imports` reports
-  every other import outside Foundation and `os`; this is the one case it does not see.
+  every other import outside Foundation, `os` and DMCore; this is the one case it does not see.
   (ENGINEERING.md, "Imports")
 - A dependency other than DMCore, DMCore required other than from 1.0.0 from its repository, a
   plugin, an unsafe flag or a read of the environment that comes with a change of

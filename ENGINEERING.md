@@ -89,8 +89,9 @@ the rules above it would have needed a major version. The rules apply from the r
 
 ## The package as it is
 
-- **Imports.** The library imports Foundation and, where the module exists, `os`. It has no UI,
-  no third-party dependency and no build plugin. `Scripts/lint.sh` enforces the imports: the custom
+- **Imports.** The library imports Foundation and, where the module exists, `os`; outside
+  `Domain/` it may import DMCore, the package of the same family. It has no UI, no third-party
+  dependency and no build plugin. `Scripts/lint.sh` enforces the imports: the custom
   rule `domain_imports` reports any other import in the library folder, except one that follows a
   block comment on the same line.
 - **Composition as data.** `fallbackTo` and `retry` build values and run nothing. What an action
