@@ -89,10 +89,10 @@ the root. The other scripts of `Scripts/` have not moved: `check-api-digester.sh
   fetch DMDevKit.
 - `devkit.conf` holds the settings of this repository that the commands read: the module and the
   library folder, the compiler flags of the interface check, the lint rules and the folder of their
-  fixtures, the version the pod is frozen at, and the list of the wrappers (`WRAPPERS`). Each
-  setting is written there once, except the compiler flags: `SWIFT_FLAGS` repeats what
-  `Package.swift` sets, and no check compares the two, so change both. A change to a command is a
-  change to DMDevKit.
+  fixtures, that the repository has no pod (`COCOAPODS`), and the list of the wrappers
+  (`WRAPPERS`). Each setting is written there once, except the compiler flags: `SWIFT_FLAGS`
+  repeats what `Package.swift` sets, and no check compares the two, so change both. A change to a
+  command is a change to DMDevKit.
 - The first run builds `devkit`, takes several seconds and prints the lines that SwiftPM writes
   while it fetches DMDevKit; each next run adds under a second to the script. If `swift run`
   itself fails, a fetch or a build, the script ends with its status, which can be 1, the status
