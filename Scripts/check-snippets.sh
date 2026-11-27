@@ -19,8 +19,7 @@
 #
 # The packages are generated under .build/check-snippets. They depend on this checkout by
 # path, the way Fixtures/Consumer does. A warning in a block fails the check too. It is read
-# from the build log: Xcode builds the dependency with its warnings suppressed, which
-# conflicts with warnings as errors for the whole build.
+# from the build log, for the generated blocks alone.
 
 set -euo pipefail
 

@@ -301,9 +301,8 @@ jobs:
       # the example's test files must be in the result bundle, run and passed.
       - name: Check the test counts
         run: Scripts/count-tests.sh --label example "$RUNNER_TEMP/example.xcresult" 'Examples/DMActionExample/*Tests/*.swift'
-      # Xcode compiles the package with its warnings suppressed, so warnings as errors cannot
-      # cover the whole build. The library's own warnings fail the test job; this step covers
-      # the sources of the example.
+      # The library's own warnings fail the test job. This step covers the sources of the
+      # example, whose warnings it reads from the build log.
       - name: Fail on a warning in the example
         run: |
           # No warning means something only if the log shows every source of the example compiled.

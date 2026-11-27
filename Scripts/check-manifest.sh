@@ -447,8 +447,8 @@ fi
 # 3. The consumer fixture. xcodebuild finds a package only in the current directory.
 #    No flag skips the plugin validation: a consumer must not need one. A warning in the
 #    fixture's own sources fails the check: a deprecation of a released symbol reaches a
-#    consumer as a warning. Warnings cannot be made errors on the command line here,
-#    because Xcode builds a package dependency with its warnings suppressed.
+#    consumer as a warning. The check reads it from the build log, for the sources of the
+#    fixture alone, and the build sets no warning flag, as a consumer's build need not.
 DERIVED="$(mktemp -d "$WORK/DerivedData.XXXXXX")"
 cd "$ROOT/Fixtures/Consumer"
 if ! xcodebuild build \
