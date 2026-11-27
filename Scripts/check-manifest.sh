@@ -61,6 +61,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODULE="DMAction"
 # The one dependency the library may have, required by version from 1.0.0.
 DMCORE_URL="https://github.com/nikolay-dementiev/DMCore.git"
+# The URL the README installs this package from.
+PACKAGE_URL="https://github.com/nikolay-dementiev/DMAction.git"
 
 # Runs the dependency rule of step 1 and the reader of Package.resolved (the block of step 2) on
 # built-in texts, and exits.
@@ -94,6 +96,7 @@ self_test() {
     }
     block dependency-rule "$SELF_TEST_WORK/rule.py"
     block resolved-inventory "$SELF_TEST_WORK/reader.py"
+    block readme-installation "$SELF_TEST_WORK/installation.py"
     pin() {  # <identity> <version>
         printf '{"identity":"%s","kind":"localSourceControl","location":"/x/%s","state":{"revision":"abc","version":"%s"}}' "$1" "$1" "$2"
     }
@@ -165,11 +168,25 @@ self_test() {
     rule "DMCore at an exact version" 1 "$wanted" "$(remote dmcore "$DMCORE_URL" '{"exact":["1.0.0"]}')"
     rule "a plugin on a target" 1 "target 'A' uses a plugin" "" '{"name":"A","pluginUsages":[{"plugin":["P"]}]}'
     rule "a manifest that reads the environment" 1 "Package.swift reads the environment" "" "" 'let flag = ProcessInfo.processInfo'
+
+    mkdir -p "$SELF_TEST_WORK/probe/consumer"
+    printf '## [Unreleased]\n\n## [2.0.0] - 2026-11-27\n\n## [1.1.0] - 2026-10-03\n' > "$SELF_TEST_WORK/CHANGELOG.md"
+    printf '{"platforms":[{"platformName":"ios","version":"17.0"},{"platformName":"watchos","version":"10.0"}]}\n' > "$SELF_TEST_WORK/floors.json"
+    installs() {  # <name> <expected status> <expected text> <url> <version> <platforms>
+        # shellcheck disable=SC2016  # the backticks are the fence of a Markdown code block
+        printf '```swift\nlet package = Package(\n    platforms: [%s],\n    dependencies: [.package(url: "%s", from: "%s")]\n)\n```\n' "$6" "$4" "$5" > "$SELF_TEST_WORK/README.md"
+        judge "$1" "$2" "$3" "$SELF_TEST_WORK/installation.py" "$SELF_TEST_WORK/README.md" "$SELF_TEST_WORK/CHANGELOG.md" "$SELF_TEST_WORK/probe" "$SELF_TEST_WORK/floors.json" "$PACKAGE_URL"
+    }
+    installs "the package URL at the newest release" 0 "2.0.0 DMAction" "$PACKAGE_URL" 2.0.0 ".iOS(.v17), .watchOS(.v10)"
+    installs "another URL" 1 "README.md installs from https://example.invalid/DMAction.git" https://example.invalid/DMAction.git 2.0.0 ".iOS(.v17)"
+    installs "a version behind the newest release" 1 "the newest release heading of CHANGELOG.md is 2.0.0" "$PACKAGE_URL" 1.1.0 ".iOS(.v17)"
+    installs "a platform below the package's floor" 1 "the package needs watchOS 10.0" "$PACKAGE_URL" 2.0.0 ".watchOS(.v7)"
+    installs "a platform the package does not declare" 1 "a platform the package does not declare" "$PACKAGE_URL" 2.0.0 ".tvOS(.v17)"
     if [ "$failures" -gt 0 ]; then
         echo "check-manifest: self-test: $failures of $total checks failed" >&2
         exit 1
     fi
-    echo "check-manifest: self-test: $total checks of the dependency rule and of the reader of Package.resolved, all ok."
+    echo "check-manifest: self-test: $total checks of the dependency rule, of the README's installation manifest and of the reader of Package.resolved, all ok."
     exit 0
 }
 
@@ -283,6 +300,7 @@ probe_git() {
 # Writes the consumer's manifest and prints the version the README asks for and the name of
 # the copy.
 if ! ANSWER="$(python3 - "$ROOT/README.md" "$ROOT/$MODULE.podspec" "$ROOT/CHANGELOG.md" "$PROBE" "$WORK/manifest.json" <<'PY'
+# readme-installation
 import json
 import re
 import sys
