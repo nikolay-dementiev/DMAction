@@ -3,7 +3,7 @@
 Compose completion-based actions with retries and fallbacks, and get one result back.
 
 [![CI](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml/badge.svg)](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml)
-[![Swift 6.0+](https://img.shields.io/badge/Swift-6.0%2B-orange?style=flat-square)](#requirements)
+[![Swift 6.2+](https://img.shields.io/badge/Swift-6.2%2B-orange?style=flat-square)](#requirements)
 [![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_10%2B_%7C_macOS_13%2B-yellowgreen?style=flat-square)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction?ref=badge_shield)
@@ -50,19 +50,19 @@ It is not a fit when:
 
 ## Requirements
 
-- Swift 6.0 or later, which is Xcode 16 or later.
+- Swift 6.2 or later, which is Xcode 26 or later.
 - iOS 17 or later, watchOS 10 or later, or macOS 13 or later.
 
 What each platform is verified with:
 
 | Platform | How |
 |---|---|
-| iOS 26.5 (Xcode 26.6), iOS 18.5 (Xcode 16.4) | the tests run on simulators in CI, for the library and the example app |
+| iOS 26.5 (Xcode 26.6) | the tests run on a simulator in CI, for the library and the example app |
 | iOS 17.5 | the library's tests run on a simulator before a release |
-| macOS, the host | the tests run in CI on macOS 15 with Swift 6.0.3, and on macOS 26 under the Thread Sanitizer |
-| macOS 13 | declared, not run: the oldest macOS a test has run on is 15 |
-| watchOS 26.5 (Xcode 26.6), watchOS 11.5 (Xcode 16.4) | the library's tests run on simulators in CI, and CI builds the library for the watchOS device SDK |
-| watchOS 10 | declared, not run: the oldest watchOS runtime a test has run on is 11.5 |
+| macOS, the host | the tests run in CI on macOS 26 under the Thread Sanitizer |
+| macOS 13 | declared, not run: the oldest macOS the tests run on is 26 |
+| watchOS 26.5 (Xcode 26.6) | the library's tests run on a simulator in CI, and CI builds the library for the watchOS device SDK |
+| watchOS 10 | declared, not run: the oldest watchOS runtime the tests run on is 26.5 |
 
 ## Installation
 
@@ -71,7 +71,7 @@ What each platform is verified with:
 Add the package and the product to your `Package.swift`:
 
 ```swift
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(

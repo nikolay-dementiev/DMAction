@@ -6,8 +6,8 @@ compatibility and release policy.
 
 ## Build and test
 
-You need Xcode 16.0 or later (Swift 6.0) and an iOS simulator, and a watchOS one to run the
-watchOS tests. CI runs Xcode 16.2, 16.4 and 26.6.
+You need Xcode 26 or later (Swift 6.2) and an iOS simulator, and a watchOS one to run the
+watchOS tests. CI runs Xcode 26.6.
 
 ```bash
 swift test
@@ -168,8 +168,8 @@ merge first, then tag. Before the tag is pushed:
    It cannot tell a line that a new compiler reworded from a line that the code changed, so both
    count. Run `Scripts/check-api.sh` first, since the baseline is the interface of the library
    only while that check passes.
-3. The library's tests pass on an iOS 17 simulator, the oldest version the package supports. CI's
-   oldest runtime is iOS 18.5, so this run is local:
+3. The library's tests pass on an iOS 17 simulator, the oldest version the package supports. CI
+   runs iOS 26.5 only, so this run is local:
    `xcodebuild test -scheme DMAction -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5'`.
 
 On the tag, the release workflow runs the check, makes sure the tagged commit is on `main`, runs the

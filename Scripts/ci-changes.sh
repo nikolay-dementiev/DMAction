@@ -10,7 +10,7 @@
 # Two groups of jobs, each answered with run or skip:
 #   light  lint, docs, snippets, api, consumer: macOS without a simulator, short. They read
 #          the documents (DocC, the snippet check, the manifest check, the changelog, the license).
-#   heavy  test, watchos, example, floor, thread-sanitizer: they build and test the code.
+#   heavy  test, watchos, example, thread-sanitizer: they build and test the code.
 #
 # A change that only touches documents (*.md outside the code directories, Documentation, LICENSE)
 # skips heavy. A change that only touches an inert file (.coderabbit.yaml, which no job reads) skips
@@ -27,7 +27,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly LIGHT_JOBS="lint docs snippets api consumer"
-readonly HEAVY_JOBS="test watchos example floor thread-sanitizer"
+readonly HEAVY_JOBS="test watchos example thread-sanitizer"
 
 # inert, document or code. Code is the default, and the code directories win over a *.md in them.
 classify() {

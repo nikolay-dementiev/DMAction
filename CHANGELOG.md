@@ -7,15 +7,18 @@ All notable changes to DMAction are recorded in this file. The format follows Ke
 
 ### Breaking changes
 
+- The package needs Swift 6.2 or later, which is Xcode 26 or later. Up to 1.2.0 it needed
+  Swift 6.0, which is Xcode 16.
 - The library needs watchOS 10.0 or later. Up to 1.2.0 it needed watchOS 7.0.
 - The manifest declares macOS 13.0. Up to 1.2.0 it declared no macOS version, so a package that
   depends on DMAction and builds for a Mac, with `swift test` too, now has to declare macOS 13 or
   later.
 
-To migrate, raise the watchOS deployment target to 10.0 or later, and add `.macOS(.v13)` or later
-to the `platforms` of a package manifest that also builds for a Mac. An app that has to support an
-older watchOS stays on 1.2.0. No declaration of the public interface changes: `runAsync` only
-loses its `@available(macOS 10.15, *)` annotation, which the macOS floor covers.
+To migrate, build with Xcode 26 or later, raise the watchOS deployment target to 10.0 or later,
+and add `.macOS(.v13)` or later to the `platforms` of a package manifest that also builds for a
+Mac. An app that has to support an older watchOS, or to build with an older Xcode, stays on 1.2.0.
+No declaration of the public interface changes: `runAsync` only loses its
+`@available(macOS 10.15, *)` annotation, which the macOS floor covers.
 
 ### Added
 
