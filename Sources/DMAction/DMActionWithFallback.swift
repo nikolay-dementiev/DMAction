@@ -47,7 +47,7 @@ public struct DMActionWithFallback: DMAction {
         self.currentAttempt = currentAttempt
         self.plan = plan
         self.action = { completion in
-            plan.run(base: currentAttempt, completion)
+            plan.run(base: currentAttempt, tracing: actionRunTracing, completion)
         }
     }
 }

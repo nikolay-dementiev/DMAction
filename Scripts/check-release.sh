@@ -5,8 +5,8 @@
 # standard output and the exit status pass through unchanged, and standard error too, but for the
 # lines that SwiftPM prints while it fetches DMDevKit on a first run. The script goes to the
 # repository root first, because devkit takes the repository from the working directory.
-# --quiet keeps the build progress of `swift run` off standard error. The pod version it expects
-# is FROZEN_POD_VERSION of devkit.conf. Scripts/check-wrappers.sh checks all of this.
+# --quiet keeps the build progress of `swift run` off standard error. It checks no pod:
+# devkit.conf says COCOAPODS="none". Scripts/check-wrappers.sh checks all of this.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 70

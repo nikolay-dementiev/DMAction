@@ -84,6 +84,34 @@ them, for call syntax on any conformer, and for a third-party conformer composed
 conformer called directly, after `retry(0)` too, its default ``DMAction/DMAction/simpleAction``,
 and a `simpleAction` it supplies itself are its own closures: nothing guards them.
 
+## Signposts
+
+Each run that the library guards reports what it does as signposts of the system, subsystem
+`DMAction`, category `ActionRun`, so a performance tool such as Instruments shows it on a timeline.
+
+DMCore records the signposts. A recording shows each one with the signpost name `interval` or
+`event`: the name in the table below starts its message, followed by a colon and the detail where
+there is one. Look for a name in the message.
+
+| Name | Kind | When | Detail |
+|---|---|---|---|
+| `run` | interval | from the start of a run to its delivery | at the start, the label a first-try success carries; at the end, `success` or `failure` |
+| `attempt` | interval | from the call of a producer to its first completion | the label that a success of this attempt carries |
+| `retry`, `fallback` | event | a failed attempt leads to the next one, a repeated unit or the next step | the label of the attempt that starts |
+| `ignoredCompletion` | event | a completion is ignored | none |
+
+An attempt whose producer never completes stays open, and so does its run. A label above
+`Int64.max` is recorded as `Int64.max`. The names are constants of the library and the details are
+numbers or constants of the library: no payload, error or other value of your app is recorded.
+
+The system records these signposts whether or not a tool is attached, so each run costs a little
+even when nobody looks. To watch them on a Mac from a terminal, give the path of the tool,
+because zsh has a command of its own named `log`:
+
+```bash
+/usr/bin/log stream --signpost --predicate 'subsystem == "DMAction"'
+```
+
 ## What the library cannot promise
 
 - **Liveness.** A producer that never completes stalls its run. Nothing times out.

@@ -107,12 +107,6 @@ jobs:
             xcode: "26.6"
             device: iPhone 17
             os: "26.5"
-          # The oldest hosted image and the oldest iOS runtime it offers.
-          - name: iOS 18.5
-            runner: macos-15
-            xcode: "16.4"
-            device: iPhone 16
-            os: "18.5"
     env:
       XCODE: ${{ matrix.xcode }}
     steps:
@@ -130,6 +124,9 @@ jobs:
         run: |
           udid="$(Scripts/prepare-simulator.sh "$DEVICE" "$OS")"
           echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
+      # Xcode compiles a dependency with its warnings suppressed, and the compiler rejects that
+      # beside warnings as errors. So every command with warnings as errors switches suppression
+      # off, which holds DMCore to the same rule.
       # The tests build in Debug. Code that only a Release build compiles is built here.
       - name: Build the library in Release
         run: |
@@ -138,7 +135,8 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Release \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            SWIFT_SUPPRESS_WARNINGS=NO
       - name: Test
         run: |
           xcodebuild test \
@@ -147,7 +145,8 @@ jobs:
             -destination "platform=iOS Simulator,id=$SIMULATOR" \
             -enableCodeCoverage YES \
             -resultBundlePath "$RUNNER_TEMP/DMAction.xcresult" \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            SWIFT_SUPPRESS_WARNINGS=NO
       - name: Coverage
         run: Scripts/coverage-gate.sh "$RUNNER_TEMP/DMAction.xcresult"
       - name: Export library coverage
@@ -175,7 +174,6 @@ jobs:
           retention-days: 7
 
   # The package's own tests on a watchOS simulator, and the library built for the device SDK.
-  # The podspec job builds the library's sources for watchOS, but no test file and no run.
   watchos:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
@@ -192,12 +190,6 @@ jobs:
             xcode: "26.6"
             device: Apple Watch Series 11 (46mm)
             os: "26.5"
-          # The oldest hosted image and the oldest watchOS runtime it offers.
-          - name: watchOS 11.5
-            runner: macos-15
-            xcode: "16.4"
-            device: Apple Watch Series 10 (46mm)
-            os: "11.5"
     env:
       XCODE: ${{ matrix.xcode }}
     steps:
@@ -222,7 +214,8 @@ jobs:
             -sdk watchos \
             -destination 'generic/platform=watchOS' \
             -configuration Release \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            SWIFT_SUPPRESS_WARNINGS=NO
       - name: Build the consumer fixture for the watchOS Simulator
         working-directory: Fixtures/Consumer
         run: |
@@ -235,7 +228,8 @@ jobs:
             -scheme DMAction \
             -destination "platform=watchOS Simulator,id=$SIMULATOR" \
             -resultBundlePath "$RUNNER_TEMP/DMAction-watchOS.xcresult" \
-            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
+            SWIFT_TREAT_WARNINGS_AS_ERRORS=YES \
+            SWIFT_SUPPRESS_WARNINGS=NO
       # A run that lost tests, or skipped them, passes too. So every test method of the test
       # files must be in the result bundle, run and passed.
       - name: Check the test count
@@ -263,13 +257,6 @@ jobs:
             xcode: "26.6"
             device: iPhone 17
             os: "26.5"
-            newest: true
-          - name: iOS 18.5
-            runner: macos-15
-            xcode: "16.4"
-            device: iPhone 16
-            os: "18.5"
-            newest: false
     env:
       XCODE: ${{ matrix.xcode }}
     defaults:
@@ -314,9 +301,8 @@ jobs:
       # the example's test files must be in the result bundle, run and passed.
       - name: Check the test counts
         run: Scripts/count-tests.sh --label example "$RUNNER_TEMP/example.xcresult" 'Examples/DMActionExample/*Tests/*.swift'
-      # Xcode compiles the package with its warnings suppressed, so warnings as errors cannot
-      # cover the whole build. The library's own warnings fail the test job; this step covers
-      # the sources of the example.
+      # The library's own warnings fail the test job. This step covers the sources of the
+      # example, whose warnings it reads from the build log.
       - name: Fail on a warning in the example
         run: |
           # No warning means something only if the log shows every source of the example compiled.
@@ -336,7 +322,6 @@ jobs:
             exit 1
           fi
       - name: Find unused imports
-        if: matrix.newest
         run: Scripts/lint.sh --analyze "$RUNNER_TEMP/example.log"
       - name: Upload the result bundle
         if: failure()
@@ -380,28 +365,6 @@ jobs:
       - name: Compile the Swift examples of the documents and the doc comments
         run: Scripts/check-snippets.sh
 
-  floor:
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
-    # The oldest toolchain the manifest promises: swift-tools-version 6.0 is Xcode 16.0 to 16.2.
-    runs-on: macos-15
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
-      # Tools/Package.swift is tools 6.0 like the package, and DMDevKit has to build with the oldest
-      # compiler that the manifest promises. The other jobs run the tools on newer Xcode versions.
-      - name: Build the tools with Swift 6.0
-        run: swift run --quiet --package-path Tools devkit --version
-      # The package has no dependency, so the flag reaches only its own library and test targets.
-      - name: Build and test with Swift 6.0
-        run: |
-          swift --version
-          swift test -Xswiftc -warnings-as-errors
-
   thread-sanitizer:
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.heavy != 'skip' }}
@@ -415,8 +378,10 @@ jobs:
           persist-credentials: false
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.6.app
+      # This is the one build for the Mac, so it also holds the library and its tests to warnings
+      # as errors there. SwiftPM drops the flag for a dependency that it takes by URL.
       - name: Test with the Thread Sanitizer
-        run: swift test --sanitize=thread
+        run: swift test --sanitize=thread -Xswiftc -warnings-as-errors
 
   consumer:
     needs: changes
@@ -433,7 +398,7 @@ jobs:
       # texts that it must reject.
       - name: Self-test of the reader of Package.resolved
         run: Scripts/check-manifest.sh --self-test
-      - name: Manifest, installation by version, consumer fixture, podspec, rejected shapes
+      - name: Manifest, installation by version, consumer fixture, rejected shapes
         run: Scripts/check-manifest.sh
 
   api:
@@ -528,23 +493,3 @@ jobs:
               exit "$status"
               ;;
           esac
-
-  # The pod is frozen at 1.1.0 and nothing goes to the trunk again. The job lints the current
-  # sources as a pod, which builds them for watchOS too. The watchos job builds and tests the
-  # package itself.
-  podspec:
-    needs: changes
-    if: ${{ !cancelled() && needs.changes.outputs.light != 'skip' }}
-    runs-on: macos-26
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_26.6.app
-      # CocoaPods lints with the newest language mode the podspec lists.
-      - name: Lint the podspec
-        run: pod lib lint DMAction.podspec
-      - name: Lint the podspec in the Swift 5 language mode
-        run: pod lib lint DMAction.podspec --swift-version=5.0

@@ -3,6 +3,37 @@
 All notable changes to DMAction are recorded in this file. The format follows Keep a Changelog
 1.1.0, and versions follow Semantic Versioning 2.0.0.
 
+## [2.0.0] - 2026-11-27
+
+### Breaking changes
+
+- The package needs Swift 6.2 or later, which is Xcode 26 or later. Up to 1.2.0 it needed
+  Swift 6.0, which is Xcode 16.
+- The library needs watchOS 10.0 or later. Up to 1.2.0 it needed watchOS 7.0.
+- The manifest declares macOS 13.0. Up to 1.2.0 it declared no macOS version, so a package that
+  depends on DMAction and builds for a Mac, with `swift test` too, now has to declare macOS 13 or
+  later.
+
+To migrate, build with Xcode 26 or later, raise the watchOS deployment target to 10.0 or later,
+and add `.macOS(.v13)` or later to the `platforms` of a package manifest that also builds for a
+Mac. An app that has to support an older watchOS, or to build with an older Xcode, stays on 1.2.0.
+No declaration of the public interface changes: `runAsync` only loses its
+`@available(macOS 10.15, *)` annotation, which the macOS floor covers.
+
+### Added
+
+- Signposts. Each guarded run records its attempts, retries and fallbacks, subsystem `DMAction`,
+  category `ActionRun`, which Instruments shows on a timeline. They hold numbers and constant names
+  only. The system records them whether or not a tool is attached, so each run costs a little.
+- A dependency on [DMCore](https://github.com/nikolay-dementiev/DMCore) 1.0.0 or later, the runtime
+  core of the family, through which the signposts are recorded. Swift Package Manager resolves it
+  with DMAction.
+
+### Removed
+
+- The podspec. Version 1.1.0 stays the last release on the CocoaPods trunk, and later releases come
+  through Swift Package Manager only.
+
 ## [1.2.0] - 2026-10-28
 
 ### Added

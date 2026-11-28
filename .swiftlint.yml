@@ -66,12 +66,13 @@ custom_rules:
     # checkout inside a folder that is itself named Sources/DMAction would apply it to everything.
     included: ".*/Sources/DMAction/.*\\.swift"
     # Any attribute, access level and import kind; a second import after a semicolon; a submodule
-    # of Foundation or os is allowed. Comments and strings never match. Only spaces and tabs may
-    # come before the import, so that a blank line is not swallowed and the diagnostic lands on
-    # the line of the import. An import that follows a block comment on the same line is not seen.
-    regex: '(?:^|;)[ \t]*(@\w+(\([^)]*\))?\s+)*((public|package|internal|fileprivate|private)\s+)?import\s+(?:(?:struct|class|enum|protocol|typealias|func|var|let)\s+)?+(?!(?:Foundation|os)\b)\w+'
+    # of Foundation, os or DMCore is allowed. DMCoreTesting is not DMCore: its spy never links into
+    # the library. Comments and strings never match. Only spaces and tabs may come before the
+    # import, so that a blank line is not swallowed and the diagnostic lands on the line of the
+    # import. An import that follows a block comment on the same line is not seen.
+    regex: '(?:^|;)[ \t]*(@\w+(\([^)]*\))?\s+)*((public|package|internal|fileprivate|private)\s+)?import\s+(?:(?:struct|class|enum|protocol|typealias|func|var|let)\s+)?+(?!(?:Foundation|os|DMCore)\b)\w+'
     match_kinds: [keyword, identifier, attribute.builtin, attribute.id]
-    message: "The library imports Foundation and os only: no UI and no platform framework."
+    message: "The library imports Foundation, os and DMCore only: no UI and no platform framework."
     severity: error
   domain_no_facade_types:
     name: "Domain names no facade type"

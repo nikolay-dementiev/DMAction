@@ -11,6 +11,8 @@ import Foundation.NSURL
 import struct Foundation.URL
 internal import Foundation
 @_exported import Foundation
+package import DMCore
+import DMCore
 // import UIKit
 /// import UIKit
 /*

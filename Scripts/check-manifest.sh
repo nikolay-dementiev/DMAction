@@ -4,28 +4,29 @@
 # on the machine of whoever runs it.
 #
 #   Scripts/check-manifest.sh              run the checks below
-#   Scripts/check-manifest.sh --self-test  run the reader of Package.resolved of item 2 on built-in texts
+#   Scripts/check-manifest.sh --self-test  run the rules of items 1 and 2 on built-in texts
 #
-# 1. The manifest declares no dependency, uses no plugin on any target, passes no unsafe
-#    flag and does not read the environment. A dependency needs the maintainer's approval and
-#    a change of this check in the same pull request. Item 2 sees only a dependency that a
-#    target of a product uses: SwiftPM leaves one that nothing uses, that only the tests use
-#    or that only a target outside every product uses out of what a consumer resolves, so
-#    only the manifest shows it. A dependency by branch or revision is named for its
-#    requirement as well: SwiftPM refuses a package with an unstable dependency or an unsafe
-#    flag as a dependency by version. A build plugin of a dependency runs in every
-#    consumer's build, and a manifest that reads the environment describes more than one
-#    package.
-# 2. The installation manifest of README.md works. Its URL is the podspec's, its version is
+# 1. The manifest declares no dependency but DMCore, from 1.0.0 from its repository, uses no
+#    plugin on any target, passes no unsafe flag and does not read the environment. Another
+#    dependency needs the maintainer's approval and a change of this check in the same pull
+#    request. Item 2 sees only a dependency that a target of a product uses: SwiftPM leaves
+#    one that nothing uses, that only the tests use or that only a target outside every product
+#    uses out of what a consumer resolves, so only the manifest shows it. A dependency by
+#    branch or revision is named for its requirement as well: SwiftPM refuses a package with
+#    an unstable dependency or an unsafe flag as a dependency by version. A local path, such
+#    as one used while DMCore is developed next to this package, is refused too. A build
+#    plugin of a dependency runs in every consumer's build, and a manifest that reads the
+#    environment describes more than one package.
+# 2. The installation manifest of README.md works. Its URL is the package's, its version is
 #    that of the newest dated release heading of CHANGELOG.md, and no platform it declares is
 #    below the package's. With only its URL pointed at a throw-away tagged copy of the
 #    tracked manifest and sources, it resolves and builds: a consumer that depends on the
 #    checkout by path cannot show a failure of a version requirement, and only a build shows
-#    a wrong product or package name. The Package.resolved of that build pins the copy and
-#    nothing else, so a consumer of the package resolves this package only: any other pin is
+#    a wrong product or package name. The Package.resolved of that build pins the copy and at
+#    most a 1.x release of DMCore, so a consumer resolves nothing else: any other pin is
 #    named with its kind, version and location, and a file that cannot be read, that holds
-#    no pin or more than one pin of the copy, or that is not of format version 2 or 3 is a
-#    failure. The build keeps its own cache, so manifests and repositories cached on the
+#    no pin or more than one pin of the copy or of DMCore, or that is not of format version
+#    2 or 3 is a failure. The build keeps its own cache, so manifests and repositories cached on the
 #    machine of whoever runs this cannot stand in for what the build resolves.
 # 3. Fixtures/Consumer builds without a warning. It uses the released public declarations
 #    with their exact types and the shapes the downstream package relies on, so if it
@@ -34,31 +35,35 @@
 #    used to delete the Xcode DerivedData folder of the whole machine on every install.
 #    This is a text search: it catches the usual spellings of such a call, it does not
 #    prove that a script has no side effect.
-# 5. The podspec describes the same product as the manifest: the same platforms, the
-#    language mode the package is built in, and no link against a test framework.
-# 6. The uses across isolation domains that the Swift 6 compiler rejects today are still
+# 5. The uses across isolation domains that the Swift 6 compiler rejects today are still
 #    rejected, each with the error it names. Each one is a target of Fixtures/Rejected.
 #    One that starts to compile means the concurrency limits of the library have changed.
 #
-# --self-test needs no network, no build and no swift. A reader that never fails looks the same
-# as a clean tree, so it takes the python block of item 2 out of this very file, the text that the
-# check runs, and runs it on Package.resolved texts that it carries: a pin of the copy alone, an
-# extra pin, no pin, the copy twice, a format other than 2 and 3, and input that is not a
-# resolution at all. A reader that was changed to pass one of these fails the self-test.
+# --self-test needs no network, no build and no swift. A check that never fails looks the same
+# as a clean tree, so it takes the python blocks of items 1 and 2 out of this very file, the texts
+# that the check runs, and runs them on manifests and Package.resolved texts that it carries: a
+# pin of the copy alone, DMCore beside it, an extra pin, no pin, the copy twice, a format other
+# than 2 and 3, input that is not a resolution at all, and a dependency that is not DMCore from
+# 1.0.0. A block that was changed to pass one of these fails the self-test.
 #
-# Exit codes: 0 every check passed, 1 a check failed, 2 wrong usage, or python3 is missing, or the
-# python block of item 2 is not where the self-test expects it.
+# Exit codes: 0 every check passed, 1 a check failed, 2 wrong usage, or python3 is missing, or a
+# python block is not where the self-test expects it.
 
 set -euo pipefail
 
 # Swift 6.4 colours the diagnostics of `swift build` even in a log file, and the escape codes hide
-# the `: error:` that step 6 reads from the log.
+# the `: error:` that step 5 reads from the log.
 export NO_COLOR=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MODULE="DMAction"
+# The one dependency the library may have, required by version from 1.0.0.
+DMCORE_URL="https://github.com/nikolay-dementiev/DMCore.git"
+# The URL the README installs this package from.
+PACKAGE_URL="https://github.com/nikolay-dementiev/DMAction.git"
 
-# Runs the reader of Package.resolved (the block of step 2) on built-in texts, and exits.
+# Runs the dependency rule of step 1 and the reader of Package.resolved (the block of step 2) on
+# built-in texts, and exits.
 SELF_TEST_WORK=""
 self_test() {
     local script total=0 failures=0 dm found
@@ -69,29 +74,34 @@ self_test() {
     fi
     SELF_TEST_WORK="$(mktemp -d "${TMPDIR:-/tmp}/check-manifest-self-test.XXXXXX")" || exit 2
     trap 'rm -rf "$SELF_TEST_WORK"' EXIT
-    # Step 2 runs the text from its heredoc to the line PY. The self-test must take that same text:
-    # one marker, directly under the line that opens the heredoc, so that a line added above the
-    # marker or a second marker cannot make the two differ.
-    found="$(awk '/^# resolved-inventory$/ { count++; opener = prev } { prev = $0 } END { print count + 0 ":" opener }' "$script")"
-    case "$found" in
-        "1:"*"<<'PY'") ;;
-        *)
-            echo "check-manifest: self-test: the marker resolved-inventory must appear once, under the line that opens the heredoc of step 2 (found '$found')" >&2
+    # Steps 1 and 2 run the text from their heredocs to the line PY. The self-test must take those
+    # same texts: each marker once, directly under the line that opens its heredoc, so that a line
+    # added above a marker or a second marker cannot make the two differ.
+    block() {  # <marker> <file to write>
+        found="$(awk -v marker="# $1" '$0 == marker { count++; opener = prev } { prev = $0 } END { print count + 0 ":" opener }' "$script")"
+        case "$found" in
+            "1:"*"<<'PY'") ;;
+            *)
+                echo "check-manifest: self-test: the marker $1 must appear once, under the line that opens a heredoc (found '$found')" >&2
+                exit 2
+                ;;
+        esac
+        awk -v marker="# $1" '$0 == marker { found = 1 } found && /^PY$/ { exit } found' "$script" > "$2"
+        if [ ! -s "$2" ]; then
+            echo "check-manifest: self-test: the python block marked $1 is not in $script" >&2
             exit 2
-            ;;
-    esac
-    awk '/^# resolved-inventory$/ { found = 1 } found && /^PY$/ { exit } found' "$script" > "$SELF_TEST_WORK/reader.py"
-    if [ ! -s "$SELF_TEST_WORK/reader.py" ]; then
-        echo "check-manifest: self-test: the python block marked resolved-inventory is not in $script" >&2
-        exit 2
-    fi
+        fi
+    }
+    block dependency-rule "$SELF_TEST_WORK/rule.py"
+    block resolved-inventory "$SELF_TEST_WORK/reader.py"
+    block readme-installation "$SELF_TEST_WORK/installation.py"
     pin() {  # <identity> <version>
         printf '{"identity":"%s","kind":"localSourceControl","location":"/x/%s","state":{"revision":"abc","version":"%s"}}' "$1" "$1" "$2"
     }
-    expect() {  # <name> <expected status> <expected text>: the reader on Package.resolved as it is
+    judge() {  # <name> <expected status> <expected text> <python block and its arguments...>
         local got=0 output
         total=$((total + 1))
-        output="$(python3 "$SELF_TEST_WORK/reader.py" "$SELF_TEST_WORK/Package.resolved" "$MODULE" 2>&1)" || got=$?
+        output="$(python3 "${@:4}" 2>&1)" || got=$?
         if [ "$got" -eq "$2" ] && printf '%s\n' "$output" | grep -q -F -- "$3"; then
             echo "check-manifest: self-test ok   $1"
         else
@@ -99,6 +109,9 @@ self_test() {
             echo "check-manifest: self-test FAIL $1: expected status $2 and '$3', got status $got:" >&2
             printf '%s\n' "$output" | head -5 | sed 's/^/    /' >&2
         fi
+    }
+    expect() {  # <name> <expected status> <expected text>: the reader on Package.resolved as it is
+        judge "$1" "$2" "$3" "$SELF_TEST_WORK/reader.py" "$SELF_TEST_WORK/Package.resolved" "$MODULE" "$DMCORE_URL"
     }
     check() {  # <name> <expected status> <expected text> <text of Package.resolved>
         printf '%s\n' "$4" > "$SELF_TEST_WORK/Package.resolved"
@@ -117,13 +130,61 @@ self_test() {
     check "the copy twice" 1 "pinned 2 times" "{\"version\":3,\"pins\":[$dm,$(pin dmaction 1.2.0)]}"
     check "a pin that is not an object" 1 "not of format version 2 or 3" "{\"version\":3,\"pins\":[$dm,\"text\"]}"
     check "a null state" 1 "second (registry, None, None)" "{\"version\":3,\"pins\":[$dm,{\"identity\":\"second\",\"kind\":\"registry\",\"state\":null}]}"
+    core() {  # <location> <state>
+        printf '{"identity":"dmcore","kind":"remoteSourceControl","location":"%s","state":%s}' "$1" "$2"
+    }
+    released() {  # <version>
+        printf '{"revision":"abc","version":"%s"}' "$1"
+    }
+    check "DMCore beside the copy" 0 "" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" "$(released 1.0.0)")]}"
+    check "a later DMCore 1.x" 0 "" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" "$(released 1.4.2)")]}"
+    check "DMCore 2.0.0" 1 "dmcore (remoteSourceControl, 2.0.0, $DMCORE_URL)" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" "$(released 2.0.0)")]}"
+    check "DMCore by branch" 1 "dmcore (remoteSourceControl, abc, $DMCORE_URL)" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" '{"branch":"main","revision":"abc"}')]}"
+    check "DMCore from another location" 1 "dmcore (remoteSourceControl, 1.0.0, https://example.invalid/DMCore.git)" "{\"version\":3,\"pins\":[$dm,$(core https://example.invalid/DMCore.git "$(released 1.0.0)")]}"
+    check "DMCore twice" 1 "dmcore is pinned 2 times" "{\"version\":3,\"pins\":[$dm,$(core "$DMCORE_URL" "$(released 1.0.0)"),$(core "$DMCORE_URL" "$(released 1.1.0)")]}"
     rm -f "$SELF_TEST_WORK/Package.resolved"
     expect "a file that is not there" 1 "cannot be read"
+
+    remote() {  # <identity> <url> <requirement>
+        printf '{"sourceControl":[{"identity":"%s","location":{"remote":[{"urlString":"%s"}]},"requirement":%s}]}' "$1" "$2" "$3"
+    }
+    rule() {  # <name> <expected status> <expected text> <dependencies> [<targets>] [<text of Package.swift>]
+        printf '{"dependencies":[%s],"targets":[%s]}\n' "$4" "${5-}" > "$SELF_TEST_WORK/manifest.json"
+        printf '%s\n' "${6-}" > "$SELF_TEST_WORK/Package.swift"
+        judge "$1" "$2" "$3" "$SELF_TEST_WORK/rule.py" "$SELF_TEST_WORK/manifest.json" "$SELF_TEST_WORK/Package.swift" "$DMCORE_URL"
+    }
+    local from_one='{"range":[{"lowerBound":"1.0.0","upperBound":"2.0.0"}]}' wanted core_dependency
+    wanted="dependency 'dmcore' is not the allowed one"
+    core_dependency="$(remote dmcore "$DMCORE_URL" "$from_one")"
+    rule "no dependency" 0 "" ""
+    rule "DMCore from 1.0.0 from its repository" 0 "" "$core_dependency"
+    rule "another dependency beside DMCore" 1 "dependency 'other' is declared" "$core_dependency,$(remote other https://example.invalid/Other.git "$from_one")"
+    rule "DMCore by branch" 1 "dependency 'dmcore' is required by branch" "$(remote dmcore "$DMCORE_URL" '{"branch":["main"]}')"
+    rule "DMCore from a local path" 1 "$wanted" '{"fileSystem":[{"identity":"dmcore","path":"/x/DMCore"}]}'
+    rule "DMCore from another repository" 1 "$wanted" "$(remote dmcore https://example.invalid/DMCore.git "$from_one")"
+    rule "DMCore up to the next minor" 1 "$wanted" "$(remote dmcore "$DMCORE_URL" '{"range":[{"lowerBound":"1.0.0","upperBound":"1.1.0"}]}')"
+    rule "DMCore at an exact version" 1 "$wanted" "$(remote dmcore "$DMCORE_URL" '{"exact":["1.0.0"]}')"
+    rule "a plugin on a target" 1 "target 'A' uses a plugin" "" '{"name":"A","pluginUsages":[{"plugin":["P"]}]}'
+    rule "a manifest that reads the environment" 1 "Package.swift reads the environment" "" "" 'let flag = ProcessInfo.processInfo'
+
+    mkdir -p "$SELF_TEST_WORK/probe/consumer"
+    printf '## [Unreleased]\n\n## [2.0.0] - 2026-11-27\n\n## [1.1.0] - 2026-10-03\n' > "$SELF_TEST_WORK/CHANGELOG.md"
+    printf '{"platforms":[{"platformName":"ios","version":"17.0"},{"platformName":"watchos","version":"10.0"}]}\n' > "$SELF_TEST_WORK/floors.json"
+    installs() {  # <name> <expected status> <expected text> <url> <version> <platforms>
+        # shellcheck disable=SC2016  # the backticks are the fence of a Markdown code block
+        printf '```swift\nlet package = Package(\n    platforms: [%s],\n    dependencies: [.package(url: "%s", from: "%s")]\n)\n```\n' "$6" "$4" "$5" > "$SELF_TEST_WORK/README.md"
+        judge "$1" "$2" "$3" "$SELF_TEST_WORK/installation.py" "$SELF_TEST_WORK/README.md" "$SELF_TEST_WORK/CHANGELOG.md" "$SELF_TEST_WORK/probe" "$SELF_TEST_WORK/floors.json" "$PACKAGE_URL"
+    }
+    installs "the package URL at the newest release" 0 "2.0.0 DMAction" "$PACKAGE_URL" 2.0.0 ".iOS(.v17), .watchOS(.v10)"
+    installs "another URL" 1 "README.md installs from https://example.invalid/DMAction.git" https://example.invalid/DMAction.git 2.0.0 ".iOS(.v17)"
+    installs "a version behind the newest release" 1 "the newest release heading of CHANGELOG.md is 2.0.0" "$PACKAGE_URL" 1.1.0 ".iOS(.v17)"
+    installs "a platform below the package's floor" 1 "the package needs watchOS 10.0" "$PACKAGE_URL" 2.0.0 ".watchOS(.v7)"
+    installs "a platform the package does not declare" 1 "a platform the package does not declare" "$PACKAGE_URL" 2.0.0 ".tvOS(.v17)"
     if [ "$failures" -gt 0 ]; then
         echo "check-manifest: self-test: $failures of $total checks failed" >&2
         exit 1
     fi
-    echo "check-manifest: self-test: $total checks of the reader of Package.resolved, all ok."
+    echo "check-manifest: self-test: $total checks of the dependency rule, of the README's installation manifest and of the reader of Package.resolved, all ok."
     exit 0
 }
 
@@ -137,7 +198,6 @@ fi
 
 WORK="$ROOT/.build/check-manifest"
 FAILED=0
-SKIPPED=""
 
 mkdir -p "$WORK"
 cd "$ROOT"
@@ -168,28 +228,41 @@ trap cleanup EXIT
 
 # 1. Static check of the manifest.
 swift package --package-path "$ROOT" dump-package > "$WORK/manifest.json"
-if ! python3 - "$WORK/manifest.json" "$ROOT/Package.swift" <<'PY'
+if ! python3 - "$WORK/manifest.json" "$ROOT/Package.swift" "$DMCORE_URL" <<'PY'
+# dependency-rule
 import json
 import re
 import sys
 
 manifest = json.load(open(sys.argv[1]))
 source = open(sys.argv[2]).read()
+dmcore_url = sys.argv[3]
+# `from: "1.0.0"`, as `swift package dump-package` writes it.
+from_one = {"range": [{"lowerBound": "1.0.0", "upperBound": "2.0.0"}]}
 problems = []
 for dependency in manifest["dependencies"]:
-    for entries in dependency.values():
+    for kind, entries in dependency.items():
         for entry in entries:
-            problems.append(
-                f"dependency '{entry.get('identity')}' is declared: a dependency needs the maintainer's "
-                "approval and a change of this check in the same pull request"
-            )
+            identity = entry.get("identity")
             requirement = entry.get("requirement", {})
+            urls = []
+            if kind == "sourceControl":
+                urls = [remote.get("urlString") for remote in entry.get("location", {}).get("remote", [])]
+            if identity == "dmcore" and urls == [dmcore_url] and requirement == from_one:
+                continue
+            if identity == "dmcore":
+                problems.append(
+                    f"dependency 'dmcore' is not the allowed one: it must be "
+                    f".package(url: \"{dmcore_url}\", from: \"1.0.0\")"
+                )
+            else:
+                problems.append(
+                    f"dependency '{identity}' is declared: only DMCore is allowed; another one needs the "
+                    "maintainer's approval and a change of this check in the same pull request"
+                )
             for unstable in ("branch", "revision"):
                 if unstable in requirement:
-                    problems.append(
-                        f"dependency '{entry.get('identity')}' is required by {unstable} "
-                        f"{requirement[unstable]}"
-                    )
+                    problems.append(f"dependency '{identity}' is required by {unstable} {requirement[unstable]}")
 for target in manifest.get("targets", []):
     for usage in target.get("pluginUsages") or []:
         problems.append(f"target '{target['name']}' uses a plugin: {json.dumps(usage)}")
@@ -205,7 +278,7 @@ PY
 then
     FAILED=1
 else
-    echo "check-manifest: no dependency, no plugin, no unsafe flag and no environment switch in Package.swift."
+    echo "check-manifest: no dependency but DMCore, no plugin, no unsafe flag and no environment switch in Package.swift."
 fi
 
 # 2. The installation manifest of README.md, against a throw-away tagged copy of the tracked
@@ -223,12 +296,13 @@ probe_git() {
 }
 # Writes the consumer's manifest and prints the version the README asks for and the name of
 # the copy.
-if ! ANSWER="$(python3 - "$ROOT/README.md" "$ROOT/$MODULE.podspec" "$ROOT/CHANGELOG.md" "$PROBE" "$WORK/manifest.json" <<'PY'
+if ! ANSWER="$(python3 - "$ROOT/README.md" "$ROOT/CHANGELOG.md" "$PROBE" "$WORK/manifest.json" "$PACKAGE_URL" <<'PY'
+# readme-installation
 import json
 import re
 import sys
 
-readme, podspec, changelog, probe, package_manifest = sys.argv[1:6]
+readme, changelog, probe, package_manifest, package_url = sys.argv[1:6]
 blocks = re.findall(r"^```swift\n(.*?)^```$", open(readme, encoding="utf-8").read(), re.S | re.M)
 manifests = [block for block in blocks if "Package(" in block]
 if len(manifests) != 1:
@@ -237,16 +311,13 @@ requirements = re.findall(r'\.package\(url: "([^"]+)", from: "([^"]+)"\)', manif
 if len(requirements) != 1:
     sys.exit("check-manifest: the manifest of README.md does not ask for the package with url: and from:")
 url, version = requirements[0]
-spec = open(podspec, encoding="utf-8").read()
-spec_url = re.search(r":git\s*=>\s*'([^']+)'", spec)
-# The pod is frozen, so the podspec no longer follows the releases. The version is that of the
-# newest dated release heading, '## [x.y.z] - YYYY-MM-DD'. A heading without a date, such as
-# Unreleased, is passed over: it is a normal state between two releases.
+# The version is that of the newest dated release heading, '## [x.y.z] - YYYY-MM-DD'. A heading
+# without a date, such as Unreleased, is passed over: it is a normal state between two releases.
 release = re.search(r"^## \[([0-9]+\.[0-9]+\.[0-9]+)\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$",
                     open(changelog, encoding="utf-8").read(), re.M)
 problems = []
-if not spec_url or url != spec_url.group(1):
-    problems.append(f"README.md installs from {url}, the podspec's source is {spec_url and spec_url.group(1)}")
+if url != package_url:
+    problems.append(f"README.md installs from {url}, the package's URL is {package_url}")
 if not release:
     problems.append("CHANGELOG.md has no release heading of the form '## [version] - date'")
 elif version != release.group(1):
@@ -315,12 +386,12 @@ else
         # the machine of whoever runs this cannot stand in for what the build resolves.
         if swift build --package-path "$PROBE/consumer" --cache-path "$PROBE/cache" > "$WORK/version-build.log" 2>&1; then
             # What the build resolved, as SwiftPM pinned it: the tagged copy and nothing else.
-            if EXTRA="$(python3 - "$PROBE/consumer/Package.resolved" "$COPY" <<'PY'
+            if EXTRA="$(python3 - "$PROBE/consumer/Package.resolved" "$COPY" "$DMCORE_URL" <<'PY'
 # resolved-inventory
 import json
 import sys
 
-path, copy = sys.argv[1:3]
+path, copy, dmcore_url = sys.argv[1:4]
 expected = copy.lower()
 try:
     with open(path, encoding="utf-8") as handle:
@@ -339,18 +410,24 @@ for pin in resolved["pins"]:
         state = pin.get("state")
         if not isinstance(state, dict):
             state = {}
+        released = str(state.get("version") or "").startswith("1.")
+        allowed = pin.get("identity") == "dmcore" and pin.get("kind") == "remoteSourceControl"
+        if allowed and pin.get("location") == dmcore_url and released:
+            continue
         problems.append(f"  {pin.get('identity')} ({pin.get('kind')}, {state.get('version') or state.get('revision')}, {pin.get('location')})")
 if identities.count(expected) == 0:
     problems.append(f"  {expected}, the tagged copy, is not among the resolved packages")
 elif identities.count(expected) > 1:
     problems.append(f"  {expected}, the tagged copy, is pinned {identities.count(expected)} times")
+if identities.count("dmcore") > 1:
+    problems.append(f"  dmcore is pinned {identities.count('dmcore')} times")
 print("\n".join(problems))
 sys.exit(1 if problems else 0)
 PY
 )"; then
-                echo "check-manifest: the manifest of README.md asks for the podspec's URL and the changelog's newest version $VERSION, resolves and builds by version, and the consumer resolves this package only."
+                echo "check-manifest: the manifest of README.md asks for the package's URL and the changelog's newest version $VERSION, resolves and builds by version, and the consumer resolves this package and DMCore only."
             else
-                echo "check-manifest: the consumer of README.md's manifest does not resolve this package only:" >&2
+                echo "check-manifest: the consumer of README.md's manifest resolves more than this package and DMCore:" >&2
                 printf '%s\n' "$EXTRA" >&2
                 FAILED=1
             fi
@@ -370,8 +447,8 @@ fi
 # 3. The consumer fixture. xcodebuild finds a package only in the current directory.
 #    No flag skips the plugin validation: a consumer must not need one. A warning in the
 #    fixture's own sources fails the check: a deprecation of a released symbol reaches a
-#    consumer as a warning. Warnings cannot be made errors on the command line here,
-#    because Xcode builds a package dependency with its warnings suppressed.
+#    consumer as a warning. The check reads it from the build log, for the sources of the
+#    fixture alone, and the build sets no warning flag, as a consumer's build need not.
 DERIVED="$(mktemp -d "$WORK/DerivedData.XXXXXX")"
 cd "$ROOT/Fixtures/Consumer"
 if ! xcodebuild build \
@@ -434,53 +511,7 @@ else
     echo "check-manifest: no recursive delete in the example's tooling."
 fi
 
-# 5. The podspec. `pod ipc spec` prints it as JSON.
-#    It compares the manifest with the frozen 1.1.0 pod.
-if ! command -v pod > /dev/null; then
-    if [ -n "${CI:-}" ]; then
-        echo "check-manifest: CocoaPods is not installed on this runner; the podspec cannot be checked." >&2
-        FAILED=1
-    else
-        SKIPPED="the podspec (CocoaPods is not installed)"
-    fi
-elif ! pod ipc spec "$ROOT/$MODULE.podspec" > "$WORK/podspec.json" 2> "$WORK/podspec.log"; then
-    echo "check-manifest: the podspec cannot be read. See ${WORK#"$ROOT"/}/podspec.log" >&2
-    FAILED=1
-elif ! python3 - "$WORK/podspec.json" "$WORK/manifest.json" <<'PY'
-import json
-import sys
-
-spec = json.load(open(sys.argv[1]))
-manifest = json.load(open(sys.argv[2]))
-problems = []
-
-def listed(value):
-    return [value] if isinstance(value, str) else list(value or [])
-
-for key in ("frameworks", "weak_frameworks"):
-    if "XCTest" in listed(spec.get(key)):
-        problems.append(f"the podspec links XCTest ({key}) into a production pod")
-modes = listed(spec.get("swift_versions"))
-unknown = [mode for mode in modes if mode not in ("5.0", "6.0")]
-if unknown:
-    problems.append(f"swift_versions lists {unknown}: only language modes that exist belong there")
-if "6.0" not in modes:
-    problems.append("swift_versions does not list 6.0, the language mode the package is built in")
-package_platforms = {p["platformName"]: p["version"] for p in manifest.get("platforms", [])}
-pod_platforms = {name: version for name, version in (spec.get("platforms") or {}).items()}
-if package_platforms != pod_platforms:
-    problems.append(f"platforms differ: Package.swift {package_platforms}, podspec {pod_platforms}")
-for problem in problems:
-    print(f"check-manifest: {problem}", file=sys.stderr)
-sys.exit(1 if problems else 0)
-PY
-then
-    FAILED=1
-else
-    echo "check-manifest: the podspec matches the manifest and links no test framework."
-fi
-
-# 6. The rejected shapes. Each names the error it expects in an `// expected-error:` line.
+# 5. The rejected shapes. Each names the error it expects in an `// expected-error:` line.
 #    Every error the compiler reports for it must be that one: a typo or a missing module
 #    also stops a build, and proves nothing about isolation.
 #    The shapes build in a new folder on every run: a build folder kept between runs can
@@ -515,9 +546,4 @@ for shape in "$ROOT"/Fixtures/Rejected/Sources/*/; do
     fi
 done
 echo "check-manifest: $STILL_REJECTED cross-isolation shapes are rejected by the compiler, each with the error it names."
-
-# Last, so that a skipped step is not lost in the middle of the output.
-if [ -n "$SKIPPED" ]; then
-    echo "check-manifest: not checked on this machine: $SKIPPED."
-fi
 exit "$FAILED"

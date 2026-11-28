@@ -8,9 +8,9 @@
 #   Scripts/ci-changes.sh --self-test                 proves the decision on fixtures and the job table on ci.yml
 #
 # Two groups of jobs, each answered with run or skip:
-#   light  lint, docs, snippets, api, consumer, podspec: macOS without a simulator, short. They read
+#   light  lint, docs, snippets, api, consumer: macOS without a simulator, short. They read
 #          the documents (DocC, the snippet check, the manifest check, the changelog, the license).
-#   heavy  test, watchos, example, floor, thread-sanitizer: they build and test the code.
+#   heavy  test, watchos, example, thread-sanitizer: they build and test the code.
 #
 # A change that only touches documents (*.md outside the code directories, Documentation, LICENSE)
 # skips heavy. A change that only touches an inert file (.coderabbit.yaml, which no job reads) skips
@@ -26,8 +26,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly LIGHT_JOBS="lint docs snippets api consumer podspec"
-readonly HEAVY_JOBS="test watchos example floor thread-sanitizer"
+readonly LIGHT_JOBS="lint docs snippets api consumer"
+readonly HEAVY_JOBS="test watchos example thread-sanitizer"
 
 # inert, document or code. Code is the default, and the code directories win over a *.md in them.
 classify() {
@@ -180,7 +180,7 @@ expect_diff() {
 
 self_test() {
     local all="light=run heavy=run" docs="light=run heavy=skip" none="light=skip heavy=skip" path event
-    for path in Sources/DMAction/X.swift Tests/DMActionTests/X.swift Package.swift Examples/DMActionExample/X.swift Scripts/lint.sh Tools/Package.swift Fixtures/Consumer/X.swift DMAction.podspec .swiftlint.yml; do
+    for path in Sources/DMAction/X.swift Tests/DMActionTests/X.swift Package.swift Examples/DMActionExample/X.swift Scripts/lint.sh Tools/Package.swift Fixtures/Consumer/X.swift .swiftlint.yml; do
         expect "a change at $path runs every job" pull_request "$path" "$all"
     done
     expect "a change under .github runs every job" pull_request ".github/workflows/ci.yml" "$all"
@@ -200,7 +200,7 @@ self_test() {
         expect "the event $event runs every job whatever changed" "$event" "README.md" "$all"
         expect "the event $event runs every job for the inert file" "$event" ".coderabbit.yaml" "$all"
     done
-    for path in Sources/DMAction/X.swift Tests/DMActionTests/X.swift Package.swift Examples/DMActionExample/X.swift Scripts/lint.sh Tools/Package.swift Fixtures/Consumer/X.swift DMAction.podspec .swiftlint.yml .github/workflows/ci.yml new/dir/x.bin; do
+    for path in Sources/DMAction/X.swift Tests/DMActionTests/X.swift Package.swift Examples/DMActionExample/X.swift Scripts/lint.sh Tools/Package.swift Fixtures/Consumer/X.swift .swiftlint.yml .github/workflows/ci.yml new/dir/x.bin; do
         expect "a push to main with a change at $path runs every job" push "$path" "$all"
     done
     expect "a push to main with a README alone skips the heavy jobs" push "README.md" "$docs"

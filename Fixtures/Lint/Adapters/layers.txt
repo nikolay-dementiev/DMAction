@@ -2,6 +2,7 @@
 // rules do not, so os and the names of the facade are fine here.
 import Foundation
 import os
+package import DMCore
 import UIKit // expect: domain_imports
 let button = DMButtonAction()
 func terminate() {

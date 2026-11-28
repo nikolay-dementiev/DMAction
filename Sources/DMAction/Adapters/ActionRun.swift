@@ -5,6 +5,7 @@
 //
 
 import Foundation
+internal import DMCore
 #if canImport(os)
 import os
 #endif
@@ -33,25 +34,34 @@ final class ActionRun {
         var callingThread: Thread?
         /// The first result, when it arrived on the calling thread before the call returned.
         var deposit: ProducerResult?
+        /// The signpost interval of the attempt. The completion that takes the cursor ends it.
+        let interval: TraceInterval
 
-        init(cursor: Cursor, callingThread: Thread) {
+        init(cursor: Cursor, callingThread: Thread, interval: TraceInterval) {
             self.cursor = cursor
             self.callingThread = callingThread
+            self.interval = interval
         }
     }
 
     /// The label of a success when no attempt failed before it.
     private let base: UInt
+    /// Where the run reports what it does, for a performance tool.
+    private let tracing: any Tracing
+    /// The signpost interval of the run, from its start to its delivery.
+    private let interval: TraceInterval
     /// The consumer's completion, until the run delivers to it. After that, a producer that
     /// keeps its own completion keeps nothing of the consumer alive.
     private var completion: ActionPlan.Completion?
-    /// Guards `completion` and the state of every attempt of this run. No producer and no
-    /// completion is ever called while it is held.
+    /// Guards `completion` and the state of every attempt of this run. No producer, no
+    /// completion and no tracing call is ever made while it is held.
     private let lock = NSLock()
 
-    init(base: UInt, completion: @escaping ActionPlan.Completion) {
+    init(base: UInt, tracing: any Tracing, completion: @escaping ActionPlan.Completion) {
         self.base = base
+        self.tracing = tracing
         self.completion = completion
+        interval = tracing.beginInterval("run", Self.detail(base))
     }
 
     func start(_ plan: ActionPlan) {
@@ -70,11 +80,16 @@ final class ActionRun {
                 next = call(cursor).map { .finish(cursor, $0) }
             case let .finish(cursor, result):
                 if case .failure = result, let following = cursor.next() {
-                    next = .start(following)
+                    let move: StaticString = switch following.move {
+                    case .fallback: "fallback"
+                    case .retry: "retry"
+                    }
+                    tracing.emitEvent(move, Self.detail(label(of: following.cursor)))
+                    next = .start(following.cursor)
                 } else {
                     // A label a producer put on its success is replaced: the run counts its own
-                    // attempts. `base` and `cursor` never change, so no lock is needed here.
-                    deliver(DMActionResultValue.labelling(result, attempt: base.saturatingAdd(cursor.failed)))
+                    // attempts.
+                    deliver(DMActionResultValue.labelling(result, attempt: label(of: cursor)))
                 }
             }
         }
@@ -87,7 +102,11 @@ final class ActionRun {
     /// they are released after the delivery once every producer call of the run has returned,
     /// not while a producer is still inside its call.
     private func call(_ cursor: Cursor) -> ProducerResult? {
-        let attempt = Attempt(cursor: cursor, callingThread: Thread.current)
+        let attempt = Attempt(
+            cursor: cursor,
+            callingThread: Thread.current,
+            interval: tracing.beginInterval("attempt", Self.detail(label(of: cursor)))
+        )
         // The run is held strongly: a producer may keep its completion and call it after
         // everything else has let go of the run.
         cursor.produce { result in
@@ -105,6 +124,7 @@ final class ActionRun {
         lock.lock()
         guard let cursor = attempt.cursor else {
             lock.unlock()
+            tracing.emitEvent("ignoredCompletion")
             Self.reportIgnoredCompletion()
             return
         }
@@ -113,13 +133,15 @@ final class ActionRun {
         // thread, which goes on when the call returns. A completion on any other thread goes
         // on at once: the producer may be waiting, inside its call, for an effect of this very
         // completion, and making the completion wait for the call would deadlock both.
-        if attempt.callingThread === Thread.current {
+        let isOnCallingThread = attempt.callingThread === Thread.current
+        if isOnCallingThread {
             attempt.deposit = result
-            lock.unlock()
-            return
         }
         lock.unlock()
-        drive(.finish(cursor, result))
+        tracing.endInterval(attempt.interval)
+        if !isOnCallingThread {
+            drive(.finish(cursor, result))
+        }
     }
 
     private func deliver(_ result: ProducerResult) {
@@ -127,7 +149,23 @@ final class ActionRun {
         let completion = self.completion
         self.completion = nil
         lock.unlock()
-        completion?(result)
+        guard let completion else { return }
+        // The interval ends before the consumer runs: what the consumer does is not the run's.
+        let outcome: StaticString = if case .success = result { "success" } else { "failure" }
+        tracing.endInterval(interval, .label(outcome))
+        completion(result)
+    }
+
+    /// The number of the attempt at `cursor`, which is the label of its success. `base` and
+    /// `cursor` never change, so no lock is needed here.
+    private func label(of cursor: Cursor) -> UInt {
+        base.saturatingAdd(cursor.failed)
+    }
+
+    /// A count as a signpost carries it. One above the range of the signpost number stays at the
+    /// largest value.
+    private static func detail(_ count: UInt) -> TraceDetail {
+        .number(Int64(clamping: count))
     }
 
     /// There is no failure to hand to anyone: the extra completion has nowhere to go. One line

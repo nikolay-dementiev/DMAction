@@ -5,7 +5,7 @@ details are in [ENGINEERING.md](ENGINEERING.md) and [CONTRIBUTING.md](CONTRIBUTI
 
 - The public interface is a contract. Classify every change as none, additive or breaking, as
   ENGINEERING.md defines them. A change of observable behaviour is breaking.
-- Add no dependency without the maintainer's approval.
+- Add no dependency without the maintainer's approval. DMCore is the one that is approved.
 - Test through the public API, with no `@testable import`. Every new test must be able to fail:
   name the change to the code that it fails on.
 - Keep the build free of warnings, and run `Scripts/lint.sh` and `Scripts/check-api.sh` before a

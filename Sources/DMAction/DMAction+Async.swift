@@ -4,7 +4,8 @@
 //  Created by Mykola Dementiev
 //
 
-@available(macOS 10.15, *)
+package import DMCore
+
 public extension DMAction {
     /// Runs the action as a guarded run, waits for its result and returns it mapped.
     ///
@@ -55,6 +56,17 @@ public extension DMAction {
         isolation: isolated (any Actor)? = #isolation,
         mapSuccess: @escaping @Sendable (any Copyable) throws -> Output
     ) async throws -> DMActionOutcome<Output> {
+        try await runAsync(isolation: isolation, tracing: actionRunTracing, mapSuccess: mapSuccess)
+    }
+}
+
+extension DMAction {
+    /// ``runAsync(isolation:mapSuccess:)`` that reports the run to `tracing`.
+    package func runAsync<Output: Sendable>(
+        isolation: isolated (any Actor)? = #isolation,
+        tracing: any Tracing,
+        mapSuccess: @escaping @Sendable (any Copyable) throws -> Output
+    ) async throws -> DMActionOutcome<Output> {
         try Task.checkCancellation()
         // The continuation of the stream owns the terminal state: the first `yield` followed by
         // `finish()` closes it, a later one is dropped, and a cancelled task ends the iteration.
@@ -68,7 +80,7 @@ public extension DMAction {
                     sink.finish(throwing: error)
                 }
             }
-            self(completion: completion)
+            callAsFunction(tracing: tracing, completion: completion)
         }
         for try await outcome in stream {
             return outcome

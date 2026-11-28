@@ -3,8 +3,8 @@
 Compose completion-based actions with retries and fallbacks, and get one result back.
 
 [![CI](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml/badge.svg)](https://github.com/nikolay-dementiev/DMAction/actions/workflows/ci.yml)
-[![Swift 6.0+](https://img.shields.io/badge/Swift-6.0%2B-orange?style=flat-square)](#requirements)
-[![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_7%2B-yellowgreen?style=flat-square)](#requirements)
+[![Swift 6.2+](https://img.shields.io/badge/Swift-6.2%2B-orange?style=flat-square)](#requirements)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS_17%2B_%7C_watchOS_10%2B_%7C_macOS_13%2B-yellowgreen?style=flat-square)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fnikolay-dementiev%2FDMAction?ref=badge_shield)
 [![Commit activity](https://img.shields.io/github/commit-activity/y/nikolay-dementiev/DMAction)](https://github.com/nikolay-dementiev/DMAction/graphs/commit-activity)
@@ -50,20 +50,19 @@ It is not a fit when:
 
 ## Requirements
 
-- Swift 6.0 or later, which is Xcode 16 or later, for Swift Package Manager and for CocoaPods.
-  The podspec's `swift_versions`, 5.0 and 6.0, are the language modes the pod builds in, not
-  compiler versions.
-- iOS 17 or later, or watchOS 7 or later.
+- Swift 6.2 or later, which is Xcode 26 or later.
+- iOS 17 or later, watchOS 10 or later, or macOS 13 or later.
 
 What each platform is verified with:
 
 | Platform | How |
 |---|---|
-| iOS 26.5 (Xcode 26.6), iOS 18.5 (Xcode 16.4) | the tests run on simulators in CI, for the library and the example app |
+| iOS 26.5 (Xcode 26.6) | the tests run on a simulator in CI, for the library and the example app |
 | iOS 17.5 | the library's tests run on a simulator before a release |
-| macOS, the host | the tests run in CI with Swift 6.0.3, and again under the Thread Sanitizer. macOS is not a declared platform |
-| watchOS 26.5 (Xcode 26.6), watchOS 11.5 (Xcode 16.4) | the library's tests run on simulators in CI, and CI builds the library for the watchOS device SDK |
-| watchOS 7 | declared, not run: the oldest watchOS runtime a test has run on is 11.5 |
+| macOS, the host | the tests run in CI on macOS 26 under the Thread Sanitizer |
+| macOS 13 | declared, not run: the oldest macOS the tests run on is 26 |
+| watchOS 26.5 (Xcode 26.6) | the library's tests run on a simulator in CI, and CI builds the library for the watchOS device SDK |
+| watchOS 10 | declared, not run: the oldest watchOS runtime the tests run on is 26.5 |
 
 ## Installation
 
@@ -72,14 +71,14 @@ What each platform is verified with:
 Add the package and the product to your `Package.swift`:
 
 ```swift
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
     name: "MyApp",
-    platforms: [.iOS(.v17)],
+    platforms: [.iOS(.v17), .macOS(.v13)],
     dependencies: [
-        .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "1.2.0"),
+        .package(url: "https://github.com/nikolay-dementiev/DMAction.git", from: "2.0.0"),
     ],
     targets: [
         .target(
@@ -100,7 +99,7 @@ pod 'DMAction', '1.1.0'
 ```
 
 Version 1.1.0 is the last release published to the CocoaPods trunk. Later releases come through
-Swift Package Manager only. The podspec stays in the repository, and CI lints it.
+Swift Package Manager only.
 
 ## Quick start
 
@@ -298,6 +297,9 @@ interface.
   also after `retry(0)`, which returns the conformer itself: nothing guards them.
 - **No answer, no result.** A producer that never calls its completion stalls its run. Nothing
   times out.
+- **Signposts.** Each of those runs records its attempts, retries and fallbacks as signposts,
+  subsystem `DMAction`, category `ActionRun`, which Instruments shows on a timeline. They hold
+  numbers and constant names only, never a value of your app.
 - **Order.** The first producer runs on your thread before the call returns. When a producer calls
   its completion on that thread before it returns, the next attempt starts after the producer has
   returned, and if every producer works that way, the result arrives on your thread before the call
@@ -331,9 +333,9 @@ with the accessibility audit.
 
 The library's tests run on iOS simulators and on the host, with the Thread Sanitizer, and their
 line coverage is a gate in CI. CI also checks that the public interface matches its baseline, that
-a consumer of the package builds, that the documentation builds without a warning, that the
-podspec lints, and that every Swift example, in this README, the documentation catalog and the
-doc comments, compiles as written. `CONTRIBUTING.md` lists the commands.
+a consumer of the package builds, that the documentation builds without a warning, and that every
+Swift example, in this README, the documentation catalog and the doc comments, compiles as
+written. `CONTRIBUTING.md` lists the commands.
 
 ## Versions and migration
 
@@ -352,8 +354,10 @@ change with a table. The ones most likely to matter:
 
 ## The family
 
-DMAction is one of three packages that share their conventions:
+DMAction is one of a family of packages that share their conventions:
 
+- [DMCore](https://github.com/nikolay-dementiev/DMCore): the runtime core of the family. DMAction
+  depends on it to record its signposts.
 - [DMVariableBlurView](https://github.com/nikolay-dementiev/DMVariableBlurView): variable blur
   effects for SwiftUI.
 - [DMUnLoader](https://github.com/nikolay-dementiev/DMUnLoader): loading, error and success

@@ -138,7 +138,7 @@ final class StackSafeExecutionTests: XCTestCase {
     /// pins 1 000 levels, about half of the smallest limit measured. Measured by raising the
     /// nesting until the process stopped with SIGBUS, with Swift 6.3.3 on macOS 26.5, arm64:
     /// 1 800 levels passed and 2 000 failed in a debug build, 2 000 passed and 4 000 failed in a
-    /// release build. CI also runs this test with Swift 6.0 and 6.1.
+    /// release build.
     func test_retry_appliedAThousandTimesToACompositeOnASmallStack_runsAndIsDestroyed() {
         final class Probe {}
         let (spies, consumer) = makeSUT(script: [.success("value")])
